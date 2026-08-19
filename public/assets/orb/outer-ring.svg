@@ -1,0 +1,20 @@
+<svg preserveAspectRatio="none" overflow="visible" style="display: block;" width="90" height="90" viewBox="0 0 90 90" fill="none" xmlns="http://www.w3.org/2000/svg">
+<g id="Group 1991428487">
+<circle id="Ellipse 7077" opacity="0.2" cx="45" cy="45" r="44.5" transform="rotate(90 45 45)" stroke="url(#paint0_linear_0_13)"/>
+<circle id="Ellipse 7078" opacity="0.2" cx="45" cy="45" r="37" transform="rotate(-180 45 45)" stroke="url(#paint1_linear_0_13)"/>
+</g>
+<defs>
+<linearGradient id="paint0_linear_0_13" x1="45" y1="1.84768e-06" x2="45" y2="90" gradientUnits="userSpaceOnUse">
+<stop stop-color="#333333"/>
+<stop offset="0.3" stop-color="#F9FAFB"/>
+<stop offset="0.7" stop-color="#F9FAFB"/>
+<stop offset="1" stop-color="#333333"/>
+</linearGradient>
+<linearGradient id="paint1_linear_0_13" x1="45" y1="7.5" x2="45" y2="82.5" gradientUnits="userSpaceOnUse">
+<stop stop-color="#333333"/>
+<stop offset="0.3" stop-color="#F9FAFB"/>
+<stop offset="0.7" stop-color="#F9FAFB"/>
+<stop offset="1" stop-color="#333333"/>
+</linearGradient>
+</defs>
+</svg>
