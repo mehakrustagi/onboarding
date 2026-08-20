@@ -6,6 +6,7 @@ import Screen1 from "./Screen1";
 import Screen2 from "./Screen2";
 import Screen3 from "./Screen3";
 import Screen4 from "./Screen4";
+import Screen5 from "./Screen5";
 import {
   ALL_CHECKPOINTS,
   CHECKPOINTS_INNER,
@@ -16,7 +17,7 @@ import {
 
 type InnerMatcher = (typeof CHECKPOINTS_INNER)[number]["matcher"];
 
-const SCREENS = [Screen1, Screen2, Screen3, Screen4] as const;
+const SCREENS = [Screen1, Screen2, Screen3, Screen4, Screen5] as const;
 
 const AUTO_ADVANCE_MS: Record<number, number> = {
   0: 3000,
@@ -71,7 +72,7 @@ export default function OnboardingFlow() {
         <AnimatePresence mode="wait">
           <motion.div key={index} className="absolute inset-0">
             {index === 3 ? (
-              <Screen4 checkpointMatcher={innerMatcher} />
+              <Screen4 checkpointMatcher={innerMatcher} onComplete={next} />
             ) : (
               <Current />
             )}

@@ -111,7 +111,7 @@ const ORBS: OrbSpec[] = [
       { cx: COL_X, cy: PILL_2, ...PILL },
       { cx: COL_X, cy: PILL_3, ...PILL },
     ],
-    welcome: { cx: 289, cy: 425, size: 36 },
+    welcome: { cx: 310, cy: 425, size: 48 },
   },
   // Orb 1 — Flight.
   {
@@ -124,7 +124,7 @@ const ORBS: OrbSpec[] = [
       { cx: COL_X, cy: PILL_1, ...PILL },
       { cx: COL_X, cy: PILL_2, ...PILL },
     ],
-    welcome: { cx: 243, cy: 425, size: 36 },
+    welcome: { cx: 250, cy: 425, size: 48 },
   },
   // Orb 2 — Forex.
   {
@@ -137,7 +137,7 @@ const ORBS: OrbSpec[] = [
       { cx: COL_X, cy: COL_Y[0], size: 90 },
       { cx: COL_X, cy: PILL_1, ...PILL },
     ],
-    welcome: { cx: 197, cy: 425, size: 36 },
+    welcome: { cx: 190, cy: 425, size: 48 },
   },
   // Orb 3 — Safety.
   {
@@ -150,7 +150,7 @@ const ORBS: OrbSpec[] = [
       { cx: COL_X, cy: COL_Y[1], size: 48 },
       { cx: COL_X, cy: COL_Y[0], size: 90 },
     ],
-    welcome: { cx: 151, cy: 425, size: 36 },
+    welcome: { cx: 130, cy: 425, size: 48 },
   },
   // Orb 4 — tail droplet during arc entrance only. Fades out on settle and
   // stays hidden for the rest of the lifecycle so the layout is always 4 orbs.
@@ -269,19 +269,23 @@ const AGENTS: Agent[] = [
 ];
 
 /* ---------------- Timing ---------------- */
-// Match the pacing of screens 1–3: ~1.1s in, ~1.6s breath, ~0.55s out.
+// Text stays visible for the entire orb arc + settle. Only blurs out once
+// the orbs have reached their vertical-column resting positions.
 const TEXT_IN = 1.1;
-const TEXT_HOLD = 1.6;
+const TEXT_HOLD = 3.3; // spans rope arc + settle
 const TEXT_OUT = 0.55;
 const TEXT_TOTAL = TEXT_IN + TEXT_HOLD + TEXT_OUT;
 
 const ROPE_DURATION = 2.0;
-const ROPE_DELAY = TEXT_TOTAL + 0.05;
+// Rope starts right after the headline word-by-word finishes — text stays
+// on screen while the orbs travel the arc + settle beneath it.
+const ROPE_DELAY = TEXT_IN + 0.2;
 const SETTLE_DURATION = 2.1;
 const SETTLE_DELAY = ROPE_DELAY + ROPE_DURATION * 0.55;
 
 const CARD_FADE_IN = 0.6;
-const CARD_DELAY = SETTLE_DELAY + SETTLE_DURATION * 0.6;
+// Card fades in only after the headline text has finished blurring out.
+const CARD_DELAY = TEXT_TOTAL + 0.05;
 
 const WATER_DROPLET_EASE = [0.16, 1, 0.3, 1] as const;
 const SETTLE_EASE = [0.45, 0, 0.25, 1] as const;
@@ -474,8 +478,8 @@ function ArcOrb({
       const cy = lerp(promotedCy, spec.welcome.cy, w);
       // Sine wave bob during the Welcome state — each orb has its own phase
       // so they collectively form a travelling wave.
-      const waveAmplitude = 5;
-      const waveSpeedRadPerMs = 0.0018;
+      const waveAmplitude = 11;
+      const waveSpeedRadPerMs = 0.0022;
       const phase = orbIndex * 0.9;
       const bob = Math.sin(t * waveSpeedRadPerMs + phase) * waveAmplitude * w;
       return cy - MAX_SIZE / 2 + bob;
@@ -796,8 +800,10 @@ const WELCOME_TEXTS: Array<{ line1: string; line2: string }> = [
 
 export default function Screen4({
   checkpointMatcher,
+  onComplete,
 }: {
   checkpointMatcher?: InnerMatcher;
+  onComplete?: () => void;
 } = {}) {
   const arcProgress = useMotionValue(0);
   const settleProgress = useMotionValue(0);
@@ -912,6 +918,15 @@ export default function Screen4({
     return () => window.clearTimeout(t);
   }, [welcomeStarted, welcomeTextIdx]);
 
+  // After the last welcome text (frame 1443 "Team perks") has been on screen
+  // for a beat, advance to the next outer screen (frame 1444 — Screen 5).
+  useEffect(() => {
+    if (!onComplete) return;
+    if (welcomeTextIdx < WELCOME_TEXTS.length - 1) return;
+    const t = window.setTimeout(onComplete, WELCOME_TEXT_ADVANCE_MS);
+    return () => window.clearTimeout(t);
+  }, [welcomeTextIdx, onComplete]);
+
   const currentEntry = timelineIdx >= 0 ? TIMELINE[timelineIdx] : null;
 
   return (
@@ -923,7 +938,6 @@ export default function Screen4({
       }}
       initial={{ opacity: 0 }}
       animate={{ opacity: 1, transition: { duration: 0.2 } }}
-      exit={{ opacity: 0, transition: { duration: 0.4 } }}
     >
       {/* Top aura — outer viewport has fixed size + mask that clips overflow.
           Inner element does the motion inside that viewport — spill stays

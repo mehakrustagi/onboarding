@@ -30,6 +30,10 @@ export const CHECKPOINTS_OUTER: Checkpoint[] = [
   { label: "3 · That job is over", outerIdx: 2 },
 ];
 
+export const CHECKPOINTS_END: Checkpoint[] = [
+  { label: "5 · WorldPass benefits", outerIdx: 4 },
+];
+
 // Inner checkpoints for Screen 4. `outerIdx: 3` = Screen 4.
 // `timelineIdx: -1` means "start from the beginning" (arc entrance).
 // Actual timeline indices are computed at runtime inside Screen4 since they
@@ -105,6 +109,7 @@ export type CheckpointOrInner = (typeof CHECKPOINTS_INNER)[number] | Checkpoint;
 export const ALL_CHECKPOINTS: CheckpointOrInner[] = [
   ...CHECKPOINTS_OUTER,
   ...CHECKPOINTS_INNER,
+  ...CHECKPOINTS_END,
 ];
 
 export function CheckpointPanel({
