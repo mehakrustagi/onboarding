@@ -28,9 +28,11 @@ import StatusIndicator from "@/components/StatusIndicator";
  * ==========================================================================*/
 
 // ---- Arc geometry (entrance) ----
-const P0 = { x: 600, y: 650 };
-const P1 = { x: 420, y: 780 };
-const P2 = { x: 150, y: 620 };
+// Bezier pulled so the entrance traces a proper circular sweep from off-screen right
+// to the main orb's rest position at (75, 500).
+const P0 = { x: 600, y: 640 };
+const P1 = { x: 460, y: 830 };
+const P2 = { x: 130, y: 780 };
 const P3 = { x: 75, y: 500 };
 
 const MAX_SIZE = 92;
@@ -71,6 +73,8 @@ type OrbLayout = { cx: number; cy: number; size: number; opacity?: number };
 type OrbSpec = {
   finalT: number;
   arcSize: number;
+  /** Per-agent blob image displayed inside the orb bezel. */
+  blob?: string;
   /** Layout for each promotion level 0..3. */
   states: OrbLayout[];
   fadeOnSettle?: boolean;
@@ -82,10 +86,11 @@ const PILL_2 = 282;
 const PILL_3 = 192;
 const ACTIVE_Y = 482;
 
-// Queued positions below the active — used when there are fewer promotions.
-const Q1 = 572;
-const Q2 = 642;
-const Q3 = 705;
+// Vertical column positions — settled state before the text card shows.
+// Entrance is a curved arc; once settled, orbs stack vertically at cx=70
+// so the text card at x=135 has no collision.
+const COL_X = 70;
+const COL_Y = [ACTIVE_Y, 572, 642, 705, 778] as const;
 
 const PILL: Omit<OrbLayout, "cx" | "cy"> = { size: 32, opacity: 0.5 };
 
@@ -94,55 +99,60 @@ const ORBS: OrbSpec[] = [
   {
     finalT: 1.0,
     arcSize: 92,
+    blob: "/assets/orb/ellipse.png",
     states: [
-      { cx: 70, cy: ACTIVE_Y, size: 90 },
-      { cx: 70, cy: PILL_1, ...PILL },
-      { cx: 70, cy: PILL_2, ...PILL },
-      { cx: 70, cy: PILL_3, ...PILL },
+      { cx: COL_X, cy: COL_Y[0], size: 90 },
+      { cx: COL_X, cy: PILL_1, ...PILL },
+      { cx: COL_X, cy: PILL_2, ...PILL },
+      { cx: COL_X, cy: PILL_3, ...PILL },
     ],
   },
   // Orb 1 — Flight.
   {
     finalT: 0.78,
     arcSize: 66,
+    blob: "/assets/orb/blob-flight.png",
     states: [
-      { cx: 70, cy: Q1, size: 60 },
-      { cx: 70, cy: ACTIVE_Y, size: 90 },
-      { cx: 70, cy: PILL_1, ...PILL },
-      { cx: 70, cy: PILL_2, ...PILL },
+      { cx: COL_X, cy: COL_Y[1], size: 55 },
+      { cx: COL_X, cy: COL_Y[0], size: 90 },
+      { cx: COL_X, cy: PILL_1, ...PILL },
+      { cx: COL_X, cy: PILL_2, ...PILL },
     ],
   },
   // Orb 2 — Forex.
   {
     finalT: 0.6,
     arcSize: 44,
+    blob: "/assets/orb/blob-forex.png",
     states: [
-      { cx: 70, cy: Q2, size: 40, opacity: 0.9 },
-      { cx: 70, cy: Q1, size: 50 },
-      { cx: 70, cy: ACTIVE_Y, size: 90 },
-      { cx: 70, cy: PILL_1, ...PILL },
+      { cx: COL_X, cy: COL_Y[2], size: 40, opacity: 0.9 },
+      { cx: COL_X, cy: COL_Y[1], size: 50 },
+      { cx: COL_X, cy: COL_Y[0], size: 90 },
+      { cx: COL_X, cy: PILL_1, ...PILL },
     ],
   },
   // Orb 3 — Safety.
   {
     finalT: 0.45,
     arcSize: 30,
+    blob: "/assets/orb/blob-safety.png",
     states: [
-      { cx: 70, cy: Q3, size: 35, opacity: 0.55 },
-      { cx: 70, cy: Q2, size: 42, opacity: 0.8 },
-      { cx: 70, cy: Q1, size: 55 },
-      { cx: 70, cy: ACTIVE_Y, size: 90 },
+      { cx: COL_X, cy: COL_Y[3], size: 30, opacity: 0.55 },
+      { cx: COL_X, cy: COL_Y[2], size: 38, opacity: 0.85 },
+      { cx: COL_X, cy: COL_Y[1], size: 48 },
+      { cx: COL_X, cy: COL_Y[0], size: 90 },
     ],
   },
-  // Orb 4 — hidden tail droplet, disappears after settle.
+  // Orb 4 — tail droplet during arc entrance only. Fades out on settle and
+  // stays hidden for the rest of the lifecycle so the layout is always 4 orbs.
   {
     finalT: 0.32,
     arcSize: 20,
     states: [
-      { cx: 70, cy: Q3, size: 20, opacity: 0 },
-      { cx: 70, cy: Q3, size: 20, opacity: 0 },
-      { cx: 70, cy: Q3, size: 20, opacity: 0 },
-      { cx: 70, cy: Q3, size: 20, opacity: 0 },
+      { cx: COL_X, cy: COL_Y[3], size: 20, opacity: 0 },
+      { cx: COL_X, cy: COL_Y[3], size: 20, opacity: 0 },
+      { cx: COL_X, cy: COL_Y[3], size: 20, opacity: 0 },
+      { cx: COL_X, cy: COL_Y[3], size: 20, opacity: 0 },
     ],
     fadeOnSettle: true,
   },
@@ -249,9 +259,10 @@ const AGENTS: Agent[] = [
 ];
 
 /* ---------------- Timing ---------------- */
-const TEXT_IN = 0.7;
-const TEXT_HOLD = 0.45;
-const TEXT_OUT = 0.4;
+// Match the pacing of screens 1–3: ~1.1s in, ~1.6s breath, ~0.55s out.
+const TEXT_IN = 1.1;
+const TEXT_HOLD = 1.6;
+const TEXT_OUT = 0.55;
 const TEXT_TOTAL = TEXT_IN + TEXT_HOLD + TEXT_OUT;
 
 const ROPE_DURATION = 2.0;
@@ -265,27 +276,28 @@ const CARD_DELAY = SETTLE_DELAY + SETTLE_DURATION * 0.6;
 const WATER_DROPLET_EASE = [0.16, 1, 0.3, 1] as const;
 const SETTLE_EASE = [0.45, 0, 0.25, 1] as const;
 
-// How long each state within an agent lifecycle holds.
+// Uniform hold + transition timing across the whole agent lifecycle.
 const HOLD = {
-  workingLine: 2200,
-  statusFirst: 1400,
+  workingLine: 2400,
+  statusFirst: 2400,
   status: 2400,
   summary: 2400,
-  promote: 1100, // duration of promotion animation
+  promote: 1100,
 };
+// Every text/component roll (subtitle, status, card) uses the same duration + ease.
+const ROLL_DURATION = 0.55;
+const ROLL_EASE = [0.22, 1, 0.36, 1] as const;
 
 /* ---------------- Runtime state ---------------- */
 // A single "step" the app is currently in.
 type Step =
   | { kind: "working"; agentIdx: number; lineIdx: number; statusIdx: number }
-  | { kind: "summary"; agentIdx: number }
-  | { kind: "next" }; // final CTA (Safety completed)
+  | { kind: "summary"; agentIdx: number };
 
 function buildTimeline(): Array<{ step: Step; hold: number }> {
   const timeline: Array<{ step: Step; hold: number }> = [];
   AGENTS.forEach((agent, agentIdx) => {
     agent.workingLines.forEach((line, lineIdx) => {
-      // Working line with no status → single step with statusIdx=-1.
       const statuses = line.statuses ?? [];
       if (statuses.length === 0) {
         timeline.push({
@@ -301,12 +313,14 @@ function buildTimeline(): Array<{ step: Step; hold: number }> {
         });
       }
     });
+    // Final agent's summary holds indefinitely — its text stays on screen
+    // while the Next CTA appears below.
+    const isLast = agentIdx === AGENTS.length - 1;
     timeline.push({
       step: { kind: "summary", agentIdx },
-      hold: HOLD.summary,
+      hold: isLast ? 999_999 : HOLD.summary,
     });
   });
-  timeline.push({ step: { kind: "next" }, hold: 999_999 });
   return timeline;
 }
 
@@ -380,7 +394,10 @@ function ArcOrb({
       if (arcT < -0.35) baseOp = 0;
       else if (arcT < 0) baseOp = (arcT + 0.35) / 0.35;
       if (spec.fadeOnSettle) baseOp *= 1 - s;
-      const promotedOp = p <= 0 ? 1 : lerpArr(opacities, p);
+      // During settle, lerp from full opacity (arc entrance) → states[0].opacity.
+      // After promotion begins, follow the promoted opacity curve.
+      const settledOp = lerp(1, spec.states[0].opacity ?? 1, s);
+      const promotedOp = p <= 0 ? settledOp : lerpArr(opacities, p);
       return baseOp * promotedOp;
     },
   );
@@ -400,7 +417,7 @@ function ArcOrb({
         willChange: "transform, filter, opacity",
       }}
     >
-      <AgentOrb size={MAX_SIZE} />
+      <AgentOrb size={MAX_SIZE} blob={spec.blob} />
     </motion.div>
   );
 }
@@ -412,27 +429,17 @@ function ArcOrb({
 function PillRow({
   agentIdx,
   promoteLevel,
-  currentAgentIdx,
 }: {
   agentIdx: number;
   promoteLevel: MotionValue<number>;
-  currentAgentIdx: number;
 }) {
-  // The pill's own promotion index within the pill stack:
-  // agentIdx 0 becomes pill 1 when agent 1 is active, pill 2 when agent 2 active, etc.
-  // So its pill-slot = (currentAgentIdx - agentIdx). When == 1 → PILL_1 (bottom pill),
-  // when == 2 → PILL_2, when == 3 → PILL_3.
-  // The pill orb's cy is the center of the small orb; we want the row
-  // centered on that y — so offset by half the row height.
+  // Slot depth = promoteLevel - agentIdx (fractional during a promotion).
+  // slot 1 → PILL_1, slot 2 → PILL_2, slot 3 → PILL_3. Driven directly by
+  // the animating promoteLevel MotionValue → smooth ride, no discrete jump.
   const PILL_ROW_HEIGHT = 20;
   const targetY = useTransform(promoteLevel, (p) => {
-    const slot = Math.max(1, currentAgentIdx - agentIdx);
-    const targets: Record<number, number> = {
-      1: PILL_1,
-      2: PILL_2,
-      3: PILL_3,
-    };
-    return (targets[slot] ?? PILL_1) - PILL_ROW_HEIGHT / 2;
+    const slot = Math.max(1, p - agentIdx);
+    return lerpArr([PILL_1, PILL_2, PILL_3], slot - 1) - PILL_ROW_HEIGHT / 2;
   });
   const opacity = useTransform(promoteLevel, [agentIdx, agentIdx + 0.4], [0, 1]);
   return (
@@ -453,30 +460,43 @@ function PillRow({
 function CheckmarkBadge() {
   return (
     <span
-      className="inline-flex h-[18px] w-[18px] items-center justify-center rounded-full"
-      style={{ backgroundColor: "#10B981" }}
+      className="relative inline-block h-[20px] w-[20px]"
       aria-hidden="true"
     >
-      <svg width="10" height="10" viewBox="0 0 10 10" fill="none">
-        <path
-          d="M1.5 5.2 L4 7.5 L8.5 2.5"
-          stroke="white"
-          strokeWidth="1.6"
-          strokeLinecap="round"
-          strokeLinejoin="round"
-        />
-      </svg>
+      {/* Outer ring */}
+      <span
+        className="absolute inset-0 rounded-full"
+        style={{ border: "1.5px solid #10B981" }}
+      />
+      {/* Inner filled circle with a small gap from the ring */}
+      <span
+        className="absolute rounded-full"
+        style={{
+          inset: 3,
+          backgroundColor: "#10B981",
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "center",
+        }}
+      >
+        <svg width="9" height="9" viewBox="0 0 10 10" fill="none">
+          <path
+            d="M1.5 5.2 L4 7.5 L8.5 2.5"
+            stroke="white"
+            strokeWidth="1.8"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+          />
+        </svg>
+      </span>
     </span>
   );
 }
 
-function ActiveCard({
-  step,
-}: {
-  step: Extract<Step, { kind: "working" | "summary" }>;
-}) {
+function ActiveCard({ step }: { step: Step }) {
   const agent = AGENTS[step.agentIdx];
   const isSummary = step.kind === "summary";
+  const isFinalSummary = isSummary && step.agentIdx === AGENTS.length - 1;
   const line = !isSummary ? agent.workingLines[step.lineIdx] : null;
   const status =
     !isSummary && line?.statuses && step.statusIdx >= 0
@@ -489,7 +509,7 @@ function ActiveCard({
         key={`title-${step.agentIdx}`}
         initial={{ opacity: 0, y: -8 }}
         animate={{ opacity: 1, y: 0 }}
-        transition={{ duration: 0.5, ease: [0.22, 1, 0.36, 1] }}
+        transition={{ duration: ROLL_DURATION, ease: ROLL_EASE }}
         className="text-[16px] font-semibold leading-[20px] tracking-[-0.02em] text-[color:var(--ink)]"
       >
         {agent.title}
@@ -506,7 +526,7 @@ function ActiveCard({
             initial={{ y: -60, opacity: 0 }}
             animate={{ y: 0, opacity: 1 }}
             exit={{ y: 60, opacity: 0 }}
-            transition={{ duration: 0.55, ease: [0.22, 1, 0.36, 1] }}
+            transition={{ duration: ROLL_DURATION, ease: ROLL_EASE }}
             className="absolute inset-0"
           >
             <div className="flex items-center justify-between gap-2">
@@ -518,7 +538,7 @@ function ActiveCard({
               >
                 {isSummary ? agent.summary.text : line!.text}
               </GradientText>
-              <StatusIndicator />
+              {isFinalSummary ? <CheckmarkBadge /> : <StatusIndicator />}
             </div>
 
             {/* Status/desc line — a single row for summary desc or the rolling status */}
@@ -530,7 +550,7 @@ function ActiveCard({
                     initial={{ y: -20, opacity: 0 }}
                     animate={{ y: 0, opacity: 1 }}
                     exit={{ y: 20, opacity: 0 }}
-                    transition={{ duration: 0.4, delay: 0.15 }}
+                    transition={{ duration: ROLL_DURATION, ease: ROLL_EASE, delay: 0.15 }}
                     className="absolute inset-0 text-[13px] font-medium leading-[17px] tracking-[-0.01em] text-neutral-400"
                   >
                     {agent.summary.desc}
@@ -542,7 +562,7 @@ function ActiveCard({
                     initial={{ y: -38, opacity: 0 }}
                     animate={{ y: 0, opacity: 1 }}
                     exit={{ y: 38, opacity: 0 }}
-                    transition={{ duration: 0.55, ease: [0.22, 1, 0.36, 1] }}
+                    transition={{ duration: ROLL_DURATION, ease: ROLL_EASE }}
                     className="absolute inset-0 text-[13px] leading-[19px] tracking-[-0.01em]"
                   >
                     <p className="grey-shine-text font-medium">{status.line1}</p>
@@ -596,10 +616,8 @@ export default function Screen4() {
 
     const advance = () => {
       if (!nextEntry) return;
-      const currentAgent =
-        entry.step.kind === "next" ? -1 : entry.step.agentIdx;
-      const nextAgent =
-        nextEntry.step.kind === "next" ? -1 : nextEntry.step.agentIdx;
+      const currentAgent = entry.step.agentIdx;
+      const nextAgent = nextEntry.step.agentIdx;
       if (nextAgent > currentAgent) {
         // Promote — animate promoteLevel up before switching step.
         animate(promoteLevel, nextAgent, {
@@ -623,10 +641,6 @@ export default function Screen4() {
   }, [timelineIdx, promoteLevel]);
 
   const currentEntry = timelineIdx >= 0 ? TIMELINE[timelineIdx] : null;
-  const currentAgentIdx =
-    currentEntry && currentEntry.step.kind !== "next"
-      ? currentEntry.step.agentIdx
-      : AGENTS.length - 1;
 
   return (
     <motion.div
@@ -639,16 +653,74 @@ export default function Screen4() {
       animate={{ opacity: 1, transition: { duration: 0.2 } }}
       exit={{ opacity: 0, transition: { duration: 0.4 } }}
     >
-      {/* Top aura */}
-      <motion.div
-        className="pointer-events-none absolute left-1/2 top-0 -translate-x-1/2"
-        style={{ y: -40 }}
-        initial={{ opacity: 0 }}
-        animate={{ opacity: 1 }}
-        transition={{ delay: CARD_DELAY, duration: CARD_FADE_IN }}
+      {/* Top aura — outer viewport has fixed size + mask that clips overflow.
+          Inner element does the motion inside that viewport — spill stays
+          contained no matter how much scale/drift we apply. */}
+      <div
+        className="pointer-events-none absolute left-1/2 top-0 -translate-x-1/2 overflow-hidden"
+        style={{
+          width: 500,
+          height: 220,
+          maskImage:
+            "linear-gradient(to bottom, black 0%, black 55%, transparent 100%)",
+          WebkitMaskImage:
+            "linear-gradient(to bottom, black 0%, black 55%, transparent 100%)",
+        }}
       >
-        <AuraGlow width={520} opacity={0.55} blur={65} />
-      </motion.div>
+        <motion.div
+          className="absolute left-1/2 top-0 -translate-x-1/2"
+          style={{ transformOrigin: "50% 20%" }}
+          initial={{ opacity: 0, y: -80 }}
+          animate={{
+            opacity: 1,
+            scale: [1, 1.08, 1.02, 1.09, 1.01, 1.06],
+            x: [-10, 12, -6, 14, -12, -8],
+            y: [-80, -84, -76, -86, -78, -82],
+            rotate: [-0.9, 1.1, -0.5, 1.3, -1.1, -0.4],
+          }}
+          transition={{
+            opacity: {
+              delay: SETTLE_DELAY,
+              duration: 2.6,
+              ease: [0.33, 0, 0.67, 1],
+            },
+            scale: {
+              delay: SETTLE_DELAY,
+              duration: 11,
+              times: [0, 0.2, 0.4, 0.6, 0.8, 1],
+              ease: [0.45, 0, 0.55, 1],
+              repeat: Infinity,
+              repeatType: "mirror",
+            },
+            x: {
+              delay: SETTLE_DELAY,
+              duration: 15,
+              times: [0, 0.2, 0.4, 0.6, 0.8, 1],
+              ease: [0.45, 0, 0.55, 1],
+              repeat: Infinity,
+              repeatType: "mirror",
+            },
+            y: {
+              delay: SETTLE_DELAY,
+              duration: 13,
+              times: [0, 0.2, 0.4, 0.6, 0.8, 1],
+              ease: [0.45, 0, 0.55, 1],
+              repeat: Infinity,
+              repeatType: "mirror",
+            },
+            rotate: {
+              delay: SETTLE_DELAY,
+              duration: 19,
+              times: [0, 0.2, 0.4, 0.6, 0.8, 1],
+              ease: [0.45, 0, 0.55, 1],
+              repeat: Infinity,
+              repeatType: "mirror",
+            },
+          }}
+        >
+          <AuraGlow width={500} opacity={0.7} blur={50} />
+        </motion.div>
+      </div>
 
       {/* Intro headline */}
       <div className="absolute left-1/2 top-[48%] w-full -translate-x-1/2 -translate-y-1/2 px-8 text-center">
@@ -683,7 +755,6 @@ export default function Screen4() {
           key={`pill-${idx}`}
           agentIdx={idx}
           promoteLevel={promoteLevel}
-          currentAgentIdx={currentAgentIdx}
         />
       ))}
 
@@ -698,35 +769,37 @@ export default function Screen4() {
           ease: [0.22, 1, 0.36, 1],
         }}
       >
-        {currentEntry &&
-          (currentEntry.step.kind === "working" ||
-            currentEntry.step.kind === "summary") && (
-            <ActiveCard step={currentEntry.step} />
-          )}
+        {currentEntry && <ActiveCard step={currentEntry.step} />}
       </motion.div>
 
-      {/* Next CTA (bottom pill after Safety completes) */}
+      {/* Next CTA — appears after Safety's summary is fully in view. */}
       <AnimatePresence>
-        {currentEntry?.step.kind === "next" && (
-          <motion.div
-            key="next-cta"
-            className="absolute bottom-8 left-1/2 -translate-x-1/2"
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.6, ease: [0.22, 1, 0.36, 1] }}
-          >
-            <button
-              className="relative h-[52px] w-[360px] overflow-hidden rounded-full text-[16px] font-semibold text-[color:var(--ink)]"
-              style={{
-                background:
-                  "linear-gradient(90deg, rgba(80,87,234,0.35) 0%, rgba(217,70,239,0.28) 35%, rgba(239,68,68,0.32) 65%, rgba(237,215,88,0.35) 100%)",
-                boxShadow: "0 12px 30px -12px rgba(0,0,0,0.15)",
+        {currentEntry?.step.kind === "summary" &&
+          currentEntry.step.agentIdx === AGENTS.length - 1 && (
+            <motion.div
+              key="next-cta"
+              className="absolute bottom-6 left-1/2 -translate-x-1/2"
+              initial={{ opacity: 0, y: 16 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{
+                delay: 0.8,
+                duration: ROLL_DURATION,
+                ease: ROLL_EASE,
               }}
             >
-              Next
-            </button>
-          </motion.div>
-        )}
+              <button
+                className="relative h-[52px] w-[360px] overflow-hidden rounded-full text-[16px] font-semibold text-[color:var(--ink)]"
+                style={{
+                  background:
+                    "linear-gradient(90deg, rgba(80,87,234,0.28) 0%, rgba(217,70,239,0.22) 35%, rgba(239,68,68,0.26) 65%, rgba(237,215,88,0.30) 100%)",
+                  boxShadow: "0 12px 30px -14px rgba(0,0,0,0.18)",
+                  border: "1px solid rgba(255,255,255,0.5)",
+                }}
+              >
+                Next
+              </button>
+            </motion.div>
+          )}
       </AnimatePresence>
 
       {/* Orbs */}
