@@ -515,7 +515,7 @@ function ActiveCard({ step }: { step: Step }) {
         {agent.title}
       </motion.p>
 
-      <div className="relative mt-1 h-[60px] overflow-hidden">
+      <div className="relative mt-1 h-[90px] overflow-hidden">
         <AnimatePresence initial={false} mode="popLayout">
           <motion.div
             key={
@@ -542,7 +542,7 @@ function ActiveCard({ step }: { step: Step }) {
             </div>
 
             {/* Status/desc line — a single row for summary desc or the rolling status */}
-            <div className="relative mt-1 h-[38px] overflow-hidden">
+            <div className="relative mt-1 h-[68px] overflow-hidden">
               <AnimatePresence initial={false}>
                 {isSummary && agent.summary.desc && (
                   <motion.p
