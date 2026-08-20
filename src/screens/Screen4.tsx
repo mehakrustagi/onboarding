@@ -348,7 +348,8 @@ function ArcOrb({
 
   const x = useTransform(
     [arcProgress, settleProgress, promoteLevel],
-    ([a, s, p]: [number, number, number]) => {
+    (vals: number[]) => {
+      const [a, s, p] = vals;
       const arcT = spec.finalT - 1 + a;
       const arcPt = arcT >= 0 ? pathAt(arcT) : trailPosAt(arcT);
       const restCx = lerp(arcPt.x, spec.states[0].cx, s);
@@ -358,7 +359,8 @@ function ArcOrb({
   );
   const y = useTransform(
     [arcProgress, settleProgress, promoteLevel],
-    ([a, s, p]: [number, number, number]) => {
+    (vals: number[]) => {
+      const [a, s, p] = vals;
       const arcT = spec.finalT - 1 + a;
       const arcPt = arcT >= 0 ? pathAt(arcT) : trailPosAt(arcT);
       const restCy = lerp(arcPt.y, spec.states[0].cy, s);
@@ -368,7 +370,8 @@ function ArcOrb({
   );
   const scale = useTransform(
     [arcProgress, settleProgress, promoteLevel],
-    ([a, s, p]: [number, number, number]) => {
+    (vals: number[]) => {
+      const [a, s, p] = vals;
       const arcT = spec.finalT - 1 + a;
       const arcSz = arcSizeAt(arcT, spec);
       const restSize = lerp(arcSz, spec.states[0].size, s);
@@ -378,7 +381,8 @@ function ArcOrb({
   );
   const filter = useTransform(
     [arcProgress, settleProgress],
-    ([a, s]: [number, number]) => {
+    (vals: number[]) => {
+      const [a, s] = vals;
       const arcT = spec.finalT - 1 + a;
       const trailingBlur = arcT < 0 ? 14 : 0;
       const arcBlur = restBlurAt(arcT) + trailingBlur;
@@ -388,14 +392,13 @@ function ArcOrb({
   );
   const opacity = useTransform(
     [arcProgress, settleProgress, promoteLevel],
-    ([a, s, p]: [number, number, number]) => {
+    (vals: number[]) => {
+      const [a, s, p] = vals;
       const arcT = spec.finalT - 1 + a;
       let baseOp = 1;
       if (arcT < -0.35) baseOp = 0;
       else if (arcT < 0) baseOp = (arcT + 0.35) / 0.35;
       if (spec.fadeOnSettle) baseOp *= 1 - s;
-      // During settle, lerp from full opacity (arc entrance) → states[0].opacity.
-      // After promotion begins, follow the promoted opacity curve.
       const settledOp = lerp(1, spec.states[0].opacity ?? 1, s);
       const promotedOp = p <= 0 ? settledOp : lerpArr(opacities, p);
       return baseOp * promotedOp;
@@ -515,7 +518,7 @@ function ActiveCard({ step }: { step: Step }) {
         {agent.title}
       </motion.p>
 
-      <div className="relative mt-1 h-[90px] overflow-hidden">
+      <div className="relative mt-1 h-[100px] overflow-hidden">
         <AnimatePresence initial={false} mode="popLayout">
           <motion.div
             key={
@@ -542,7 +545,7 @@ function ActiveCard({ step }: { step: Step }) {
             </div>
 
             {/* Status/desc line — a single row for summary desc or the rolling status */}
-            <div className="relative mt-1 h-[68px] overflow-hidden">
+            <div className="relative mt-1 h-[76px] overflow-hidden">
               <AnimatePresence initial={false}>
                 {isSummary && agent.summary.desc && (
                   <motion.p
@@ -551,7 +554,8 @@ function ActiveCard({ step }: { step: Step }) {
                     animate={{ y: 0, opacity: 1 }}
                     exit={{ y: 20, opacity: 0 }}
                     transition={{ duration: ROLL_DURATION, ease: ROLL_EASE, delay: 0.15 }}
-                    className="absolute inset-0 text-[13px] font-medium leading-[17px] tracking-[-0.01em] text-neutral-400"
+                    className="absolute inset-0 pr-3 text-[13px] font-medium leading-[17px] tracking-[-0.01em] text-neutral-400"
+                    style={{ hyphens: "auto", wordBreak: "break-word" }}
                   >
                     {agent.summary.desc}
                   </motion.p>
