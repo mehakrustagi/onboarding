@@ -113,10 +113,17 @@ function consumedAgents(benefitIdx: number): Set<OrbKey> {
   for (let i = 0; i <= benefitIdx; i++) s.add(BENEFITS[i].orb);
   return s;
 }
-// When an orb is "active" on the card, it sits centered above the card content.
+// Card orb trajectory:
+//   Stage 1 (arc): row slot → arrives centered on the card's TOP edge,
+//                  still small (34px).
+//   Stage 2 (descend + grow): slides down INTO the card and swells,
+//                             ending above the benefit text (52px).
+const CARD_ORB_ARRIVAL_X = 220;
+const CARD_ORB_ARRIVAL_Y = 545; // card top edge (bottom 90 + height 330 → 545)
+const CARD_ORB_ARRIVAL_SIZE = 34;
 const CARD_ORB_X = 220;
-const CARD_ORB_Y = 440;
-const CARD_ORB_SIZE = 34;
+const CARD_ORB_Y = 620;
+const CARD_ORB_SIZE = 52;
 
 // Where each orb sits at the moment Screen 4 hands us over — matches
 // Screen 4's welcome-row positions so the handoff has no jump.
@@ -278,75 +285,6 @@ export default function Screen5() {
         }
       >
         <Card3D width={230} height={330} radius={26}>
-          {/* Card orb — keyed by AGENT (not benefit) so it persists across
-              consecutive same-agent benefits. When the agent changes, this
-              exits and the new one flies in from its row slot via a soft arc. */}
-          <AnimatePresence mode="wait">
-            {activeBenefit &&
-              typeof phase === "number" &&
-              (() => {
-                const agent = activeBenefit.orb;
-                // Row state right BEFORE this benefit fires (previous phase).
-                const prevConsumed = consumedAgents(phase - 1);
-                const prevRemaining = QUEUE.filter(
-                  (a) => !prevConsumed.has(a),
-                );
-                const startIdx = prevRemaining.indexOf(agent);
-                // Where the orb was sitting in the row a moment ago.
-                const startCX =
-                  startIdx >= 0
-                    ? slotX(prevRemaining.length, startIdx)
-                    : CARD_ORB_X; // agent no longer in row (reused) — fade in on card
-                const startY = TOP_ROW_Y;
-                return (
-                  <motion.div
-                    key={`card-orb-${agent}`}
-                    className="absolute left-1/2 -translate-x-1/2"
-                    style={{ top: -CARD_ORB_SIZE / 2 }}
-                    initial={{
-                      x: startCX - CARD_ORB_X,
-                      y: startY - CARD_ORB_Y,
-                      scale: TOP_ORB_SIZE / CARD_ORB_SIZE,
-                      opacity: 0,
-                    }}
-                    animate={{
-                      x: 0,
-                      y: 0,
-                      scale: 1,
-                      opacity: 1,
-                      transition: {
-                        x: {
-                          type: "spring",
-                          stiffness: 90,
-                          damping: 22,
-                          mass: 1,
-                        },
-                        y: {
-                          type: "spring",
-                          stiffness: 90,
-                          damping: 22,
-                          mass: 1,
-                        },
-                        scale: {
-                          type: "spring",
-                          stiffness: 100,
-                          damping: 18,
-                        },
-                        opacity: { duration: 0.55, ease: "easeOut" },
-                      },
-                    }}
-                    exit={{
-                      opacity: 0,
-                      scale: 0.7,
-                      filter: "blur(6px)",
-                      transition: { duration: 0.45, ease: [0.4, 0, 0.2, 1] },
-                    }}
-                  >
-                    <AgentOrb size={CARD_ORB_SIZE} blob={ORB_BLOBS[agent]} />
-                  </motion.div>
-                );
-              })()}
-          </AnimatePresence>
 
           {/* Card contents. Title uses word-by-word reveal, description uses
               a cuboid X-axis flip so the text swap feels like a physical face
@@ -390,6 +328,106 @@ export default function Screen5() {
 
         </Card3D>
       </motion.div>
+
+      {/* Active-agent orb — lives at the SCREEN level (not inside the card)
+          so its arc travels across the whole screen without being clipped by
+          Card3D's overflow-hidden. Traces a clockwise semicircle from its
+          row slot down onto the card. Default AnimatePresence mode so the
+          outgoing orb's drop-into-card overlaps the next orb's arc entry. */}
+      <AnimatePresence>
+        {activeBenefit &&
+          typeof phase === "number" &&
+          (() => {
+            const agent = activeBenefit.orb;
+            const prevConsumed = consumedAgents(phase - 1);
+            const prevRemaining = QUEUE.filter((a) => !prevConsumed.has(a));
+            const startIdx = prevRemaining.indexOf(agent);
+            const startCX =
+              startIdx >= 0
+                ? slotX(prevRemaining.length, startIdx)
+                : CARD_ORB_X;
+            // STAGE 1 — clockwise semicircle from row slot to the top edge
+            //            of the card. Small size throughout this stage.
+            const arc = clockwiseSemicircle(
+              { x: startCX, y: TOP_ROW_Y },
+              { x: CARD_ORB_ARRIVAL_X, y: CARD_ORB_ARRIVAL_Y },
+            );
+            // We reference `CARD_ORB_SIZE` as the base; the arriving size is
+            // a fraction of that so we scale UP during the descent.
+            const arrivalScale = CARD_ORB_ARRIVAL_SIZE / CARD_ORB_SIZE;
+            const startScale = TOP_ORB_SIZE / CARD_ORB_SIZE;
+
+            // Build a single keyframe sequence: arc → descend & grow.
+            const xs = [...arc.xs, CARD_ORB_X];
+            const ys = [...arc.ys, CARD_ORB_Y];
+            const scales = [
+              ...arc.xs.map(
+                (_, i) =>
+                  startScale +
+                  (arrivalScale - startScale) *
+                    (i / (arc.xs.length - 1)),
+              ),
+              1,
+            ];
+            const opacities = [
+              ...arc.xs.map((_, i) =>
+                i === 0 ? 0 : Math.min(1, i / 3),
+              ),
+              1,
+            ];
+            // Arc takes ~70% of the animation, descent the remaining ~30%.
+            const arcSteps = arc.xs.length;
+            const times = [
+              ...arc.xs.map((_, i) => (i / (arcSteps - 1)) * 0.7),
+              1,
+            ];
+            return (
+              <motion.div
+                key={`card-orb-${agent}`}
+                className="pointer-events-none absolute left-0 top-0"
+                style={{
+                  width: CARD_ORB_SIZE,
+                  height: CARD_ORB_SIZE,
+                  marginLeft: -CARD_ORB_SIZE / 2,
+                  marginTop: -CARD_ORB_SIZE / 2,
+                }}
+                initial={{
+                  x: xs[0],
+                  y: ys[0],
+                  scale: startScale,
+                  opacity: 0,
+                }}
+                animate={{
+                  x: xs,
+                  y: ys,
+                  scale: scales,
+                  opacity: opacities,
+                  transition: {
+                    // 1.15s arc + 0.65s slow descend + grow = 1.8s total.
+                    x: { duration: 1.8, ease: "linear", times },
+                    y: { duration: 1.8, ease: "linear", times },
+                    scale: {
+                      duration: 1.8,
+                      ease: [0.22, 1, 0.36, 1],
+                      times,
+                    },
+                    opacity: { duration: 0.55, ease: "easeOut" },
+                  },
+                }}
+                exit={{
+                  // Grow bigger, fade, and drop down — merges into the card.
+                  opacity: 0,
+                  scale: 1.9,
+                  y: CARD_ORB_Y + 90,
+                  filter: "blur(10px)",
+                  transition: { duration: 0.85, ease: [0.4, 0, 0.2, 1] },
+                }}
+              >
+                <AgentOrb size={CARD_ORB_SIZE} blob={ORB_BLOBS[agent]} />
+              </motion.div>
+            );
+          })()}
+      </AnimatePresence>
     </div>
   );
 }
@@ -423,12 +461,24 @@ function QueueOrb({
   // No size change during handoff — TOP_ORB_SIZE now equals HANDOFF_SIZE.
   const topRowScale = 1;
 
-  // Continuous sine wave — different phase per orb creates a travelling wave.
+  // Continuous sine wave — larger amplitude + wider phase offset per orb so
+  // the row visibly reads as a rope with a travelling wave passing through it.
+  // Amplitude increases slightly when there are fewer orbs (the "rope" flexes
+  // more freely as it shortens).
   const waveY = useTransform(time, (t) => {
-    const waveAmplitude = 9;
+    const remainingCount = Math.max(1, displayCount);
+    const flex = 1 + (QUEUE.length - remainingCount) * 0.12; // 1.0 → ~1.36
+    const waveAmplitude = 12 * flex;
     const waveSpeedRadPerMs = 0.0022;
-    const phaseOffset = orbIndex * 0.9;
+    const phaseOffset = orbIndex * 1.2;
     return Math.sin(t * waveSpeedRadPerMs + phaseOffset) * waveAmplitude;
+  });
+  // Subtle horizontal sway — orbs also drift a couple of px sideways in
+  // lock-step with the wave, reinforcing the "chain being tugged" feel.
+  const waveX = useTransform(time, (t) => {
+    const waveSpeedRadPerMs = 0.0022;
+    const phaseOffset = orbIndex * 1.2 - Math.PI / 2;
+    return Math.sin(t * waveSpeedRadPerMs + phaseOffset) * 3;
   });
 
   return (
@@ -439,6 +489,7 @@ function QueueOrb({
         height: HANDOFF_SIZE,
         top: HANDOFF_Y - HANDOFF_SIZE / 2,
         left: 0,
+        x: waveX,
         y: waveY,
       }}
     >
@@ -460,12 +511,14 @@ function QueueOrb({
         transition={{
           y: { delay: 0.15, duration: 1.1, ease: [0.22, 1, 0.36, 1] },
           scale: { delay: 0.15, duration: 1.1, ease: [0.22, 1, 0.36, 1] },
+          // Slower + heavier spring — orbs shift as if pulled by a rope,
+          // with a slight lag that reads as coupled motion.
           x: {
             delay: 0.15,
             type: "spring",
-            stiffness: 110,
-            damping: 22,
-            mass: 0.9,
+            stiffness: 70,
+            damping: 20,
+            mass: 1.2,
           },
           opacity: { duration: 0.6, ease: [0.22, 1, 0.36, 1] },
           filter: { duration: 0.5 },
