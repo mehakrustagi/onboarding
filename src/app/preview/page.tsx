@@ -1,5 +1,6 @@
 import AgentOrb from "@/components/AgentOrb";
 import AuraGlow from "@/components/AuraGlow";
+import Card3D from "@/components/Card3D";
 
 export default function Preview() {
   return (
@@ -27,6 +28,22 @@ export default function Preview() {
           <span className="relative text-lg font-medium">content on top of aura</span>
         </div>
         <div className="text-sm text-gray-500">AuraGlow used as background under content</div>
+      </section>
+
+      <section className="flex flex-col items-center gap-4">
+        <div className="flex items-end gap-10 p-6">
+          <Card3D>
+            <p className="absolute bottom-5 left-5 text-[19.5px] font-medium leading-[22.8px] tracking-[-0.04em] text-white">
+              02%
+            </p>
+          </Card3D>
+          <Card3D>
+            <p className="absolute bottom-5 left-5 text-[19.5px] font-medium leading-[22.8px] tracking-[-0.04em] text-white">
+              48%
+            </p>
+          </Card3D>
+        </div>
+        <div className="text-sm text-gray-500">Card3D — hover to tilt</div>
       </section>
     </main>
   );

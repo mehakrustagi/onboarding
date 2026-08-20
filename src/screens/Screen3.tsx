@@ -1,7 +1,7 @@
 "use client";
 
 import { motion } from "framer-motion";
-import { blurInVariants } from "./motion";
+import WordReveal from "@/components/WordReveal";
 
 export default function Screen3() {
   return (
@@ -16,15 +16,12 @@ export default function Screen3() {
       exit={{ opacity: 0, transition: { duration: 0.4 } }}
     >
       <div className="absolute left-1/2 top-1/2 w-full -translate-x-1/2 -translate-y-1/2 px-8 text-center">
-        <motion.p
-          variants={blurInVariants}
-          initial="hidden"
-          animate="visible"
-          exit="exit"
+        <WordReveal
+          text="That job is over."
           className="text-[22px] font-medium leading-[28px] tracking-[-0.04em] text-[color:var(--ink)]"
-        >
-          That job is over.
-        </motion.p>
+          staggerMs={90}
+          perWordDurationMs={340}
+        />
       </div>
     </motion.div>
   );

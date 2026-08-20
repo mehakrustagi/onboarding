@@ -2,6 +2,7 @@
 
 import Image from "next/image";
 import { motion } from "framer-motion";
+import WordReveal from "@/components/WordReveal";
 import { blurInVariants } from "./motion";
 
 export default function Screen1() {
@@ -35,16 +36,15 @@ export default function Screen1() {
           />
         </motion.div>
 
-        <motion.p
-          variants={blurInVariants}
-          initial="hidden"
-          animate="visible"
-          exit="exit"
-          transition={{ delay: 0.35 }}
-          className="mt-6 max-w-[244px] text-center text-[20px] font-medium leading-[25px] tracking-[-0.04em] text-[color:var(--ink)]"
-        >
-          You&rsquo;ve trusted Atlys with your visas
-        </motion.p>
+        <div className="mt-6 max-w-[244px] text-center">
+          <WordReveal
+            text={"You’ve trusted Atlys with your visas"}
+            className="text-[20px] font-medium leading-[25px] tracking-[-0.04em] text-[color:var(--ink)]"
+            delay={0.4}
+            staggerMs={130}
+            perWordDurationMs={420}
+          />
+        </div>
       </div>
     </motion.div>
   );

@@ -6,6 +6,7 @@ import {
   motion,
   useMotionValue,
   useTransform,
+  useTime,
   animate,
   type MotionValue,
 } from "framer-motion";
@@ -13,6 +14,8 @@ import AgentOrb from "@/components/AgentOrb";
 import AuraGlow from "@/components/AuraGlow";
 import GradientText from "@/components/GradientText";
 import StatusIndicator from "@/components/StatusIndicator";
+import WordReveal from "@/components/WordReveal";
+import { CHECKPOINTS_INNER } from "./checkpoints";
 
 /* =============================================================================
  * Screen 4 — the full agent choreography.
@@ -77,6 +80,8 @@ type OrbSpec = {
   blob?: string;
   /** Layout for each promotion level 0..3. */
   states: OrbLayout[];
+  /** Position/size in the final "Welcome back" horizontal row (screen 1486). */
+  welcome: OrbLayout;
   fadeOnSettle?: boolean;
 };
 
@@ -106,6 +111,7 @@ const ORBS: OrbSpec[] = [
       { cx: COL_X, cy: PILL_2, ...PILL },
       { cx: COL_X, cy: PILL_3, ...PILL },
     ],
+    welcome: { cx: 289, cy: 425, size: 36 },
   },
   // Orb 1 — Flight.
   {
@@ -118,6 +124,7 @@ const ORBS: OrbSpec[] = [
       { cx: COL_X, cy: PILL_1, ...PILL },
       { cx: COL_X, cy: PILL_2, ...PILL },
     ],
+    welcome: { cx: 243, cy: 425, size: 36 },
   },
   // Orb 2 — Forex.
   {
@@ -130,6 +137,7 @@ const ORBS: OrbSpec[] = [
       { cx: COL_X, cy: COL_Y[0], size: 90 },
       { cx: COL_X, cy: PILL_1, ...PILL },
     ],
+    welcome: { cx: 197, cy: 425, size: 36 },
   },
   // Orb 3 — Safety.
   {
@@ -142,6 +150,7 @@ const ORBS: OrbSpec[] = [
       { cx: COL_X, cy: COL_Y[1], size: 48 },
       { cx: COL_X, cy: COL_Y[0], size: 90 },
     ],
+    welcome: { cx: 151, cy: 425, size: 36 },
   },
   // Orb 4 — tail droplet during arc entrance only. Fades out on settle and
   // stays hidden for the rest of the lifecycle so the layout is always 4 orbs.
@@ -154,6 +163,7 @@ const ORBS: OrbSpec[] = [
       { cx: COL_X, cy: COL_Y[3], size: 20, opacity: 0 },
       { cx: COL_X, cy: COL_Y[3], size: 20, opacity: 0 },
     ],
+    welcome: { cx: COL_X, cy: COL_Y[3], size: 20, opacity: 0 },
     fadeOnSettle: true,
   },
 ];
@@ -326,56 +336,160 @@ function buildTimeline(): Array<{ step: Step; hold: number }> {
 
 const TIMELINE = buildTimeline();
 
+/** Named checkpoints for the dev jump panel. */
+type Checkpoint = {
+  label: string;
+  timelineIdx: number;
+  promoteLevel: number;
+  welcomeProgress: number;
+  welcomeTextIdx: number;
+  arcProgress: number;
+  settleProgress: number;
+};
+
+function findTimelineIdx(
+  agentIdx: number,
+  kind: "working" | "summary",
+  lineIdx = 0,
+  statusIdx = -1,
+): number {
+  return TIMELINE.findIndex((e) => {
+    if (e.step.kind !== kind) return false;
+    if (e.step.agentIdx !== agentIdx) return false;
+    if (kind === "working") {
+      const s = e.step as Extract<Step, { kind: "working" }>;
+      return s.lineIdx === lineIdx && s.statusIdx === statusIdx;
+    }
+    return true;
+  });
+}
+
+type InnerMatcher = (typeof CHECKPOINTS_INNER)[number]["matcher"];
+
+function resolveInnerCheckpoint(matcher: InnerMatcher): Checkpoint {
+  switch (matcher.kind) {
+    case "start":
+      return {
+        label: "start",
+        timelineIdx: -1,
+        arcProgress: 0,
+        settleProgress: 0,
+        promoteLevel: 0,
+        welcomeProgress: 0,
+        welcomeTextIdx: 0,
+      };
+    case "welcome":
+      return {
+        label: "welcome",
+        timelineIdx: findTimelineIdx(3, "summary"),
+        arcProgress: 1,
+        settleProgress: 1,
+        promoteLevel: 3,
+        welcomeProgress: 1,
+        welcomeTextIdx: 0,
+      };
+    case "teamPerks":
+      return {
+        label: "teamPerks",
+        timelineIdx: findTimelineIdx(3, "summary"),
+        arcProgress: 1,
+        settleProgress: 1,
+        promoteLevel: 3,
+        welcomeProgress: 1,
+        welcomeTextIdx: 1,
+      };
+    case "working":
+      return {
+        label: "working",
+        timelineIdx: findTimelineIdx(
+          matcher.agentIdx,
+          "working",
+          matcher.lineIdx,
+          matcher.statusIdx,
+        ),
+        arcProgress: 1,
+        settleProgress: 1,
+        promoteLevel: matcher.agentIdx,
+        welcomeProgress: 0,
+        welcomeTextIdx: 0,
+      };
+    case "summary":
+      return {
+        label: "summary",
+        timelineIdx: findTimelineIdx(matcher.agentIdx, "summary"),
+        arcProgress: 1,
+        settleProgress: 1,
+        promoteLevel: matcher.agentIdx,
+        welcomeProgress: 0,
+        welcomeTextIdx: 0,
+      };
+  }
+}
+
 /* ============================================================================
  * Component
  * ==========================================================================*/
 
 function ArcOrb({
   spec,
+  orbIndex,
   arcProgress,
   settleProgress,
   promoteLevel,
+  welcomeProgress,
 }: {
   spec: OrbSpec;
+  orbIndex: number;
   arcProgress: MotionValue<number>;
   settleProgress: MotionValue<number>;
   promoteLevel: MotionValue<number>;
+  welcomeProgress: MotionValue<number>;
 }) {
+  const time = useTime();
   const cxs = spec.states.map((s) => s.cx);
   const cys = spec.states.map((s) => s.cy);
   const sizes = spec.states.map((s) => s.size);
   const opacities = spec.states.map((s) => s.opacity ?? 1);
 
   const x = useTransform(
-    [arcProgress, settleProgress, promoteLevel],
+    [arcProgress, settleProgress, promoteLevel, welcomeProgress],
     (vals: number[]) => {
-      const [a, s, p] = vals;
+      const [a, s, p, w] = vals;
       const arcT = spec.finalT - 1 + a;
       const arcPt = arcT >= 0 ? pathAt(arcT) : trailPosAt(arcT);
       const restCx = lerp(arcPt.x, spec.states[0].cx, s);
-      const cx = p <= 0 ? restCx : lerpArr(cxs, p);
+      const promotedCx = p <= 0 ? restCx : lerpArr(cxs, p);
+      const cx = lerp(promotedCx, spec.welcome.cx, w);
       return cx - MAX_SIZE / 2;
     },
   );
   const y = useTransform(
-    [arcProgress, settleProgress, promoteLevel],
+    [arcProgress, settleProgress, promoteLevel, welcomeProgress, time],
     (vals: number[]) => {
-      const [a, s, p] = vals;
+      const [a, s, p, w, t] = vals;
       const arcT = spec.finalT - 1 + a;
       const arcPt = arcT >= 0 ? pathAt(arcT) : trailPosAt(arcT);
       const restCy = lerp(arcPt.y, spec.states[0].cy, s);
-      const cy = p <= 0 ? restCy : lerpArr(cys, p);
-      return cy - MAX_SIZE / 2;
+      const promotedCy = p <= 0 ? restCy : lerpArr(cys, p);
+      const cy = lerp(promotedCy, spec.welcome.cy, w);
+      // Sine wave bob during the Welcome state — each orb has its own phase
+      // so they collectively form a travelling wave.
+      const waveAmplitude = 5;
+      const waveSpeedRadPerMs = 0.0018;
+      const phase = orbIndex * 0.9;
+      const bob = Math.sin(t * waveSpeedRadPerMs + phase) * waveAmplitude * w;
+      return cy - MAX_SIZE / 2 + bob;
     },
   );
   const scale = useTransform(
-    [arcProgress, settleProgress, promoteLevel],
+    [arcProgress, settleProgress, promoteLevel, welcomeProgress],
     (vals: number[]) => {
-      const [a, s, p] = vals;
+      const [a, s, p, w] = vals;
       const arcT = spec.finalT - 1 + a;
       const arcSz = arcSizeAt(arcT, spec);
       const restSize = lerp(arcSz, spec.states[0].size, s);
-      const size = p <= 0 ? restSize : lerpArr(sizes, p);
+      const promotedSize = p <= 0 ? restSize : lerpArr(sizes, p);
+      const size = lerp(promotedSize, spec.welcome.size, w);
       return size / MAX_SIZE;
     },
   );
@@ -391,9 +505,9 @@ function ArcOrb({
     },
   );
   const opacity = useTransform(
-    [arcProgress, settleProgress, promoteLevel],
+    [arcProgress, settleProgress, promoteLevel, welcomeProgress],
     (vals: number[]) => {
-      const [a, s, p] = vals;
+      const [a, s, p, w] = vals;
       const arcT = spec.finalT - 1 + a;
       let baseOp = 1;
       if (arcT < -0.35) baseOp = 0;
@@ -401,7 +515,8 @@ function ArcOrb({
       if (spec.fadeOnSettle) baseOp *= 1 - s;
       const settledOp = lerp(1, spec.states[0].opacity ?? 1, s);
       const promotedOp = p <= 0 ? settledOp : lerpArr(opacities, p);
-      return baseOp * promotedOp;
+      const welcomeOp = lerp(promotedOp, spec.welcome.opacity ?? 1, w);
+      return baseOp * welcomeOp;
     },
   );
 
@@ -456,6 +571,93 @@ function PillRow({
         </p>
         <CheckmarkBadge />
       </div>
+    </motion.div>
+  );
+}
+
+function AuraContainer({
+  welcomeProgress,
+  children,
+}: {
+  welcomeProgress: MotionValue<number>;
+  children: React.ReactNode;
+}) {
+  // Fade the aura completely as the Welcome transition takes over.
+  const opacity = useTransform(welcomeProgress, [0, 0.9], [1, 0]);
+  return (
+    <motion.div
+      className="pointer-events-none absolute left-1/2 top-0 -translate-x-1/2 overflow-hidden"
+      style={{
+        width: 500,
+        height: 220,
+        maskImage:
+          "linear-gradient(to bottom, black 0%, black 55%, transparent 100%)",
+        WebkitMaskImage:
+          "linear-gradient(to bottom, black 0%, black 55%, transparent 100%)",
+        opacity,
+      }}
+    >
+      {children}
+    </motion.div>
+  );
+}
+
+function FadingWrapper({
+  welcomeProgress,
+  children,
+}: {
+  welcomeProgress: MotionValue<number>;
+  children: React.ReactNode;
+}) {
+  const opacity = useTransform(welcomeProgress, [0, 0.6], [1, 0]);
+  return (
+    <motion.div className="absolute inset-0" style={{ opacity }}>
+      {children}
+    </motion.div>
+  );
+}
+
+function WelcomeText({
+  welcomeProgress,
+  textIdx,
+}: {
+  welcomeProgress: MotionValue<number>;
+  textIdx: number;
+}) {
+  const opacity = useTransform(welcomeProgress, [0.5, 1], [0, 1]);
+  const y = useTransform(welcomeProgress, [0.5, 1], [10, 0]);
+  const current = WELCOME_TEXTS[textIdx];
+  // Longer stagger + per-word duration → readable but still crisp.
+  const line1Words = current.line1.split(/\s+/).length;
+  return (
+    <motion.div
+      className="pointer-events-none absolute left-1/2 top-[490px] -translate-x-1/2 text-center"
+      style={{ opacity, y }}
+    >
+      <AnimatePresence mode="wait">
+        <motion.div
+          key={textIdx}
+          initial={{ opacity: 1 }}
+          animate={{ opacity: 1 }}
+          exit={{ opacity: 0, filter: "blur(12px)", transition: { duration: 0.5, ease: ROLL_EASE } }}
+        >
+          <WordReveal
+            text={current.line1}
+            className="text-[22px] font-medium leading-[28px] tracking-[-0.04em] text-neutral-400"
+            staggerMs={140}
+            perWordDurationMs={480}
+          />
+          <div className="mt-2">
+            <WordReveal
+              text={current.line2}
+              className="text-[22px] font-semibold leading-[28px] tracking-[-0.04em] text-[color:var(--ink)]"
+              delay={(line1Words * 140) / 1000 + 0.15}
+              staggerMs={140}
+              perWordDurationMs={480}
+            />
+          </div>
+        </motion.div>
+      </AnimatePresence>
     </motion.div>
   );
 }
@@ -582,10 +784,46 @@ function ActiveCard({ step }: { step: Step }) {
   );
 }
 
-export default function Screen4() {
+const WELCOME_HOLD_MS = 2800;
+const WELCOME_DURATION = 1.6;
+// After the Welcome text has been visible for this long, swap to the "Your team..." message.
+const WELCOME_TEXT_ADVANCE_MS = 3200;
+
+const WELCOME_TEXTS: Array<{ line1: string; line2: string }> = [
+  { line1: "Welcome back,", line2: "Mohak" },
+  { line1: "Your team doesn't just\nhandle the work", line2: "They bring the perks" },
+];
+
+export default function Screen4({
+  checkpointMatcher,
+}: {
+  checkpointMatcher?: InnerMatcher;
+} = {}) {
   const arcProgress = useMotionValue(0);
   const settleProgress = useMotionValue(0);
   const promoteLevel = useMotionValue(0);
+  const welcomeProgress = useMotionValue(0);
+  const [welcomeStarted, setWelcomeStarted] = useState(false);
+  const [welcomeTextIdx, setWelcomeTextIdx] = useState(0);
+
+  // Apply a checkpoint jump when the matcher prop changes.
+  useEffect(() => {
+    if (!checkpointMatcher) return;
+    const cp = resolveInnerCheckpoint(checkpointMatcher);
+    arcProgress.set(cp.arcProgress);
+    settleProgress.set(cp.settleProgress);
+    promoteLevel.set(cp.promoteLevel);
+    welcomeProgress.set(cp.welcomeProgress);
+    setTimelineIdx(cp.timelineIdx);
+    setWelcomeStarted(cp.welcomeProgress > 0);
+    setWelcomeTextIdx(cp.welcomeTextIdx);
+  }, [
+    checkpointMatcher,
+    arcProgress,
+    settleProgress,
+    promoteLevel,
+    welcomeProgress,
+  ]);
 
   const [timelineIdx, setTimelineIdx] = useState(-1);
   const timerRef = useRef<number | null>(null);
@@ -644,6 +882,36 @@ export default function Screen4() {
     };
   }, [timelineIdx, promoteLevel]);
 
+  // Once Safety's summary is showing, hold briefly then kick off the Welcome transition.
+  useEffect(() => {
+    if (welcomeStarted) return;
+    const entry = timelineIdx >= 0 ? TIMELINE[timelineIdx] : null;
+    if (!entry) return;
+    const isFinalSummary =
+      entry.step.kind === "summary" &&
+      entry.step.agentIdx === AGENTS.length - 1;
+    if (!isFinalSummary) return;
+    const t = window.setTimeout(() => {
+      setWelcomeStarted(true);
+      animate(welcomeProgress, 1, {
+        duration: WELCOME_DURATION,
+        ease: SETTLE_EASE as unknown as [number, number, number, number],
+      });
+    }, WELCOME_HOLD_MS);
+    return () => window.clearTimeout(t);
+  }, [timelineIdx, welcomeProgress, welcomeStarted]);
+
+  // Once Welcome is fully on screen, cycle to the next text message.
+  useEffect(() => {
+    if (!welcomeStarted) return;
+    if (welcomeTextIdx >= WELCOME_TEXTS.length - 1) return;
+    const t = window.setTimeout(
+      () => setWelcomeTextIdx((i) => i + 1),
+      WELCOME_DURATION * 1000 + WELCOME_TEXT_ADVANCE_MS,
+    );
+    return () => window.clearTimeout(t);
+  }, [welcomeStarted, welcomeTextIdx]);
+
   const currentEntry = timelineIdx >= 0 ? TIMELINE[timelineIdx] : null;
 
   return (
@@ -659,18 +927,9 @@ export default function Screen4() {
     >
       {/* Top aura — outer viewport has fixed size + mask that clips overflow.
           Inner element does the motion inside that viewport — spill stays
-          contained no matter how much scale/drift we apply. */}
-      <div
-        className="pointer-events-none absolute left-1/2 top-0 -translate-x-1/2 overflow-hidden"
-        style={{
-          width: 500,
-          height: 220,
-          maskImage:
-            "linear-gradient(to bottom, black 0%, black 55%, transparent 100%)",
-          WebkitMaskImage:
-            "linear-gradient(to bottom, black 0%, black 55%, transparent 100%)",
-        }}
-      >
+          contained no matter how much scale/drift we apply. Fades out during
+          the Welcome transition. */}
+      <AuraContainer welcomeProgress={welcomeProgress}>
         <motion.div
           className="absolute left-1/2 top-0 -translate-x-1/2"
           style={{ transformOrigin: "50% 20%" }}
@@ -724,96 +983,102 @@ export default function Screen4() {
         >
           <AuraGlow width={500} opacity={0.7} blur={50} />
         </motion.div>
-      </div>
+      </AuraContainer>
 
-      {/* Intro headline */}
-      <div className="absolute left-1/2 top-[48%] w-full -translate-x-1/2 -translate-y-1/2 px-8 text-center">
-        <motion.h2
-          className="text-[22px] font-medium leading-[28px] tracking-[-0.04em] text-[color:var(--ink)]"
-          initial={{ opacity: 0, filter: "blur(24px)", scale: 0.96 }}
-          animate={{
-            opacity: [0, 1, 1, 0],
-            filter: ["blur(24px)", "blur(0px)", "blur(0px)", "blur(24px)"],
-            scale: [0.96, 1, 1, 1.02],
-          }}
-          transition={{
-            duration: TEXT_TOTAL,
-            times: [
-              0,
-              TEXT_IN / TEXT_TOTAL,
-              (TEXT_IN + TEXT_HOLD) / TEXT_TOTAL,
-              1,
-            ],
-            ease: [0.22, 1, 0.36, 1],
-          }}
-        >
-          Meet your travel team.
-          <br />
-          On duty 24/7.
-        </motion.h2>
-      </div>
-
-      {/* Completed-agent pills — one per completed agent, stacked at the top. */}
-      {AGENTS.slice(0, -1).map((_, idx) => (
-        <PillRow
-          key={`pill-${idx}`}
-          agentIdx={idx}
-          promoteLevel={promoteLevel}
-        />
-      ))}
-
-      {/* Active card */}
+      {/* Intro headline — word-by-word reveal, then blur-out on hold end. */}
       <motion.div
-        className="absolute left-[135px] top-[458px] w-[265px]"
-        initial={{ opacity: 0, filter: "blur(20px)", x: -6 }}
-        animate={{ opacity: 1, filter: "blur(0px)", x: 0 }}
+        className="absolute left-1/2 top-[48%] w-full -translate-x-1/2 -translate-y-1/2 px-8 text-center"
+        initial={{ opacity: 1, filter: "blur(0px)" }}
+        animate={{
+          opacity: [1, 1, 0],
+          filter: ["blur(0px)", "blur(0px)", "blur(24px)"],
+        }}
         transition={{
-          delay: CARD_DELAY,
-          duration: CARD_FADE_IN,
+          duration: TEXT_TOTAL,
+          times: [0, (TEXT_IN + TEXT_HOLD) / TEXT_TOTAL, 1],
           ease: [0.22, 1, 0.36, 1],
         }}
       >
-        {currentEntry && <ActiveCard step={currentEntry.step} />}
+        <WordReveal
+          text={"Meet your travel team.\nOn duty 24/7."}
+          className="text-[22px] font-medium leading-[28px] tracking-[-0.04em] text-[color:var(--ink)]"
+          staggerMs={80}
+          perWordDurationMs={340}
+        />
       </motion.div>
 
-      {/* Next CTA — appears after Safety's summary is fully in view. */}
-      <AnimatePresence>
-        {currentEntry?.step.kind === "summary" &&
-          currentEntry.step.agentIdx === AGENTS.length - 1 && (
-            <motion.div
-              key="next-cta"
-              className="absolute bottom-6 left-1/2 -translate-x-1/2"
-              initial={{ opacity: 0, y: 16 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{
-                delay: 0.8,
-                duration: ROLL_DURATION,
-                ease: ROLL_EASE,
-              }}
-            >
-              <button
-                className="relative h-[52px] w-[360px] overflow-hidden rounded-full text-[16px] font-semibold text-[color:var(--ink)]"
-                style={{
-                  background:
-                    "linear-gradient(90deg, rgba(80,87,234,0.28) 0%, rgba(217,70,239,0.22) 35%, rgba(239,68,68,0.26) 65%, rgba(237,215,88,0.30) 100%)",
-                  boxShadow: "0 12px 30px -14px rgba(0,0,0,0.18)",
-                  border: "1px solid rgba(255,255,255,0.5)",
+      {/* Wrapper that fades everything (pills + card + CTA) as we transition
+          into the Welcome state. Orbs stay outside this wrapper since they
+          morph rather than fade. */}
+      <FadingWrapper welcomeProgress={welcomeProgress}>
+        {/* Completed-agent pills */}
+        {AGENTS.slice(0, -1).map((_, idx) => (
+          <PillRow
+            key={`pill-${idx}`}
+            agentIdx={idx}
+            promoteLevel={promoteLevel}
+          />
+        ))}
+
+        {/* Active card */}
+        <motion.div
+          className="absolute left-[135px] top-[458px] w-[265px]"
+          initial={{ opacity: 0, filter: "blur(20px)", x: -6 }}
+          animate={{ opacity: 1, filter: "blur(0px)", x: 0 }}
+          transition={{
+            delay: CARD_DELAY,
+            duration: CARD_FADE_IN,
+            ease: [0.22, 1, 0.36, 1],
+          }}
+        >
+          {currentEntry && <ActiveCard step={currentEntry.step} />}
+        </motion.div>
+
+        {/* Next CTA */}
+        <AnimatePresence>
+          {currentEntry?.step.kind === "summary" &&
+            currentEntry.step.agentIdx === AGENTS.length - 1 && (
+              <motion.div
+                key="next-cta"
+                className="absolute bottom-6 left-1/2 -translate-x-1/2"
+                initial={{ opacity: 0, y: 16 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{
+                  delay: 0.8,
+                  duration: ROLL_DURATION,
+                  ease: ROLL_EASE,
                 }}
               >
-                Next
-              </button>
-            </motion.div>
-          )}
-      </AnimatePresence>
+                <button
+                  className="relative h-[52px] w-[360px] overflow-hidden rounded-full text-[16px] font-semibold text-[color:var(--ink)]"
+                  style={{
+                    background:
+                      "linear-gradient(90deg, rgba(80,87,234,0.28) 0%, rgba(217,70,239,0.22) 35%, rgba(239,68,68,0.26) 65%, rgba(237,215,88,0.30) 100%)",
+                    boxShadow: "0 12px 30px -14px rgba(0,0,0,0.18)",
+                    border: "1px solid rgba(255,255,255,0.5)",
+                  }}
+                >
+                  Next
+                </button>
+              </motion.div>
+            )}
+        </AnimatePresence>
+      </FadingWrapper>
+
+      {/* Welcome text — fades in during the welcome transition, then swaps
+          messages via blur cross-fade (frame 1443). */}
+      <WelcomeText welcomeProgress={welcomeProgress} textIdx={welcomeTextIdx} />
 
       {/* Orbs */}
       {ORBS.map((orb, i) => (
         <ArcOrb
           key={i}
           spec={orb}
+          orbIndex={i}
           arcProgress={arcProgress}
           settleProgress={settleProgress}
           promoteLevel={promoteLevel}
+          welcomeProgress={welcomeProgress}
         />
       ))}
     </motion.div>
