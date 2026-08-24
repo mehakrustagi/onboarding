@@ -169,7 +169,7 @@ export default function Screen5({
   initialPhase,
   onComplete,
   hideFinaleSummary = false,
-  finaleCardOpacity,
+  finaleCardX,
 }: {
   /** Optional phase to seed on mount — used by the dev checkpoint panel to
    *  jump directly to a specific state (skips prior auto-advance timers). */
@@ -181,10 +181,10 @@ export default function Screen5({
    *  stays but the "All your benefits. One WorldPass." summary is replaced
    *  by the name + ID overlay from Screen 6. */
   hideFinaleSummary?: boolean;
-  /** External MotionValue owned by OnboardingFlow — Screen 6 drives this
-   *  down from 1 as user swipes to the household card so this card fades
-   *  out in sync with the strip. */
-  finaleCardOpacity?: import("framer-motion").MotionValue<number>;
+  /** External MotionValue owned by OnboardingFlow — Screen 6 sets this to
+   *  the carousel strip's x offset so this card translates horizontally in
+   *  sync (WorldPass slides off left when user swipes to the household card). */
+  finaleCardX?: import("framer-motion").MotionValue<number>;
 } = {}) {
   const [phase, setPhase] = useState<
     "intro" | "cardEmpty" | number | "final"
@@ -423,7 +423,7 @@ export default function Screen5({
           each time an orb lands. */}
       <motion.div
         className="absolute left-1/2 -translate-x-1/2"
-        style={{ bottom: CARD_BOTTOM, opacity: finaleCardOpacity }}
+        style={{ bottom: CARD_BOTTOM, x: finaleCardX }}
         initial={{ y: 260, opacity: 0, rotateX: -10, scale: 0.94 }}
         animate={
           cardVisible

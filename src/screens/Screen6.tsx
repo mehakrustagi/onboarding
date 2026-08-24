@@ -10,7 +10,6 @@ import {
   type MotionValue,
   type PanInfo,
 } from "framer-motion";
-import Card3D from "@/components/Card3D";
 
 /* -----------------------------------------------------------------------------
  * Screen 6 — "Your WorldPass is issued"
@@ -34,27 +33,25 @@ const STRIP_PAD_X = (PHONE_W - CARD_W) / 2; // center the first card
 const CARD_TOP = 317; // matches Screen 5's finale card position
 
 export default function Screen6({
-  screen5CardVisibility,
+  screen5CardX,
 }: {
-  /** MotionValue owned by OnboardingFlow — Screen 6 drives 1→0 as user
-   *  swipes to the household card so Screen 5's underlying WorldPass card
-   *  fades out in sync with the strip. */
-  screen5CardVisibility?: MotionValue<number>;
+  /** MotionValue owned by OnboardingFlow — Screen 6 drives this to the
+   *  strip's x offset so Screen 5's WorldPass card slides horizontally
+   *  in perfect sync with the carousel (no fade ghosting). */
+  screen5CardX?: MotionValue<number>;
 } = {}) {
   const [activeIdx, setActiveIdx] = useState(0);
   const x = useMotionValue(0);
   const scrollProgress = useTransform(x, [-STRIDE, 0], [1, 0], { clamp: true });
-  const s5CardOpacity = useTransform(scrollProgress, [0, 0.4], [1, 0]);
-  const worldPassOpacity = useTransform(scrollProgress, [0, 0.15], [0, 1]);
-  const bgOverlayOpacity = useTransform(scrollProgress, [0, 0.35, 1], [0, 0, 1]);
+  const s5NameOpacity = useTransform(scrollProgress, [0, 0.2], [1, 0]);
 
-  // Bubble Screen 5's card visibility upward — synced to s5CardOpacity so
-  // the card underneath fades exactly as our overlays take over.
+  // Slide Screen 5's card along with the strip. Values are identical to `x`
+  // so the two cards move as one — no crossfade required.
   useEffect(() => {
-    if (!screen5CardVisibility) return;
-    const unsub = s5CardOpacity.on("change", (v) => screen5CardVisibility.set(v));
+    if (!screen5CardX) return;
+    const unsub = x.on("change", (v) => screen5CardX.set(v));
     return () => unsub();
-  }, [s5CardOpacity, screen5CardVisibility]);
+  }, [x, screen5CardX]);
 
   const handleDragEnd = (_: unknown, info: PanInfo) => {
     const projected = info.offset.x + info.velocity.x * 0.12;
@@ -70,16 +67,6 @@ export default function Screen6({
 
   return (
     <div className="relative h-full w-full overflow-hidden rounded-[44px]">
-      {/* Overlay that fades Screen 5's card as the strip scrolls. */}
-      <motion.div
-        className="pointer-events-none absolute inset-0"
-        style={{
-          background:
-            "linear-gradient(to bottom, var(--bg-screen-start), var(--bg-screen-end))",
-          opacity: bgOverlayOpacity,
-        }}
-      />
-
       {/* Scan icon pill */}
       <motion.div
         className="absolute left-1/2 -translate-x-1/2 flex items-center justify-center rounded-full text-[color:var(--ink)]"
@@ -134,11 +121,12 @@ export default function Screen6({
         Complete quick KYC to activate your pass and unlock all benefits
       </motion.p>
 
-      {/* Name + divider + ID overlay — pinned to Screen 5's card interior;
-          fades out as user scrolls to the household card. */}
+      {/* Name + divider + ID overlay — pinned to Screen 5's card interior and
+          slides along with it via the shared x. Fades quickly as user leaves
+          the WorldPass so it doesn't linger over the household card. */}
       <motion.div
         className="pointer-events-none absolute left-1/2 -translate-x-1/2 text-center"
-        style={{ top: 560, width: 180, opacity: s5CardOpacity }}
+        style={{ top: 560, width: 180, opacity: s5NameOpacity, x }}
       >
         <motion.div
           initial={{ opacity: 0, y: 6 }}
@@ -187,15 +175,9 @@ export default function Screen6({
         animate={{ opacity: 1 }}
         transition={{ delay: STAGGER * 2, duration: 0.6, ease: IN_EASE }}
       >
-        {/* Slot 0 — WorldPass card (opacity ramps from 0 → 1 as user drags) */}
-        <motion.div
-          style={{
-            flexShrink: 0,
-            opacity: worldPassOpacity,
-          }}
-        >
-          <WorldPassCard />
-        </motion.div>
+        {/* Slot 0 — phantom that leaves Screen 5's card visible; the card
+            itself slides via the shared screen5CardX MotionValue. */}
+        <div style={{ width: CARD_W, height: CARD_H, flexShrink: 0 }} />
         {/* Slot 1 — Build your household */}
         <div style={{ flexShrink: 0 }}>
           <HouseholdCard />
@@ -253,58 +235,6 @@ export default function Screen6({
 /* ---------------------------------------------------------------------------
  * Cards
  * -------------------------------------------------------------------------*/
-
-function WorldPassCard() {
-  return (
-    <div style={{ width: CARD_W }}>
-      <Card3D width={CARD_W} height={CARD_H} radius={26} static>
-        <p
-          className="subtext-gradient pointer-events-none absolute left-1/2 -translate-x-1/2 whitespace-nowrap text-[11px] font-medium tracking-[-0.01em]"
-          style={{ top: 18 }}
-        >
-          + atlys worldpass
-        </p>
-        <div
-          className="pointer-events-none absolute left-1/2 -translate-x-1/2"
-          style={{
-            top: 40,
-            width: 220,
-            height: 220,
-            maskImage: "radial-gradient(circle, black 38%, transparent 55%)",
-            WebkitMaskImage:
-              "radial-gradient(circle, black 38%, transparent 55%)",
-          }}
-        >
-          <video
-            src="/assets/globe/globe.mp4"
-            autoPlay
-            loop
-            muted
-            playsInline
-            preload="auto"
-            style={{ width: "100%", height: "100%", objectFit: "cover" }}
-          />
-        </div>
-        <div className="absolute inset-x-6" style={{ bottom: 22 }}>
-          <p className="subtext-gradient text-center text-[15px] font-medium leading-[22px] tracking-[-0.02em]">
-            mohak n.
-          </p>
-          <div
-            className="mt-[8px]"
-            style={{
-              height: 1,
-              background:
-                "linear-gradient(90deg, rgba(255,255,255,0) 0%, rgba(255,255,255,0.2) 50%, rgba(255,255,255,0) 100%)",
-            }}
-          />
-          <p className="mt-[8px] text-center font-mono text-[11px] tracking-[0.16em] text-white/25">
-            6190001
-          </p>
-        </div>
-      </Card3D>
-    </div>
-  );
-}
 
 function HouseholdCard() {
   return (

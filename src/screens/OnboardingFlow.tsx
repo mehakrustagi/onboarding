@@ -30,9 +30,10 @@ const AUTO_ADVANCE_MS: Record<number, number> = {
 export default function OnboardingFlow() {
   const [index, setIndex] = useState(0);
   const [checkpointIdx, setCheckpointIdx] = useState(-1);
-  // Shared: Screen 6 drives this 1 → 0 as user swipes to the household card;
-  // Screen 5 reads it to fade out its finale WorldPass card in sync.
-  const screen5CardVisibility = useMotionValue(1);
+  // Shared: Screen 6 drives this to translate Screen 5's finale card
+  // horizontally along with the carousel strip — the card actually slides
+  // instead of fading, so the WorldPass and household cards feel connected.
+  const screen5CardX = useMotionValue(0);
 
   const next = useCallback(() => {
     setIndex((i) => Math.min(i + 1, SCREENS.length - 1));
@@ -106,13 +107,13 @@ export default function OnboardingFlow() {
               initialPhase={index === 5 ? "final" : screen5Phase}
               onComplete={next}
               hideFinaleSummary={index === 5}
-              finaleCardOpacity={index === 5 ? screen5CardVisibility : undefined}
+              finaleCardX={index === 5 ? screen5CardX : undefined}
             />
           </div>
         )}
         {index === 5 && (
           <div className="absolute inset-0">
-            <Screen6 screen5CardVisibility={screen5CardVisibility} />
+            <Screen6 screen5CardX={screen5CardX} />
           </div>
         )}
       </div>
