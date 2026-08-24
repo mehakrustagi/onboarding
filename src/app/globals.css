@@ -84,41 +84,58 @@
 }
 
 /* Per-benefit title gradients on the WorldPass cards.
-   Each stops at grey → the benefit's accent color. */
-.title-gradient-visa {
-  background-image: linear-gradient(90deg, #e3e3e3 0%, #9dd645 100%);
+   Base = grey → benefit accent color, with a bright shine band sweeping
+   left→right on loop (same rhythm as Screen 4's status text). */
+.title-gradient-visa,
+.title-gradient-protect,
+.title-gradient-forex,
+.title-gradient-stays,
+.title-gradient-data {
+  background-size: 220% 100%, 100% 100%;
+  background-position: 150% 0, 0 0;
+  background-repeat: no-repeat, no-repeat;
   -webkit-background-clip: text;
   background-clip: text;
   color: transparent;
   -webkit-text-fill-color: transparent;
+  animation: title-gradient-shine 3.4s cubic-bezier(0.4, 0, 0.2, 1) 0.6s infinite;
+}
+.title-gradient-visa {
+  background-image:
+    linear-gradient(115deg, rgba(255,255,255,0) 35%, rgba(255,255,255,0.9) 50%, rgba(255,255,255,0) 65%),
+    linear-gradient(90deg, #e3e3e3 0%, #9dd645 100%);
 }
 .title-gradient-protect {
-  background-image: linear-gradient(90deg, #e3e3e3 0%, #70d5b3 100%);
-  -webkit-background-clip: text;
-  background-clip: text;
-  color: transparent;
-  -webkit-text-fill-color: transparent;
+  background-image:
+    linear-gradient(115deg, rgba(255,255,255,0) 35%, rgba(255,255,255,0.9) 50%, rgba(255,255,255,0) 65%),
+    linear-gradient(90deg, #e3e3e3 0%, #70d5b3 100%);
 }
 .title-gradient-forex {
-  background-image: linear-gradient(90deg, #e3e3e3 0%, #e890f5 100%);
-  -webkit-background-clip: text;
-  background-clip: text;
-  color: transparent;
-  -webkit-text-fill-color: transparent;
+  background-image:
+    linear-gradient(115deg, rgba(255,255,255,0) 35%, rgba(255,255,255,0.9) 50%, rgba(255,255,255,0) 65%),
+    linear-gradient(90deg, #e3e3e3 0%, #e890f5 100%);
 }
 .title-gradient-stays {
-  background-image: linear-gradient(90deg, #e3e3e3 0%, #6ad3e5 100%);
-  -webkit-background-clip: text;
-  background-clip: text;
-  color: transparent;
-  -webkit-text-fill-color: transparent;
+  background-image:
+    linear-gradient(115deg, rgba(255,255,255,0) 35%, rgba(255,255,255,0.9) 50%, rgba(255,255,255,0) 65%),
+    linear-gradient(90deg, #e3e3e3 0%, #6ad3e5 100%);
 }
 .title-gradient-data {
-  background-image: linear-gradient(90deg, #e3e3e3 0%, #f58f8f 100%);
-  -webkit-background-clip: text;
-  background-clip: text;
-  color: transparent;
-  -webkit-text-fill-color: transparent;
+  background-image:
+    linear-gradient(115deg, rgba(255,255,255,0) 35%, rgba(255,255,255,0.9) 50%, rgba(255,255,255,0) 65%),
+    linear-gradient(90deg, #e3e3e3 0%, #f58f8f 100%);
+}
+
+@keyframes title-gradient-shine {
+  0% {
+    background-position: 150% 0, 0 0;
+  }
+  55% {
+    background-position: -50% 0, 0 0;
+  }
+  100% {
+    background-position: -50% 0, 0 0;
+  }
 }
 
 /* Secondary status text: static grey base + a single bright highlight band

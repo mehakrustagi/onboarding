@@ -44,13 +44,14 @@ export type Screen5Phase =
 export type EndCheckpoint = Checkpoint & { screen5Phase?: Screen5Phase };
 
 export const CHECKPOINTS_END: EndCheckpoint[] = [
-  { label: "5a · Card rise", outerIdx: 4, screen5Phase: "cardEmpty" },
-  { label: "5b · Visa (25%)", outerIdx: 4, screen5Phase: 0 },
-  { label: "5c · Flight (50%)", outerIdx: 4, screen5Phase: 1 },
-  { label: "5d · Forex (75%)", outerIdx: 4, screen5Phase: 2 },
-  { label: "5e · Safety (100%)", outerIdx: 4, screen5Phase: 3 },
-  { label: "5f · Whirlpool", outerIdx: 4, screen5Phase: "final" },
-  { label: "6 · WorldPass issued", outerIdx: 5 },
+  { label: "7 · Supercar", outerIdx: 4 },
+  { label: "5a · Card rise", outerIdx: 5, screen5Phase: "cardEmpty" },
+  { label: "5b · Visa (25%)", outerIdx: 5, screen5Phase: 0 },
+  { label: "5c · Flight (50%)", outerIdx: 5, screen5Phase: 1 },
+  { label: "5d · Forex (75%)", outerIdx: 5, screen5Phase: 2 },
+  { label: "5e · Safety (100%)", outerIdx: 5, screen5Phase: 3 },
+  { label: "5f · Whirlpool", outerIdx: 5, screen5Phase: "final" },
+  { label: "6 · WorldPass issued", outerIdx: 6 },
 ];
 
 // Inner checkpoints for Screen 4. `outerIdx: 3` = Screen 4.
@@ -63,7 +64,6 @@ export const CHECKPOINTS_INNER: Array<Omit<Checkpoint, "outerIdx"> & {
     | { kind: "start" }
     | { kind: "working"; agentIdx: number; lineIdx: number; statusIdx: number }
     | { kind: "summary"; agentIdx: number }
-    | { kind: "welcome" }
     | { kind: "teamPerks" };
 }> = [
   {
@@ -112,12 +112,7 @@ export const CHECKPOINTS_INNER: Array<Omit<Checkpoint, "outerIdx"> & {
     matcher: { kind: "summary", agentIdx: 3 },
   },
   {
-    label: "4j · Welcome",
-    outerIdx: 3,
-    matcher: { kind: "welcome" },
-  },
-  {
-    label: "4k · Team perks",
+    label: "4j · Team perks",
     outerIdx: 3,
     matcher: { kind: "teamPerks" },
   },

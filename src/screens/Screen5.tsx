@@ -12,7 +12,6 @@ import {
 } from "framer-motion";
 import AgentOrb from "@/components/AgentOrb";
 import Card3D from "@/components/Card3D";
-import CuboidText from "@/components/CuboidText";
 import WordReveal from "@/components/WordReveal";
 
 /* -----------------------------------------------------------------------------
@@ -373,9 +372,10 @@ export default function Screen5({
   const activeBenefit = typeof phase === "number" ? BENEFITS[phase] : null;
   const cardVisible = phase !== "intro";
 
-  // Text should appear only after the activation pulse finishes for new-orb
-  // arrivals; for same-agent swaps the flip happens immediately.
-  const textRevealDelay = isNewAgent ? 3.1 : 0;
+  // Text appears the MOMENT the orb touches the card (matches landingDelayMs
+  // = 1.5s) so the user can read the benefit before the whirlpool fires.
+  // For same-agent swaps the swap happens immediately.
+  const textRevealDelay = isNewAgent ? 1.5 : 0;
 
   return (
     <div
@@ -407,7 +407,9 @@ export default function Screen5({
               }}
               className="grey-shine-text text-[19px] font-medium leading-[24px] tracking-[-0.02em]"
             >
-              Issuing your Atlys WorldPass
+              Issuing your
+              <br />
+              Atlys WorldPass
             </motion.div>
           )}
         </AnimatePresence>
@@ -509,22 +511,22 @@ export default function Screen5({
           {/* Card contents — either the current benefit or the final summary. */}
           <div className="relative flex h-full flex-col justify-center px-6 text-center">
             {activeBenefit && (
-              <>
-                <CuboidText
+              <div key={activeBenefit.orb} className="contents">
+                <WordReveal
                   text={activeBenefit.title}
                   className={`text-[15px] font-semibold leading-[19px] tracking-[-0.02em] ${activeBenefit.titleGradientClass}`}
-                  height={22}
                   delay={textRevealDelay}
+                  staggerMs={70}
                 />
                 <div className="mt-3">
-                  <CuboidText
+                  <WordReveal
                     text={activeBenefit.desc}
                     className="subtext-gradient text-[12px] font-normal leading-[16px] tracking-[-0.01em]"
-                    height={80}
-                    delay={textRevealDelay + 0.2}
+                    delay={textRevealDelay + 0.25}
+                    staggerMs={45}
                   />
                 </div>
-              </>
+              </div>
             )}
             {phase === "final" && !hideFinaleSummary && (
               <motion.div

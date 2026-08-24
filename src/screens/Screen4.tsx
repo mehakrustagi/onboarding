@@ -85,11 +85,12 @@ type OrbSpec = {
   fadeOnSettle?: boolean;
 };
 
-// Pill column positions (from top): 3 completed levels stack above the active.
-const PILL_1 = 372;
-const PILL_2 = 282;
-const PILL_3 = 192;
-const ACTIVE_Y = 482;
+// Pill column positions (center y) — matches Figma node 16:22343.
+// PILL_1 is the bottom completed row (closest to the active orb).
+const PILL_1 = 378;
+const PILL_2 = 308;
+const PILL_3 = 243;
+const ACTIVE_Y = 468;
 
 // Vertical column positions — settled state before the text card shows.
 // Entrance is a curved arc; once settled, orbs stack vertically at cx=70
@@ -97,7 +98,8 @@ const ACTIVE_Y = 482;
 const COL_X = 70;
 const COL_Y = [ACTIVE_Y, 572, 642, 705, 778] as const;
 
-const PILL: Omit<OrbLayout, "cx" | "cy"> = { size: 32, opacity: 0.5 };
+// Completed-row (pill) orb: 40px, half-opacity — per Figma spec.
+const PILL: Omit<OrbLayout, "cx" | "cy"> = { size: 40, opacity: 0.5 };
 
 const ORBS: OrbSpec[] = [
   // Orb 0 — Visa. Starts main, ends deepest pill.
@@ -106,7 +108,7 @@ const ORBS: OrbSpec[] = [
     arcSize: 92,
     blob: "/assets/orb/ellipse.png",
     states: [
-      { cx: COL_X, cy: COL_Y[0], size: 90 },
+      { cx: COL_X, cy: COL_Y[0], size: 60 },
       { cx: COL_X, cy: PILL_1, ...PILL },
       { cx: COL_X, cy: PILL_2, ...PILL },
       { cx: COL_X, cy: PILL_3, ...PILL },
@@ -120,7 +122,7 @@ const ORBS: OrbSpec[] = [
     blob: "/assets/orb/blob-flight.png",
     states: [
       { cx: COL_X, cy: COL_Y[1], size: 55 },
-      { cx: COL_X, cy: COL_Y[0], size: 90 },
+      { cx: COL_X, cy: COL_Y[0], size: 60 },
       { cx: COL_X, cy: PILL_1, ...PILL },
       { cx: COL_X, cy: PILL_2, ...PILL },
     ],
@@ -134,7 +136,7 @@ const ORBS: OrbSpec[] = [
     states: [
       { cx: COL_X, cy: COL_Y[2], size: 40, opacity: 0.9 },
       { cx: COL_X, cy: COL_Y[1], size: 50 },
-      { cx: COL_X, cy: COL_Y[0], size: 90 },
+      { cx: COL_X, cy: COL_Y[0], size: 60 },
       { cx: COL_X, cy: PILL_1, ...PILL },
     ],
     welcome: { cx: 190, cy: 425, size: 48 },
@@ -148,7 +150,7 @@ const ORBS: OrbSpec[] = [
       { cx: COL_X, cy: COL_Y[3], size: 30, opacity: 0.55 },
       { cx: COL_X, cy: COL_Y[2], size: 38, opacity: 0.85 },
       { cx: COL_X, cy: COL_Y[1], size: 48 },
-      { cx: COL_X, cy: COL_Y[0], size: 90 },
+      { cx: COL_X, cy: COL_Y[0], size: 60 },
     ],
     welcome: { cx: 130, cy: 425, size: 48 },
   },
@@ -382,16 +384,6 @@ function resolveInnerCheckpoint(matcher: InnerMatcher): Checkpoint {
         welcomeProgress: 0,
         welcomeTextIdx: 0,
       };
-    case "welcome":
-      return {
-        label: "welcome",
-        timelineIdx: findTimelineIdx(3, "summary"),
-        arcProgress: 1,
-        settleProgress: 1,
-        promoteLevel: 3,
-        welcomeProgress: 1,
-        welcomeTextIdx: 0,
-      };
     case "teamPerks":
       return {
         label: "teamPerks",
@@ -400,7 +392,9 @@ function resolveInnerCheckpoint(matcher: InnerMatcher): Checkpoint {
         settleProgress: 1,
         promoteLevel: 3,
         welcomeProgress: 1,
-        welcomeTextIdx: 1,
+        // Team perks is the only welcome text now — "Welcome back, Mohak" was
+        // removed. WELCOME_TEXTS[0] is the team-perks copy.
+        welcomeTextIdx: 0,
       };
     case "working":
       return {
@@ -498,14 +492,18 @@ function ArcOrb({
     },
   );
   const filter = useTransform(
-    [arcProgress, settleProgress],
+    [arcProgress, settleProgress, promoteLevel, welcomeProgress],
     (vals: number[]) => {
-      const [a, s] = vals;
+      const [a, s, p, w] = vals;
       const arcT = spec.finalT - 1 + a;
       const trailingBlur = arcT < 0 ? 14 : 0;
       const arcBlur = restBlurAt(arcT) + trailingBlur;
       const b = lerp(arcBlur, 0, s);
-      return `blur(${b.toFixed(2)}px)`;
+      // Once this orb is promoted past its own turn, drain its color so the
+      // completed agents read as "done" in the top row. Welcome un-grayscales.
+      const promoted = Math.min(1, Math.max(0, p - orbIndex));
+      const gray = promoted * (1 - w);
+      return `blur(${b.toFixed(2)}px) grayscale(${gray.toFixed(2)})`;
     },
   );
   const opacity = useTransform(
@@ -558,7 +556,7 @@ function PillRow({
   // Slot depth = promoteLevel - agentIdx (fractional during a promotion).
   // slot 1 → PILL_1, slot 2 → PILL_2, slot 3 → PILL_3. Driven directly by
   // the animating promoteLevel MotionValue → smooth ride, no discrete jump.
-  const PILL_ROW_HEIGHT = 20;
+  const PILL_ROW_HEIGHT = 19;
   const targetY = useTransform(promoteLevel, (p) => {
     const slot = Math.max(1, p - agentIdx);
     return lerpArr([PILL_1, PILL_2, PILL_3], slot - 1) - PILL_ROW_HEIGHT / 2;
@@ -570,7 +568,7 @@ function PillRow({
       style={{ top: targetY, height: PILL_ROW_HEIGHT, opacity }}
     >
       <div className="flex h-full items-center justify-between gap-2">
-        <p className="text-[14px] font-medium leading-[18px] tracking-[-0.01em] text-neutral-400">
+        <p className="text-[14px] font-semibold leading-[19px] tracking-[-0.01em] text-[#999]">
           {AGENTS[agentIdx].summary.text}
         </p>
         <CheckmarkBadge />
@@ -719,7 +717,7 @@ function ActiveCard({ step }: { step: Step }) {
         initial={{ opacity: 0, y: -8 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ duration: ROLL_DURATION, ease: ROLL_EASE }}
-        className="text-[16px] font-semibold leading-[20px] tracking-[-0.02em] text-[color:var(--ink)]"
+        className="text-[16px] font-semibold leading-[20px] tracking-[-0.04em] text-[#0b0b0b]"
       >
         {agent.title}
       </motion.p>
@@ -743,7 +741,7 @@ function ActiveCard({ step }: { step: Step }) {
                 as="p"
                 shine
                 variant={isSummary ? "green" : line!.variant ?? "default"}
-                className="text-[15px] font-medium leading-[19px] tracking-[-0.02em]"
+                className="text-[14px] font-semibold leading-[19px] tracking-[-0.01em]"
               >
                 {isSummary ? agent.summary.text : line!.text}
               </GradientText>
@@ -760,7 +758,7 @@ function ActiveCard({ step }: { step: Step }) {
                     animate={{ y: 0, opacity: 1 }}
                     exit={{ y: 20, opacity: 0 }}
                     transition={{ duration: ROLL_DURATION, ease: ROLL_EASE, delay: 0.15 }}
-                    className="absolute inset-0 pr-3 text-[13px] font-medium leading-[17px] tracking-[-0.01em] text-neutral-400"
+                    className="absolute inset-0 pr-3 text-[12px] font-semibold leading-[16px] tracking-[-0.01em] text-[#787878]"
                     style={{ hyphens: "auto", wordBreak: "break-word" }}
                   >
                     {agent.summary.desc}
@@ -794,7 +792,6 @@ const WELCOME_DURATION = 1.6;
 const WELCOME_TEXT_ADVANCE_MS = 3200;
 
 const WELCOME_TEXTS: Array<{ line1: string; line2: string }> = [
-  { line1: "Welcome back,", line2: "Mohak" },
   { line1: "Your team doesn't just\nhandle the work", line2: "They bring the perks" },
 ];
 
@@ -888,7 +885,9 @@ export default function Screen4({
     };
   }, [timelineIdx, promoteLevel]);
 
-  // Once Safety's summary is showing, hold briefly then kick off the Welcome transition.
+  // Once Safety's summary is showing, hold briefly then kick off the Welcome
+  // transition. The "Welcome back, Mohak" text is skipped — we start directly
+  // on the Team-perks message.
   useEffect(() => {
     if (welcomeStarted) return;
     const entry = timelineIdx >= 0 ? TIMELINE[timelineIdx] : null;
@@ -907,25 +906,16 @@ export default function Screen4({
     return () => window.clearTimeout(t);
   }, [timelineIdx, welcomeProgress, welcomeStarted]);
 
-  // Once Welcome is fully on screen, cycle to the next text message.
+  // After the Team-perks text has been on screen for a beat, advance to
+  // Screen 5.
   useEffect(() => {
-    if (!welcomeStarted) return;
-    if (welcomeTextIdx >= WELCOME_TEXTS.length - 1) return;
+    if (!welcomeStarted || !onComplete) return;
     const t = window.setTimeout(
-      () => setWelcomeTextIdx((i) => i + 1),
+      onComplete,
       WELCOME_DURATION * 1000 + WELCOME_TEXT_ADVANCE_MS,
     );
     return () => window.clearTimeout(t);
-  }, [welcomeStarted, welcomeTextIdx]);
-
-  // After the last welcome text (frame 1443 "Team perks") has been on screen
-  // for a beat, advance to the next outer screen (frame 1444 — Screen 5).
-  useEffect(() => {
-    if (!onComplete) return;
-    if (welcomeTextIdx < WELCOME_TEXTS.length - 1) return;
-    const t = window.setTimeout(onComplete, WELCOME_TEXT_ADVANCE_MS);
-    return () => window.clearTimeout(t);
-  }, [welcomeTextIdx, onComplete]);
+  }, [welcomeStarted, onComplete]);
 
   const currentEntry = timelineIdx >= 0 ? TIMELINE[timelineIdx] : null;
 
@@ -1034,9 +1024,10 @@ export default function Screen4({
           />
         ))}
 
-        {/* Active card */}
+        {/* Active card — title lands at y ~444 to match Figma node 16:22343
+            (title top 444.69, subtitle 472.69, description 506.69). */}
         <motion.div
-          className="absolute left-[135px] top-[458px] w-[265px]"
+          className="absolute left-[135px] top-[437px] w-[265px]"
           initial={{ opacity: 0, filter: "blur(20px)", x: -6 }}
           animate={{ opacity: 1, filter: "blur(0px)", x: 0 }}
           transition={{
