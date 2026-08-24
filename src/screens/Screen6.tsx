@@ -41,12 +41,13 @@ export default function Screen6() {
         <ScanIcon />
       </motion.div>
 
-      {/* Title with laurel decorations — laurels span most of the canvas
-          width and the title sits in the gap between the two halves. Native
-          SVG aspect is 306.9 : 60 (~5.1:1); we scale by width only. */}
+      {/* Title with laurel decorations — laurels hug the title with a small
+          gap on each side (native SVG aspect 306.9:60, ~5.1:1). Keep width
+          close to Figma spec so the leaves sit next to the text, not floating
+          way out at the phone frame edges. */}
       <motion.div
         className="absolute left-1/2 -translate-x-1/2 flex items-center justify-center"
-        style={{ top: 205, width: 400, height: 78 }}
+        style={{ top: 205, width: 330, height: 64 }}
         initial={{ opacity: 0, y: 8 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ delay: STAGGER, duration: 0.6, ease: IN_EASE }}
@@ -54,13 +55,13 @@ export default function Screen6() {
         <Image
           src="/assets/worldpass/laurels.svg"
           alt=""
-          width={400}
-          height={78}
-          style={{ width: 400, height: "auto", opacity: 0.55 }}
+          width={330}
+          height={64}
+          style={{ width: 330, height: "auto", opacity: 0.55 }}
         />
         <p
-          className="absolute text-center text-[24px] font-medium leading-[30px] tracking-[-0.03em] text-[color:var(--ink)]"
-          style={{ maxWidth: 220 }}
+          className="absolute text-center text-[20px] font-medium leading-[25px] tracking-[-0.03em] text-[color:var(--ink)]"
+          style={{ maxWidth: 200 }}
         >
           Your WorldPass is
           <br />
@@ -68,13 +69,13 @@ export default function Screen6() {
         </p>
       </motion.div>
 
-      {/* Main WorldPass card is NOT rendered here — Screen 5's card underneath
-          is the shared element, so its globe video keeps looping unaffected.
-          We only overlay the name + divider + ID inside the card's footer,
-          fading in where Screen 5's "All your benefits. One WorldPass." was. */}
+      {/* Name + divider + ID overlay — positioned INSIDE Screen 5's card,
+          which sits at y 317 → 647 on the canvas. The block anchors near the
+          card's bottom edge (like the original summary text) so nothing spills
+          out. */}
       <motion.div
         className="pointer-events-none absolute left-1/2 -translate-x-1/2 text-center"
-        style={{ top: 587, width: 180 }}
+        style={{ top: 560, width: 180 }}
         initial={{ opacity: 0, y: 6 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ delay: STAGGER * 2, duration: 0.6, ease: IN_EASE }}
@@ -83,14 +84,14 @@ export default function Screen6() {
           mohak n.
         </p>
         <div
-          className="mt-[10px]"
+          className="mt-[8px]"
           style={{
             height: 1,
             background:
-              "linear-gradient(90deg, rgba(255,255,255,0) 0%, rgba(255,255,255,0.18) 50%, rgba(255,255,255,0) 100%)",
+              "linear-gradient(90deg, rgba(255,255,255,0) 0%, rgba(255,255,255,0.2) 50%, rgba(255,255,255,0) 100%)",
           }}
         />
-        <p className="mt-[10px] font-mono text-[11px] tracking-[0.16em] text-white/25">
+        <p className="mt-[8px] font-mono text-[11px] tracking-[0.16em] text-white/25">
           6190001
         </p>
       </motion.div>

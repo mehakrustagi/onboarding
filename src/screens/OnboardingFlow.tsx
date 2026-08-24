@@ -70,10 +70,13 @@ export default function OnboardingFlow() {
 
   return (
     <>
-      <CheckpointPanel
-        activeIdx={checkpointIdx}
-        onJump={(i) => setCheckpointIdx(i)}
-      />
+      {/* Checkpoint panel hidden — flip to `true` when needed for dev jumping. */}
+      {false && (
+        <CheckpointPanel
+          activeIdx={checkpointIdx}
+          onJump={(i) => setCheckpointIdx(i)}
+        />
+      )}
       <div
         onClick={next}
         className="relative h-[965px] w-[440px] cursor-pointer select-none overflow-hidden rounded-[44px] bg-white shadow-[0_40px_80px_-20px_rgba(0,0,0,0.5)]"

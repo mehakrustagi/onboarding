@@ -350,7 +350,7 @@ export default function Screen5({
         duration: 1.0,
         ease: [0.22, 1, 0.36, 1],
       });
-    }, 3200); // right as whirlpool merges + before globe/text fade in
+    }, 2300); // right as the rope closes the circle, before globe/text fade in
     return () => window.clearTimeout(t);
   }, [phase, cardShiftY]);
 
@@ -359,7 +359,9 @@ export default function Screen5({
   useEffect(() => {
     if (phase !== "final") return;
     if (!onComplete) return;
-    const t = window.setTimeout(onComplete, 7200);
+    // Fires after the finale content has landed (~4.4s in) with a beat
+    // to read "All your benefits. One WorldPass." before advancing.
+    const t = window.setTimeout(onComplete, 4000);
     return () => window.clearTimeout(t);
   }, [phase, onComplete]);
 
@@ -387,7 +389,7 @@ export default function Screen5({
               initial={{ opacity: 0, filter: "blur(10px)", y: -8 }}
               animate={{ opacity: 1, filter: "blur(0px)", y: 0 }}
               transition={{ delay: 0.25, duration: 0.6, ease: [0.22, 1, 0.36, 1] }}
-              className="text-[19px] font-medium leading-[24px] tracking-[-0.02em] text-neutral-500"
+              className="grey-shine-text text-[19px] font-medium leading-[24px] tracking-[-0.02em]"
             >
               Issuing your Atlys WorldPass
             </motion.div>
@@ -448,7 +450,7 @@ export default function Screen5({
               style={{ top: 18 }}
               initial={{ opacity: 0, y: -6 }}
               animate={{ opacity: 1, y: 0 }}
-              transition={{ delay: 3.5, duration: 0.6, ease: [0.22, 1, 0.36, 1] }}
+              transition={{ delay: 2.5, duration: 0.6, ease: [0.22, 1, 0.36, 1] }}
             >
               + atlys worldpass
             </motion.div>
@@ -468,9 +470,9 @@ export default function Screen5({
                 WebkitMaskImage:
                   "radial-gradient(circle, black 38%, transparent 55%)",
               }}
-              initial={{ opacity: 0, scale: 0.7 }}
+              initial={{ opacity: 0, scale: 0.86 }}
               animate={{ opacity: 1, scale: 1 }}
-              transition={{ delay: 3.5, duration: 0.9, ease: [0.22, 1, 0.36, 1] }}
+              transition={{ delay: 2.5, duration: 2.4, ease: [0.4, 0, 0.2, 1] }}
             >
               <video
                 src="/assets/globe/globe.mp4"
@@ -516,7 +518,7 @@ export default function Screen5({
                 initial={{ opacity: 0, filter: "blur(10px)", scale: 0.85 }}
                 animate={{ opacity: 1, filter: "blur(0px)", scale: 1 }}
                 transition={{
-                  delay: 3.2,
+                  delay: 2.4,
                   duration: 0.8,
                   ease: [0.22, 1, 0.36, 1],
                 }}
@@ -676,41 +678,39 @@ function WhirlpoolOrb({
   agent: OrbKey;
   orbIndex: number;
 }) {
-  // Whirlpool converges at the CENTER of the card — orbs swirl and merge
-  // at a single point where the summary text will then appear.
+  // Subtle "closing the circle": beads trace ONE gentle arc around the card
+  // center — same tight radius the entrance arc used, no multi-loop swirl.
+  // All four beads follow the same curve, staggered slightly so they read
+  // as a rope tightening into the eye.
   const CX = 220;
   const CY = CARD_TOP_Y + CARD_HEIGHT / 2; // = 610, card center
-  const SIZE = 36;
-  const startAngle = orbIndex * ((Math.PI * 2) / QUEUE.length);
-  const WHIRL_DURATION_S = 3.4;
+  const SIZE = 30;
+  const STAGGER_S = 0.22;
+  const INDIVIDUAL_S = 1.6;
+  const RADIUS = 48; // small, subtle — like the entrance arc
+  const START_ANGLE = -Math.PI / 2; // start at top (12 o'clock)
 
   const progress = useMotionValue(0);
   useEffect(() => {
     const controls = animate(progress, 1, {
-      duration: WHIRL_DURATION_S,
-      ease: "linear",
+      duration: INDIVIDUAL_S,
+      delay: orbIndex * STAGGER_S,
+      ease: [0.4, 0, 0.2, 1],
     });
     return () => controls.stop();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  const x = useTransform(progress, (p) => {
-    const radius = 90 * Math.pow(1 - p, 1.8);
-    const angle = startAngle + p * Math.PI * 2 * 3.5; // 3.5 full rotations
-    return CX + radius * Math.cos(angle) - SIZE / 2;
-  });
-  const y = useTransform(progress, (p) => {
-    const radius = 90 * Math.pow(1 - p, 1.8);
-    const angle = startAngle + p * Math.PI * 2 * 3.5;
-    return CY + radius * Math.sin(angle) - SIZE / 2;
-  });
-  // Smooth continuous fade — opacity gently rolls off over the whole spiral
-  // so orbs dissolve as they shrink (no hard cliff).
-  const opacity = useTransform(progress, [0, 0.5, 1], [1, 0.85, 0]);
-  // Big at the start, tiny at the merge — 1.2 → 0.15 exponential shrink.
-  const scale = useTransform(progress, (p) => 1.2 * Math.pow(1 - p, 1.5) + 0.05);
-  // Blur increases as the orb shrinks — reads as "dissolving into the surface".
-  const filter = useTransform(progress, (p) => `blur(${p * 6}px)`);
+  // Exactly one revolution, radius eases to zero only in the last stretch.
+  const angleOf = (p: number) => START_ANGLE + p * Math.PI * 2;
+  const radiusOf = (p: number) => RADIUS * (1 - Math.pow(p, 2.4));
+
+  const x = useTransform(progress, (p) => CX + radiusOf(p) * Math.cos(angleOf(p)) - SIZE / 2);
+  const y = useTransform(progress, (p) => CY + radiusOf(p) * Math.sin(angleOf(p)) - SIZE / 2);
+  // Quick fade-in as the bead joins the rope, held bright, dissolves at eye.
+  const opacity = useTransform(progress, [0, 0.1, 0.75, 1], [0, 1, 1, 0]);
+  const scale = useTransform(progress, (p) => 1 - p * 0.6);
+  const filter = useTransform(progress, (p) => `blur(${Math.max(0, p - 0.7) * 6}px)`);
 
   return (
     <motion.div
