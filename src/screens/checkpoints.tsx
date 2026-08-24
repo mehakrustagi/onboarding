@@ -50,6 +50,7 @@ export const CHECKPOINTS_END: EndCheckpoint[] = [
   { label: "5d · Forex (75%)", outerIdx: 4, screen5Phase: 2 },
   { label: "5e · Safety (100%)", outerIdx: 4, screen5Phase: 3 },
   { label: "5f · Whirlpool", outerIdx: 4, screen5Phase: "final" },
+  { label: "6 · WorldPass issued", outerIdx: 5 },
 ];
 
 // Inner checkpoints for Screen 4. `outerIdx: 3` = Screen 4.

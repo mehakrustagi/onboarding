@@ -7,6 +7,7 @@ import Screen2 from "./Screen2";
 import Screen3 from "./Screen3";
 import Screen4 from "./Screen4";
 import Screen5 from "./Screen5";
+import Screen6 from "./Screen6";
 import {
   ALL_CHECKPOINTS,
   CHECKPOINTS_INNER,
@@ -18,7 +19,7 @@ import {
 
 type InnerMatcher = (typeof CHECKPOINTS_INNER)[number]["matcher"];
 
-const SCREENS = [Screen1, Screen2, Screen3, Screen4, Screen5] as const;
+const SCREENS = [Screen1, Screen2, Screen3, Screen4, Screen5, Screen6] as const;
 
 const AUTO_ADVANCE_MS: Record<number, number> = {
   0: 3000,
@@ -82,7 +83,7 @@ export default function OnboardingFlow() {
             {index === 3 ? (
               <Screen4 checkpointMatcher={innerMatcher} onComplete={next} />
             ) : index === 4 ? (
-              <Screen5 key={screen5Key} initialPhase={screen5Phase} />
+              <Screen5 key={screen5Key} initialPhase={screen5Phase} onComplete={next} />
             ) : (
               <Current />
             )}

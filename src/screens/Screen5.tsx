@@ -167,10 +167,14 @@ function clockwiseSemicircle(
 
 export default function Screen5({
   initialPhase,
+  onComplete,
 }: {
   /** Optional phase to seed on mount — used by the dev checkpoint panel to
    *  jump directly to a specific state (skips prior auto-advance timers). */
   initialPhase?: "intro" | "cardEmpty" | number | "final";
+  /** Called once the WorldPass finale has settled — used to auto-advance
+   *  to Screen 6 ("Your WorldPass is issued"). */
+  onComplete?: () => void;
 } = {}) {
   const [phase, setPhase] = useState<
     "intro" | "cardEmpty" | number | "final"
@@ -344,6 +348,15 @@ export default function Screen5({
     }, 3200); // right as whirlpool merges + before globe/text fade in
     return () => window.clearTimeout(t);
   }, [phase, cardShiftY]);
+
+  // Auto-advance to Screen 6 once the finale has been on screen long enough
+  // for the "All your benefits. One WorldPass." text to land.
+  useEffect(() => {
+    if (phase !== "final") return;
+    if (!onComplete) return;
+    const t = window.setTimeout(onComplete, 7200);
+    return () => window.clearTimeout(t);
+  }, [phase, onComplete]);
 
   const activeBenefit = typeof phase === "number" ? BENEFITS[phase] : null;
   const cardVisible = phase !== "intro";
