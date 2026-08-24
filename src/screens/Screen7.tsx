@@ -1,11 +1,15 @@
 "use client";
 
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import Image from "next/image";
+import AgentOrb from "@/components/AgentOrb";
+import WordReveal from "@/components/WordReveal";
 import {
   animate,
+  AnimatePresence,
   motion,
   useMotionValue,
+  useTime,
   useTransform,
   type PanInfo,
 } from "framer-motion";
@@ -88,6 +92,23 @@ export default function Screen7({
   // `x` = drag offset (unbounded). Negative x = swiped left = next car.
   const x = useMotionValue(0);
   const [activeIdx, setActiveIdx] = useState(0);
+  // "select" = swipeable carousel; "staged" = locked-in state after Reserve.
+  const [phase, setPhase] = useState<"select" | "staged">("select");
+
+  // Auto-advance from the staged screen after 9.5s. Full timeline:
+  //   0.0–1.75s  car drives off + tracks/smoke bloom
+  //   1.85–2.86s orbs bloom in staggered (car has left the frame)
+  //   2.95–3.85s "Your ride is staged" word-reveal
+  //   3.5–5.0s   "Ferrari 296 GTB locked for your airport pickup" word-reveal
+  //   5.0–8.0s   full staged view held (user reads the copy, orbs bob,
+  //              smoke keeps drifting — nothing rushed)
+  //   8.0s       decor (car trail, tracks, smoke, text) starts fading out
+  //   9.5s       decor fully faded → Screen 5 mounts (orbs handoff at 425)
+  useEffect(() => {
+    if (phase !== "staged" || !onComplete) return;
+    const t = window.setTimeout(onComplete, 9500);
+    return () => window.clearTimeout(t);
+  }, [phase, onComplete]);
 
   // Fractional car index — how far along the carousel we've scrolled,
   // wrapped to [0, CARS.length). Used to derive per-car scale/opacity/gray.
@@ -140,11 +161,32 @@ export default function Screen7({
         background: "linear-gradient(to bottom, #f9fafb 0%, #ffffff 100%)",
       }}
       onClick={(e) => {
-        // Stops the OnboardingFlow's global click-to-advance from firing;
-        // this screen only advances when the user taps "Reserve my car".
-        e.stopPropagation();
+        // Block the OnboardingFlow's global click-to-advance on the select
+        // phase (car must be reserved first). On the staged phase, taps
+        // still advance to Screen 5 alongside the 4s auto-advance timer.
+        if (phase === "select") {
+          e.stopPropagation();
+        } else if (onComplete) {
+          e.stopPropagation();
+          onComplete();
+        }
       }}
     >
+      {/* SELECT phase — carousel, header, reserve CTA. On phase change to
+          staged, everything softly recedes (fade + slight downward drift). */}
+      <AnimatePresence>
+      {phase === "select" && (
+      <motion.div
+        key="select"
+        className="absolute inset-0"
+        exit={{
+          opacity: 0,
+          y: 12,
+          filter: "blur(6px)",
+          transition: { duration: 0.55, ease: [0.4, 0, 0.2, 1] },
+        }}
+      >
+
       {/* Header — seat icon + title + subtitle */}
       <motion.div
         className="absolute left-1/2 top-[70px] -translate-x-1/2 flex flex-col items-center"
@@ -242,8 +284,9 @@ export default function Screen7({
       <motion.button
         onClick={(e) => {
           e.stopPropagation();
-          onComplete?.();
+          setPhase("staged");
         }}
+        whileTap={{ scale: 0.97 }}
         className="absolute overflow-hidden rounded-full text-[14px] font-semibold tracking-[-0.01em] text-black"
         style={{
           top: 833,
@@ -272,9 +315,314 @@ export default function Screen7({
       >
         Included with membership. Switch models anytime in Settings
       </motion.p>
+
+      </motion.div>
+      )}
+      </AnimatePresence>
+
+      {/* STAGED phase — the reserved car drives forward off-screen, tire
+          tracks trail behind, agent orbs + confirmation text fade in, and
+          exhaust cloud billows up from the bottom. */}
+      {phase === "staged" && <StagedView car={CARS[activeIdx]} />}
     </div>
   );
 }
+
+/* ---------------------------------------------------------------------------
+ * Staged phase — "Your ride is staged" locked-in state.
+ * -------------------------------------------------------------------------*/
+function StagedView({ car }: { car: Car }) {
+  // Fade the Staged decor (car trail, tracks, smoke, text) out in the last
+  // ~1s before Screen 5 mounts, so the orbs are the only element still on
+  // screen when the swap happens — clean, seamless handoff.
+  const [isExiting, setIsExiting] = useState(false);
+  useEffect(() => {
+    const t = window.setTimeout(() => setIsExiting(true), 8000);
+    return () => window.clearTimeout(t);
+  }, []);
+
+  return (
+    <>
+    <motion.div
+      className="pointer-events-none absolute inset-0"
+      animate={{ opacity: isExiting ? 0 : 1 }}
+      transition={{ duration: 1.5, ease: [0.4, 0, 0.2, 1] }}
+    >
+      {/* Twin tire tracks — laid down UNDERNEATH the car (rendered first so
+          the car sits on top of them). Bloom in during the car's forward
+          drive so the tracks appear to reveal from behind the wheels. */}
+      <TireTracks />
+
+      {/* Car drives forward — settle-back-and-launch: a small preview dip
+          before it accelerates off the top of the phone. Ease-in curve gives
+          a real "hitting the throttle" feel (slow start → whoosh). */}
+      <motion.div
+        className="pointer-events-none absolute left-1/2"
+        style={{
+          top: CAR_TOP,
+          width: CAR_W,
+          height: CAR_H,
+          translateX: "-50%",
+        }}
+        initial={{ y: 0, scaleY: 1 }}
+        animate={{
+          y: [0, 8, -320],
+          scaleY: [1, 1, 1.06],
+        }}
+        transition={{
+          duration: 1.75,
+          times: [0, 0.14, 1],
+          ease: [0.55, 0, 0.9, 0.4],
+        }}
+      >
+        <Image
+          src={car.src}
+          alt={car.name}
+          width={CAR_W}
+          height={CAR_H}
+          priority
+          style={{
+            width: "100%",
+            height: "100%",
+            objectFit: "contain",
+            objectPosition: "center",
+            transform: car.imgScale ? `scale(${car.imgScale})` : undefined,
+            transformOrigin: "center",
+          }}
+        />
+      </motion.div>
+
+      {/* "Your ride is staged" — grey caption below the orb row. Figma
+          spec: (137.82, 589.6), 164×25. */}
+      <div
+        className="absolute left-1/2 -translate-x-1/2 text-center"
+        style={{ top: 589.6, width: 300 }}
+      >
+        <WordReveal
+          text="Your ride is staged"
+          className="text-[20px] font-medium leading-[25px] tracking-[-0.04em] text-[#787878] whitespace-nowrap"
+          delay={2.95}
+          staggerMs={140}
+          perWordDurationMs={480}
+        />
+      </div>
+
+      {/* "Ferrari 296 GTB locked for your airport pickup" — Figma:
+          (101.66, 634.6), 236.67×50, 2 lines Inter Medium 20/25. */}
+      <div
+        className="absolute left-1/2 -translate-x-1/2 text-center"
+        style={{ top: 634.6, width: 237 }}
+      >
+        <WordReveal
+          text={`${car.name} locked for\nyour airport pickup`}
+          className="text-[20px] font-medium leading-[25px] tracking-[-0.04em] text-black"
+          delay={3.5}
+          staggerMs={140}
+          perWordDurationMs={480}
+        />
+      </div>
+
+      {/* Exhaust cloud — billows in from bottom, then keeps drifting/
+          breathing so it feels alive. Two layers offset horizontally for
+          parallax so the smoke reads as three-dimensional. */}
+      <SmokeLayer delay={0.35} offsetX={-14} scaleAmp={0.06} drift={12} loopMs={5200} />
+      <SmokeLayer delay={0.55} offsetX={14} scaleAmp={0.05} drift={-10} loopMs={6800} opacity={0.45} />
+    </motion.div>
+
+      {/* Agent orbs — mount at Screen 4's team-perks positions
+          (cx ∈ {130,190,250,310}, cy=425, size 48) and STAY there. When
+          Screen 5 mounts (cardEmpty phase) its queue orbs start at these
+          exact same positions and glide up to y=205 as part of its own
+          card-rise entrance — so the transition is one continuous motion
+          across the screen boundary. Orbs sit OUTSIDE the decor fade
+          wrapper so they persist through the handoff. */}
+      {STAGED_ORBS.map((orb, i) => (
+        <FloatingOrb key={orb.blob} orb={orb} orbIndex={i} />
+      ))}
+    </>
+  );
+}
+
+/* ---------------------------------------------------------------------------
+ * Staged orb — enters after the car has left the frame, then bobs on a
+ * shared sine-wave clock. Screen 5 uses the exact same wall-clock so the
+ * wave phase is continuous across the screen swap: when Screen 5 mounts,
+ * every orb is at the same sub-pixel position, and the card rises up
+ * behind them — nothing else changes.
+ * -------------------------------------------------------------------------*/
+function FloatingOrb({
+  orb,
+  orbIndex,
+}: {
+  orb: { blob: string; left: number };
+  orbIndex: number;
+}) {
+  const time = useTime();
+  const waveY = useTransform(time, (t) => {
+    const phase = orbIndex * 1.2;
+    return Math.sin(t * 0.0022 + phase) * 5;
+  });
+  return (
+    <motion.div
+      className="absolute"
+      style={{
+        left: orb.left,
+        top: STAGED_ORB_Y,
+        width: STAGED_ORB_SIZE,
+        height: STAGED_ORB_SIZE,
+        y: waveY,
+      }}
+      initial={{ opacity: 0, scale: 0.7 }}
+      animate={{ opacity: 1, scale: 1 }}
+      transition={{
+        // Car finishes driving off at ~1.75s; orbs bloom in after that.
+        delay: 1.85 + orbIndex * 0.12,
+        duration: 0.65,
+        ease: [0.22, 1, 0.36, 1],
+      }}
+    >
+      <AgentOrb size={STAGED_ORB_SIZE} blob={orb.blob} />
+    </motion.div>
+  );
+}
+
+/* ---------------------------------------------------------------------------
+ * Tire tracks — single PNG containing BOTH tread strips, matches Figma
+ * node 617:27284. Bloom-in as the car pulls away, top/bottom soft-fade
+ * mask so the tracks feel laid down and dissipating.
+ * -------------------------------------------------------------------------*/
+/* ---------------------------------------------------------------------------
+ * Tire tracks — twin vertical tread strips baked into one PNG (Figma node
+ * 633:27899, `tracks.png`). Sized to match Figma's rectangle bounds
+ * (157×258, at y 207). Bloom-in as the car pulls away.
+ * -------------------------------------------------------------------------*/
+function TireTracks() {
+  // Figma spec (node 633:27899): (143, 207.6), 157×258.
+  return (
+    <motion.div
+      className="pointer-events-none absolute overflow-hidden"
+      style={{
+        left: 143,
+        top: 207.6,
+        width: 157,
+        height: 258,
+        transformOrigin: "top center",
+      }}
+      initial={{ opacity: 0, scaleY: 0.55, y: -16 }}
+      animate={{ opacity: 1, scaleY: 1, y: 0 }}
+      transition={{
+        delay: 0.4,
+        duration: 1.2,
+        ease: [0.4, 0, 0.2, 1],
+      }}
+    >
+      <Image
+        src="/assets/supercar/tracks.png"
+        alt=""
+        width={157}
+        height={258}
+        style={{ width: "100%", height: "100%", objectFit: "fill" }}
+      />
+    </motion.div>
+  );
+}
+
+/* ---------------------------------------------------------------------------
+ * Smoke layer — bloom-in from below, then keep breathing (subtle horizontal
+ * drift + scale-pulse) so the exhaust cloud feels alive.
+ * -------------------------------------------------------------------------*/
+function SmokeLayer({
+  delay,
+  offsetX,
+  scaleAmp,
+  drift,
+  loopMs,
+  opacity = 0.55,
+}: {
+  delay: number;
+  offsetX: number;
+  scaleAmp: number;
+  drift: number;
+  loopMs: number;
+  opacity?: number;
+}) {
+  return (
+    <motion.div
+      className="pointer-events-none absolute left-1/2"
+      style={{
+        // Anchored to the phone floor (Figma places smoke at y=710, height
+        // 275 — bottom of 985 = 20px past the 965 frame). Cloud starts a
+        // full band BELOW that anchor and rises up + out.
+        bottom: -20,
+        width: 488,
+        height: 275,
+        marginLeft: -244,
+      }}
+      initial={{ opacity: 0 }}
+      animate={{
+        // Cloud emerges from below, billows up past the anchor, then fades
+        // out as it clears the plume line. Opacity is 0 at both endpoints
+        // → seamless loop.
+        y: [80, -180],
+        opacity: [0, opacity, opacity, 0],
+        x: [offsetX, offsetX + drift, offsetX],
+        scale: [0.9, 1 + scaleAmp, 1.12],
+      }}
+      transition={{
+        y: {
+          delay,
+          duration: loopMs / 1000,
+          repeat: Infinity,
+          ease: "easeOut",
+        },
+        opacity: {
+          delay,
+          duration: loopMs / 1000,
+          repeat: Infinity,
+          ease: "easeInOut",
+          times: [0, 0.18, 0.75, 1],
+        },
+        x: {
+          delay,
+          duration: loopMs / 1000,
+          repeat: Infinity,
+          ease: "easeInOut",
+        },
+        scale: {
+          delay,
+          duration: loopMs / 1000,
+          repeat: Infinity,
+          ease: "easeOut",
+        },
+      }}
+    >
+      <Image
+        src="/assets/supercar/smoke.png"
+        alt=""
+        width={488}
+        height={275}
+        style={{
+          width: "100%",
+          height: "100%",
+          objectFit: "cover",
+          objectPosition: "bottom",
+        }}
+      />
+    </motion.div>
+  );
+}
+
+/** Staged-screen agent orbs — exact positions from Figma node 617:27283:
+ *  container (143.125, 514.6), 153.75×50 → four 30×30 orbs at these left
+ *  coords. cy = 529.6 for all four. */
+const STAGED_ORB_SIZE = 30;
+const STAGED_ORB_Y = 514.6; // top-left y of each orb
+const STAGED_ORBS: Array<{ blob: string; left: number }> = [
+  { blob: "/assets/orb/blob-safety.png", left: 143.125 },  // safety (leftmost)
+  { blob: "/assets/orb/blob-forex.png", left: 184.375 },   // forex
+  { blob: "/assets/orb/blob-flight.png", left: 225.625 },  // flight
+  { blob: "/assets/orb/ellipse.png", left: 266.875 },      // visa (rightmost)
+];
 
 /* ---------------------------------------------------------------------------
  * Car slot in the infinite carousel. Its x wraps around; scale, opacity, and

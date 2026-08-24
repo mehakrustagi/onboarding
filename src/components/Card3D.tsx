@@ -120,8 +120,7 @@ export default function Card3D({
           height,
           borderRadius: radius,
           // Deep base + faint vertical sheen to give the card a physical top-to-bottom "light".
-          background:
-            "linear-gradient(180deg, #131313 0%, #0a0a0a 45%, #050505 100%)",
+          background: "#000000",
           boxShadow: [
             // Elevation
             "0 40px 80px -30px rgba(0,0,0,0.75)",
@@ -154,15 +153,6 @@ export default function Card3D({
             backgroundPosition: "0 0, 1px 1px",
             mixBlendMode: "screen",
             opacity: 0.8,
-          }}
-        />
-
-        {/* Edge vignette — darkens the outside so the middle feels convex */}
-        <div
-          className="pointer-events-none absolute inset-0"
-          style={{
-            background:
-              "radial-gradient(circle at 50% 50%, transparent 40%, rgba(0,0,0,0.65) 100%)",
           }}
         />
 

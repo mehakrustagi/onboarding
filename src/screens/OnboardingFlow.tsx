@@ -97,7 +97,19 @@ export default function OnboardingFlow() {
             a reload when Screen 6 layers on top at index 6. */}
         <AnimatePresence mode="wait">
           {index <= 4 && (
-            <motion.div key={index} className="absolute inset-0">
+            <motion.div
+              key={index}
+              className="absolute inset-0"
+              // Content drifts upward and softly blurs on exit. Gives the
+              // Team-perks → Supercars swap (and every other outer transition)
+              // a sense of forward-motion instead of a hard cut.
+              exit={{
+                y: -50,
+                opacity: 0,
+                filter: "blur(6px)",
+                transition: { duration: 0.55, ease: [0.4, 0, 0.2, 1] },
+              }}
+            >
               {index === 3 ? (
                 <Screen4 checkpointMatcher={innerMatcher} onComplete={next} />
               ) : index === 4 ? (
@@ -112,7 +124,15 @@ export default function OnboardingFlow() {
           <div className="absolute inset-0">
             <Screen5
               key={screen5Key}
-              initialPhase={index === 6 ? "final" : screen5Phase}
+              initialPhase={
+                index === 6
+                  ? "final"
+                  : // Auto-flow (no Screen 5 checkpoint): come in on cardEmpty
+                    // so the queue orbs are already at TOP_ROW_Y = 205 —
+                    // Screen 7's Staged view leaves them exactly there, so
+                    // the mount swap is visually continuous.
+                    (screen5Phase ?? "cardEmpty")
+              }
               onComplete={next}
               hideFinaleSummary={index === 6}
               finaleCardX={index === 6 ? screen5CardX : undefined}

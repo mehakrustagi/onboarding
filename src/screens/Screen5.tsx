@@ -461,13 +461,14 @@ export default function Screen5({
           radius={26}
           activatePulse={cardActivate}
         >
-          {/* "+ atlys worldpass" pill — top of card, fades in after whirlpool. */}
+          {/* "+ atlys worldpass" pill — top of card, fades in after whirlpool.
+              Font/size/gradient/opacity per Figma node 561:26097. */}
           {phase === "final" && (
             <motion.div
-              className="subtext-gradient pointer-events-none absolute left-1/2 -translate-x-1/2 whitespace-nowrap text-[11px] font-medium tracking-[-0.01em]"
-              style={{ top: 18 }}
+              className="worldpass-header pointer-events-none absolute left-1/2 -translate-x-1/2 whitespace-nowrap"
+              style={{ top: 22 }}
               initial={{ opacity: 0, y: -6 }}
-              animate={{ opacity: 1, y: 0 }}
+              animate={{ opacity: 0.4, y: 0 }}
               transition={{ delay: 2.5, duration: 0.6, ease: [0.22, 1, 0.36, 1] }}
             >
               + atlys worldpass
@@ -483,10 +484,13 @@ export default function Screen5({
                 top: 40,
                 width: 220,
                 height: 220,
+                // Soft edge-fade so the video's black rectangle background
+                // dissolves into the card. The globe stays fully visible
+                // (no visible ring), only the outer few pixels blend.
                 maskImage:
-                  "radial-gradient(circle, black 38%, transparent 55%)",
+                  "radial-gradient(circle, black 68%, transparent 100%)",
                 WebkitMaskImage:
-                  "radial-gradient(circle, black 38%, transparent 55%)",
+                  "radial-gradient(circle, black 68%, transparent 100%)",
               }}
               initial={{ opacity: 0, scale: 0.86 }}
               animate={{ opacity: 1, scale: 1 }}
