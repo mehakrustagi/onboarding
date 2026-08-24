@@ -465,38 +465,16 @@ export default function Screen5({
           radius={26}
           activatePulse={cardActivate}
         >
-          {/* "+ atlys worldpass" pill — top of card, fades in after whirlpool.
-              Font/size/gradient/opacity per Figma node 561:26097. */}
+          {/* Globe — fills the entire card background (object-cover). The
+              video's own black background matches the card, so the globe
+              floats naturally with no visible edge. Rendered FIRST so all
+              overlay text (worldpass header, benefits, summary) sits on
+              top of it. */}
           {phase === "final" && (
             <motion.div
-              className="worldpass-header pointer-events-none absolute left-1/2 -translate-x-1/2 whitespace-nowrap"
-              style={{ top: 22 }}
-              initial={{ opacity: 0, y: -6 }}
-              animate={{ opacity: 0.4, y: 0 }}
-              transition={{ delay: 2.5, duration: 0.6, ease: [0.22, 1, 0.36, 1] }}
-            >
-              + atlys worldpass
-            </motion.div>
-          )}
-
-          {/* Globe — rotating video from Figma, masked with a radial gradient
-              so only the circular globe is visible against the card. */}
-          {phase === "final" && (
-            <motion.div
-              className="pointer-events-none absolute left-1/2 -translate-x-1/2"
-              style={{
-                top: 40,
-                width: 220,
-                height: 220,
-                // Soft edge-fade so the video's black rectangle background
-                // dissolves into the card. The globe stays fully visible
-                // (no visible ring), only the outer few pixels blend.
-                maskImage:
-                  "radial-gradient(circle, black 68%, transparent 100%)",
-                WebkitMaskImage:
-                  "radial-gradient(circle, black 68%, transparent 100%)",
-              }}
-              initial={{ opacity: 0, scale: 0.86 }}
+              className="pointer-events-none absolute inset-0 overflow-hidden"
+              style={{ borderRadius: 26 }}
+              initial={{ opacity: 0, scale: 0.94 }}
               animate={{ opacity: 1, scale: 1 }}
               transition={{ delay: 2.5, duration: 2.4, ease: [0.4, 0, 0.2, 1] }}
             >
@@ -513,6 +491,20 @@ export default function Screen5({
                   objectFit: "cover",
                 }}
               />
+            </motion.div>
+          )}
+
+          {/* "+ atlys worldpass" pill — sits ON TOP of the globe video.
+              Font/size/gradient/opacity per Figma node 561:26097. */}
+          {phase === "final" && (
+            <motion.div
+              className="worldpass-header pointer-events-none absolute left-1/2 -translate-x-1/2 whitespace-nowrap"
+              style={{ top: 22, zIndex: 2 }}
+              initial={{ opacity: 0, y: -6 }}
+              animate={{ opacity: 0.4, y: 0 }}
+              transition={{ delay: 2.5, duration: 0.6, ease: [0.22, 1, 0.36, 1] }}
+            >
+              + atlys worldpass
             </motion.div>
           )}
 

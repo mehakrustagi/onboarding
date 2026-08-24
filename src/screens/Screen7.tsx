@@ -407,15 +407,16 @@ function StagedView({ car }: { car: Car }) {
         />
       </div>
 
-      {/* "Ferrari 296 GTB locked for your airport pickup" — Figma:
-          (101.66, 634.6), 236.67×50, 2 lines Inter Medium 20/25. */}
+      {/* "<car> locked for your airport pickup" — Figma: (101.66, 634.6),
+          236.67×50, always 2 lines (\n split + whitespace-nowrap keeps each
+          line intact regardless of the car name's width). */}
       <div
         className="absolute left-1/2 -translate-x-1/2 text-center"
-        style={{ top: 634.6, width: 237 }}
+        style={{ top: 634.6, width: 320 }}
       >
         <WordReveal
           text={`${car.name} locked for\nyour airport pickup`}
-          className="text-[20px] font-medium leading-[25px] tracking-[-0.04em] text-black"
+          className="whitespace-nowrap text-[20px] font-medium leading-[25px] tracking-[-0.04em] text-black"
           delay={3.9}
           staggerMs={140}
           perWordDurationMs={480}
@@ -560,14 +561,19 @@ function SmokeLayer({
       }}
       initial={{ opacity: 0 }}
       animate={{
-        // Cloud starts fully off-screen below (top edge of cloud sits at
-        // the base of the phone), rises up through the frame, then clears
-        // out past the anchor line at the top. Seamless loop — opacity is
-        // 0 at both endpoints so the reset is invisible.
-        y: [275, -220],
+        // Cloud starts fully off-screen below (top edge sits at the base
+        // of the phone), rises up, and fully fades out by the time its
+        // top edge reaches the text at y≈635 — the cloud never bleeds
+        // above the "Ferrari … locked" line. Seamless loop: opacity is 0
+        // at both endpoints so the reset is invisible.
+        //
+        // Natural cloud top when y=0 sits at ~710 (bottom:-20 anchor,
+        // height 275 → top = 985 − 20 − 275 = 690). y: -60 lifts top to
+        // ~630, right at the text baseline.
+        y: [275, -60],
         opacity: [0, opacity, opacity, 0],
         x: [offsetX, offsetX + drift, offsetX],
-        scale: [0.92, 1 + scaleAmp, 1.14],
+        scale: [0.92, 1 + scaleAmp, 1.12],
       }}
       transition={{
         y: {
