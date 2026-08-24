@@ -55,7 +55,7 @@ const CARS: Car[] = [
     name: "Tesla Cybertruck",
     brand: "/assets/supercar/brand-tesla.png",
     tagline: "All-electric performance • 4+ luggage slots",
-    imgScale: 0.72,
+    imgScale: 0.84,
   },
   {
     key: "porsche",
