@@ -400,7 +400,10 @@ export default function Screen5({
                 opacity: 1,
                 filter: "blur(0px)",
                 y: 0,
-                transition: { delay: 0.25, duration: 0.6, ease: [0.22, 1, 0.36, 1] },
+                // Wait until the queue orbs have finished their rise from
+                // 530 → 205 (delay 0.15s + duration 1.3s = 1.45s); text
+                // fades in with a small breath after they land.
+                transition: { delay: 1.6, duration: 0.6, ease: [0.22, 1, 0.36, 1] },
               }}
               exit={{
                 opacity: 0,
