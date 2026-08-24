@@ -41,9 +41,6 @@ type Car = {
   name: string;
   brand: string;
   tagline: string;
-  /** Some source PNGs are stored horizontally; rotate them so they read
-   *  vertically like the rest of the fleet. */
-  rotateDeg?: number;
 };
 
 const CARS: Car[] = [
@@ -53,9 +50,6 @@ const CARS: Car[] = [
     name: "Tesla Cybertruck",
     brand: "/assets/supercar/brand-tesla.png",
     tagline: "All-electric performance • 4+ luggage slots",
-    // The tesla.png canvas is portrait but the truck inside is drawn
-    // horizontally — rotate -90° so the front points UP like the others.
-    rotateDeg: -90,
   },
   {
     key: "porsche",
@@ -312,44 +306,19 @@ function CarSlot({
         filter,
       }}
     >
-      {/* For cars whose source PNG is stored horizontally (Tesla), rotate the
-          <img> in place. Width/height on the <img> are the pre-rotation dims
-          (landscape). After rotate(-90), the visible box is CAR_W × CAR_H.
-          Using a plain <img> here — Next.js Image was quietly ignoring the
-          size we passed and left the truck horizontal. */}
-      {car.rotateDeg ? (
-        // eslint-disable-next-line @next/next/no-img-element
-        <img
-          src={car.src}
-          alt={car.name}
-          style={{
-            position: "absolute",
-            width: CAR_H,
-            height: CAR_W,
-            left: "50%",
-            top: "50%",
-            marginLeft: -CAR_H / 2,
-            marginTop: -CAR_W / 2,
-            objectFit: "contain",
-            objectPosition: "center",
-            transform: `rotate(${car.rotateDeg}deg)`,
-            transformOrigin: "center center",
-          }}
-        />
-      ) : (
-        <Image
-          src={car.src}
-          alt={car.name}
-          width={CAR_W}
-          height={CAR_H}
-          style={{
-            width: "100%",
-            height: "100%",
-            objectFit: "contain",
-            objectPosition: "center",
-          }}
-        />
-      )}
+      <Image
+        src={car.src}
+        alt={car.name}
+        width={CAR_W}
+        height={CAR_H}
+        priority={car.key === "tesla"}
+        style={{
+          width: "100%",
+          height: "100%",
+          objectFit: "contain",
+          objectPosition: "center",
+        }}
+      />
     </motion.div>
   );
 }
