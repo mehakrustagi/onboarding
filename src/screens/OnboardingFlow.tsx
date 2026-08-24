@@ -13,6 +13,7 @@ import {
   CHECKPOINTS_OUTER,
   CheckpointPanel,
   type CheckpointOrInner,
+  type Screen5Phase,
 } from "./checkpoints";
 
 type InnerMatcher = (typeof CHECKPOINTS_INNER)[number]["matcher"];
@@ -58,6 +59,13 @@ export default function OnboardingFlow() {
     activeCp && "matcher" in activeCp
       ? (activeCp.matcher as InnerMatcher)
       : undefined;
+  const screen5Phase: Screen5Phase | undefined =
+    activeCp && "screen5Phase" in activeCp
+      ? (activeCp.screen5Phase as Screen5Phase | undefined)
+      : undefined;
+  // Force-remount Screen 5 when a checkpoint into it changes, so the
+  // initialPhase seed re-runs from scratch.
+  const screen5Key = `screen5-${screen5Phase ?? "default"}`;
 
   return (
     <>
@@ -73,6 +81,8 @@ export default function OnboardingFlow() {
           <motion.div key={index} className="absolute inset-0">
             {index === 3 ? (
               <Screen4 checkpointMatcher={innerMatcher} onComplete={next} />
+            ) : index === 4 ? (
+              <Screen5 key={screen5Key} initialPhase={screen5Phase} />
             ) : (
               <Current />
             )}

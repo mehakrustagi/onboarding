@@ -30,8 +30,26 @@ export const CHECKPOINTS_OUTER: Checkpoint[] = [
   { label: "3 · That job is over", outerIdx: 2 },
 ];
 
-export const CHECKPOINTS_END: Checkpoint[] = [
-  { label: "5 · WorldPass benefits", outerIdx: 4 },
+/** Sub-phase checkpoints for Screen 5 (WorldPass benefits). `screen5Phase`
+ *  seeds the internal phase state; empty means play from the top. */
+export type Screen5Phase =
+  | "intro"
+  | "cardEmpty"
+  | 0
+  | 1
+  | 2
+  | 3
+  | "final";
+
+export type EndCheckpoint = Checkpoint & { screen5Phase?: Screen5Phase };
+
+export const CHECKPOINTS_END: EndCheckpoint[] = [
+  { label: "5a · Card rise", outerIdx: 4, screen5Phase: "cardEmpty" },
+  { label: "5b · Visa (25%)", outerIdx: 4, screen5Phase: 0 },
+  { label: "5c · Flight (50%)", outerIdx: 4, screen5Phase: 1 },
+  { label: "5d · Forex (75%)", outerIdx: 4, screen5Phase: 2 },
+  { label: "5e · Safety (100%)", outerIdx: 4, screen5Phase: 3 },
+  { label: "5f · Whirlpool", outerIdx: 4, screen5Phase: "final" },
 ];
 
 // Inner checkpoints for Screen 4. `outerIdx: 3` = Screen 4.

@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
+import Image from "next/image";
 import {
   AnimatePresence,
   motion,
@@ -44,6 +45,7 @@ type Benefit = {
 };
 
 // One benefit per agent — 4 total, counter ticks 25% per orb.
+// Order: Visa → Flight → Forex → Safety.
 const BENEFITS: Benefit[] = [
   {
     title: "Embassy Slot Priority",
@@ -53,18 +55,18 @@ const BENEFITS: Benefit[] = [
     titleGradientClass: "title-gradient-visa",
   },
   {
-    title: "0 Forex Markups",
-    desc: "Real interbank exchange rates locked with zero spread fees and doorstep cash delivery",
-    percent: 50,
-    orb: "forex",
-    titleGradientClass: "title-gradient-forex",
-  },
-  {
     title: "Flat 10% Off Stays",
     desc: "Direct savings auto-applied across Taj, Oberoi, Marriott, Hyatt, and more",
-    percent: 75,
+    percent: 50,
     orb: "flight",
     titleGradientClass: "title-gradient-stays",
+  },
+  {
+    title: "0 Forex Markups",
+    desc: "Real interbank exchange rates locked with zero spread fees and doorstep cash delivery",
+    percent: 75,
+    orb: "forex",
+    titleGradientClass: "title-gradient-forex",
   },
   {
     title: "24/7 Medical & Delay Cover",
@@ -102,16 +104,19 @@ function consumedAgents(benefitIdx: number): Set<OrbKey> {
   for (let i = 0; i <= end; i++) s.add(BENEFITS[i].orb);
   return s;
 }
+// Card position: pulled up so there's less empty space between the
+// header title and the card. All orb-landing constants derive from this.
+const CARD_BOTTOM = 190; // was 90 → moved card up 100px
+const CARD_HEIGHT = 330;
+const CARD_TOP_Y = 965 - CARD_BOTTOM - CARD_HEIGHT; // = 445
 // Card orb trajectory:
-//   Stage 1 (arc): row slot → arrives centered on the card's TOP edge,
-//                  still small (34px).
-//   Stage 2 (descend + grow): slides down INTO the card and swells,
-//                             ending above the benefit text (52px).
+//   Stage 1 (arc): row slot → arrives centered on the card's TOP edge (small).
+//   Stage 2 (descend + grow): slides down INTO the card and swells.
 const CARD_ORB_ARRIVAL_X = 220;
-const CARD_ORB_ARRIVAL_Y = 545; // card top edge (bottom 90 + height 330 → 545)
+const CARD_ORB_ARRIVAL_Y = CARD_TOP_Y; // = 445
 const CARD_ORB_ARRIVAL_SIZE = 34;
 const CARD_ORB_X = 220;
-const CARD_ORB_Y = 620;
+const CARD_ORB_Y = CARD_TOP_Y + 75; // = 520
 const CARD_ORB_SIZE = 52;
 
 // Where each orb sits at the moment Screen 4 hands us over — matches
@@ -160,13 +165,26 @@ function clockwiseSemicircle(
   return { xs, ys };
 }
 
-export default function Screen5() {
-  // Overall phase state: -1=intro, 0..BENEFITS.length-1=benefit index
+export default function Screen5({
+  initialPhase,
+}: {
+  /** Optional phase to seed on mount — used by the dev checkpoint panel to
+   *  jump directly to a specific state (skips prior auto-advance timers). */
+  initialPhase?: "intro" | "cardEmpty" | number | "final";
+} = {}) {
   const [phase, setPhase] = useState<
     "intro" | "cardEmpty" | number | "final"
-  >("intro");
-  const percent = useMotionValue(2);
-  const [displayPercent, setDisplayPercent] = useState(2);
+  >(initialPhase ?? "intro");
+
+  // Starting percent for the counter, in case we jump to a mid-flow phase.
+  const initialPercent = (() => {
+    if (initialPhase === undefined || initialPhase === "intro") return 0;
+    if (initialPhase === "cardEmpty") return 0;
+    if (typeof initialPhase === "number") return initialPhase * 25;
+    return 100; // "final"
+  })();
+  const percent = useMotionValue(initialPercent);
+  const [displayPercent, setDisplayPercent] = useState(initialPercent);
   const time = useTime();
   // When the orb lands, the card gets "pressed" — this MotionValue pulses to
   // dip Y and shrink scale briefly, then springs back.
@@ -174,44 +192,57 @@ export default function Screen5() {
   const cardPressScale = useMotionValue(1);
   // Card "activation" — dot pattern lights up top-to-bottom when orb lands.
   const cardActivate = useMotionValue(0);
+  // Y-shift applied to the card once the whirlpool completes — moves the
+  // card up so it sits at the vertical center of the screen for the
+  // WorldPass finale (globe + pill + text).
+  const cardShiftY = useMotionValue(0);
 
-  // Progression state machine.
+  // Progression state machine. When an initialPhase is provided (via the
+  // dev checkpoint panel), we only schedule timers for phases AFTER it.
   useEffect(() => {
     const timers: number[] = [];
-    // Intro → card empty
-    timers.push(
-      window.setTimeout(() => setPhase("cardEmpty"), INTRO_HOLD_MS),
-    );
-    // card empty → first benefit
-    timers.push(
-      window.setTimeout(
-        () => setPhase(0),
-        INTRO_HOLD_MS + CARD_RISE_MS + CARD_EMPTY_HOLD_MS,
-      ),
-    );
-    // subsequent benefits
+    const cardEmptyAt = INTRO_HOLD_MS;
+    const firstBenefitAt =
+      INTRO_HOLD_MS + CARD_RISE_MS + CARD_EMPTY_HOLD_MS;
+    const benefitAt = (i: number) =>
+      firstBenefitAt + i * (BENEFIT_HOLD_MS + BENEFIT_TRANSITION_MS);
+    // For the LAST benefit (Safety), fire the whirlpool sooner — text has
+    // been on the card for ~2s already; no need to sit through the full
+    // 4.1s phase window.
+    const finalAt =
+      firstBenefitAt +
+      (BENEFITS.length - 1) * (BENEFIT_HOLD_MS + BENEFIT_TRANSITION_MS) +
+      2600;
+
+    // Determine the "starting index" in our step timeline based on initialPhase.
+    // Steps: 0=intro, 1=cardEmpty, 2=benefit0, 3=benefit1, …, 6=final
+    const stepFromInitial = (() => {
+      if (initialPhase === undefined || initialPhase === "intro") return 0;
+      if (initialPhase === "cardEmpty") return 1;
+      if (typeof initialPhase === "number") return 2 + initialPhase;
+      return 2 + BENEFITS.length; // "final"
+    })();
+
+    const schedule = (fireAt: number, atStep: number, action: () => void) => {
+      if (atStep <= stepFromInitial) return;
+      const delay = Math.max(0, fireAt - (
+        stepFromInitial === 0
+          ? 0
+          : stepFromInitial === 1
+            ? cardEmptyAt
+            : stepFromInitial < 2 + BENEFITS.length
+              ? benefitAt(stepFromInitial - 2)
+              : finalAt
+      ));
+      timers.push(window.setTimeout(action, delay));
+    };
+
+    schedule(cardEmptyAt, 1, () => setPhase("cardEmpty"));
+    schedule(firstBenefitAt, 2, () => setPhase(0));
     for (let i = 1; i < BENEFITS.length; i++) {
-      timers.push(
-        window.setTimeout(
-          () => setPhase(i),
-          INTRO_HOLD_MS +
-            CARD_RISE_MS +
-            CARD_EMPTY_HOLD_MS +
-            i * (BENEFIT_HOLD_MS + BENEFIT_TRANSITION_MS),
-        ),
-      );
+      schedule(benefitAt(i), 2 + i, () => setPhase(i));
     }
-    // Final "whirlpool" phase — after the last benefit's hold, all orbs
-    // swirl into the card and the summary text appears.
-    timers.push(
-      window.setTimeout(
-        () => setPhase("final"),
-        INTRO_HOLD_MS +
-          CARD_RISE_MS +
-          CARD_EMPTY_HOLD_MS +
-          BENEFITS.length * (BENEFIT_HOLD_MS + BENEFIT_TRANSITION_MS),
-      ),
-    );
+    schedule(finalAt, 2 + BENEFITS.length, () => setPhase("final"));
     return () => timers.forEach((t) => window.clearTimeout(t));
   }, []);
 
@@ -238,7 +269,7 @@ export default function Screen5() {
     if (!isNewAgent) return;
 
     // Which agent index this is (0..3 in appearance order → Visa/Forex/Flight/Safety).
-    const AGENT_ORDER: OrbKey[] = ["visa", "forex", "flight", "safety"];
+    const AGENT_ORDER: OrbKey[] = ["visa", "flight", "forex", "safety"];
     const agentIdx = AGENT_ORDER.indexOf(BENEFITS[phase].orb);
     if (agentIdx < 0) return;
     const targetPercent = (agentIdx + 1) * 25;
@@ -298,6 +329,22 @@ export default function Screen5() {
     return () => window.clearTimeout(t);
   }, [phase, isNewAgent, cardPressY, cardPressScale, cardActivate]);
 
+  // When the whirlpool finishes, glide the card up to the vertical center
+  // of the screen for the WorldPass finale (globe + pill + text).
+  useEffect(() => {
+    if (phase !== "final") return;
+    // Screen center Y = 482. Card center currently at CARD_TOP_Y + 165 = 610.
+    // Move up by (610 - 482) = 128px so the card sits at screen center.
+    const targetShift = -(CARD_TOP_Y + CARD_HEIGHT / 2 - 965 / 2);
+    const t = window.setTimeout(() => {
+      animate(cardShiftY, targetShift, {
+        duration: 1.0,
+        ease: [0.22, 1, 0.36, 1],
+      });
+    }, 3200); // right as whirlpool merges + before globe/text fade in
+    return () => window.clearTimeout(t);
+  }, [phase, cardShiftY]);
+
   const activeBenefit = typeof phase === "number" ? BENEFITS[phase] : null;
   const cardVisible = phase !== "intro";
 
@@ -316,7 +363,7 @@ export default function Screen5() {
       {/* Header title — appears once the card is on screen. */}
       <div className="absolute left-1/2 top-[300px] w-full -translate-x-1/2 px-8 text-center">
         <AnimatePresence>
-          {phase !== "intro" && (
+          {phase !== "intro" && phase !== "final" && (
             <motion.div
               key="issuing-title"
               initial={{ opacity: 0, filter: "blur(10px)", y: -8 }}
@@ -342,17 +389,8 @@ export default function Screen5() {
         />
       ))}
 
-      {/* Final "whirlpool" — after the last benefit, all 4 orbs return and
-          spiral inward around the card center before merging. */}
-      {phase === "final" &&
-        QUEUE.map((agent, orbIndex) => (
-          <WhirlpoolOrb
-            key={`whirl-${agent}`}
-            agent={agent}
-            orbIndex={orbIndex}
-            time={time}
-          />
-        ))}
+      {/* Whirlpool moved BELOW card in this JSX block — see after the card
+          wrapper so orbs render above the card surface (not clipped behind it). */}
 
       {/* Card + its floating agent orb.
           OUTER wrapper handles the entrance rise.
@@ -360,7 +398,7 @@ export default function Screen5() {
           each time an orb lands. */}
       <motion.div
         className="absolute left-1/2 -translate-x-1/2"
-        style={{ bottom: 90 }}
+        style={{ bottom: CARD_BOTTOM }}
         initial={{ y: 260, opacity: 0, rotateX: -10, scale: 0.94 }}
         animate={
           cardVisible
@@ -377,6 +415,7 @@ export default function Screen5() {
             : { y: 260, opacity: 0, rotateX: -10, scale: 0.94 }
         }
       >
+        <motion.div style={{ y: cardShiftY }}>
         <motion.div style={{ y: cardPressY, scale: cardPressScale }}>
         <Card3D
           width={230}
@@ -384,6 +423,52 @@ export default function Screen5() {
           radius={26}
           activatePulse={cardActivate}
         >
+          {/* "+ atlys worldpass" pill — top of card, fades in after whirlpool. */}
+          {phase === "final" && (
+            <motion.div
+              className="subtext-gradient pointer-events-none absolute left-1/2 -translate-x-1/2 whitespace-nowrap text-[11px] font-medium tracking-[-0.01em]"
+              style={{ top: 18 }}
+              initial={{ opacity: 0, y: -6 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ delay: 3.5, duration: 0.6, ease: [0.22, 1, 0.36, 1] }}
+            >
+              + atlys worldpass
+            </motion.div>
+          )}
+
+          {/* Globe — rotating video from Figma, masked with a radial gradient
+              so only the circular globe is visible against the card. */}
+          {phase === "final" && (
+            <motion.div
+              className="pointer-events-none absolute left-1/2 -translate-x-1/2"
+              style={{
+                top: 40,
+                width: 220,
+                height: 220,
+                maskImage:
+                  "radial-gradient(circle, black 38%, transparent 55%)",
+                WebkitMaskImage:
+                  "radial-gradient(circle, black 38%, transparent 55%)",
+              }}
+              initial={{ opacity: 0, scale: 0.7 }}
+              animate={{ opacity: 1, scale: 1 }}
+              transition={{ delay: 3.5, duration: 0.9, ease: [0.22, 1, 0.36, 1] }}
+            >
+              <video
+                src="/assets/globe/globe.mp4"
+                autoPlay
+                loop
+                muted
+                playsInline
+                preload="auto"
+                style={{
+                  width: "100%",
+                  height: "100%",
+                  objectFit: "cover",
+                }}
+              />
+            </motion.div>
+          )}
 
           {/* Card contents — either the current benefit or the final summary. */}
           <div className="relative flex h-full flex-col justify-center px-6 text-center">
@@ -408,18 +493,20 @@ export default function Screen5() {
             {phase === "final" && (
               <motion.div
                 key="final-summary"
-                initial={{ opacity: 0, filter: "blur(10px)" }}
-                animate={{ opacity: 1, filter: "blur(0px)" }}
+                className="pointer-events-none absolute inset-x-0"
+                style={{ bottom: 60 }}
+                initial={{ opacity: 0, filter: "blur(10px)", scale: 0.85 }}
+                animate={{ opacity: 1, filter: "blur(0px)", scale: 1 }}
                 transition={{
-                  delay: 1.6,
-                  duration: 0.7,
+                  delay: 3.2,
+                  duration: 0.8,
                   ease: [0.22, 1, 0.36, 1],
                 }}
               >
-                <p className="text-[15px] font-medium leading-[20px] tracking-[-0.02em] text-white">
+                <p className="subtext-gradient text-[15px] font-medium leading-[20px] tracking-[-0.02em]">
                   All your benefits.
                 </p>
-                <p className="text-[15px] font-medium leading-[20px] tracking-[-0.02em] text-white">
+                <p className="subtext-gradient text-[15px] font-medium leading-[20px] tracking-[-0.02em]">
                   One WorldPass.
                 </p>
               </motion.div>
@@ -435,7 +522,19 @@ export default function Screen5() {
 
         </Card3D>
         </motion.div>
+        </motion.div>
       </motion.div>
+
+      {/* Whirlpool — rendered AFTER the card so orbs stack on top of the
+          card surface (would otherwise be hidden behind it). */}
+      {phase === "final" &&
+        QUEUE.map((agent, orbIndex) => (
+          <WhirlpoolOrb
+            key={`whirl-${agent}`}
+            agent={agent}
+            orbIndex={orbIndex}
+          />
+        ))}
 
       {/* Active-agent orb — lives at the SCREEN level (not inside the card)
           so its arc travels across the whole screen without being clipped by
@@ -548,58 +647,57 @@ export default function Screen5() {
  * the inner motion.div carries the shift/scale/opacity transitions.
  */
 /**
- * Whirlpool orb — spirals inward around the card center. Starts at a large
- * radius, radius decays exponentially while angular velocity increases so
- * the motion accelerates as it converges. Opacity fades to 0 near the end so
- * the orbs "merge" into the card.
+ * Whirlpool orb — spirals inward around a center point above the card text.
+ * Progress is driven by an explicit `animate()` call on mount, which is
+ * more reliable than reading `useTime` during render.
  */
 function WhirlpoolOrb({
   agent,
   orbIndex,
-  time,
 }: {
   agent: OrbKey;
   orbIndex: number;
-  time: import("framer-motion").MotionValue<number>;
 }) {
-  // Whirlpool sits ON the card, in its upper half — orbs orbit visibly
-  // across the card face (above the "All your benefits" text).
+  // Whirlpool converges at the CENTER of the card — orbs swirl and merge
+  // at a single point where the summary text will then appear.
   const CX = 220;
-  const CY = 620;
+  const CY = CARD_TOP_Y + CARD_HEIGHT / 2; // = 610, card center
   const SIZE = 36;
   const startAngle = orbIndex * ((Math.PI * 2) / QUEUE.length);
-  // Whirlpool timing: 3.4s total spiral before orbs disappear into card.
-  const WHIRL_DURATION_MS = 3400;
+  const WHIRL_DURATION_S = 3.4;
 
-  // Mount time captured once so animation starts from 0.
-  const mountRef = useRef<number | null>(null);
-  if (mountRef.current === null) mountRef.current = time.get();
+  const progress = useMotionValue(0);
+  useEffect(() => {
+    const controls = animate(progress, 1, {
+      duration: WHIRL_DURATION_S,
+      ease: "linear",
+    });
+    return () => controls.stop();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
-  const state = useTransform(time, (t: number) => {
-    const localT = Math.min(1, (t - (mountRef.current ?? t)) / WHIRL_DURATION_MS);
-    // Radius shrinks from 90 → 0 with an ease-in curve — keeps orbs inside
-    // the card's upper half, spinning above the "All your benefits" text.
-    const radius = 90 * Math.pow(1 - localT, 1.8);
-    // Angular sweep: 3 full rotations over the duration + spin faster as
-    // radius shrinks (constant tangential speed feel).
-    const totalRotations = 3;
-    const angle = startAngle + localT * Math.PI * 2 * totalRotations;
-    const x = CX + radius * Math.cos(angle);
-    const y = CY + radius * Math.sin(angle);
-    // Fade out over the last 20% of the spiral.
-    const opacity = localT < 0.8 ? 1 : Math.max(0, 1 - (localT - 0.8) / 0.2);
-    const scale = 1 - localT * 0.5;
-    return { x, y, opacity, scale };
+  const x = useTransform(progress, (p) => {
+    const radius = 90 * Math.pow(1 - p, 1.8);
+    const angle = startAngle + p * Math.PI * 2 * 3.5; // 3.5 full rotations
+    return CX + radius * Math.cos(angle) - SIZE / 2;
   });
-  const x = useTransform(state, (s) => s.x - SIZE / 2);
-  const y = useTransform(state, (s) => s.y - SIZE / 2);
-  const opacity = useTransform(state, (s) => s.opacity);
-  const scale = useTransform(state, (s) => s.scale);
+  const y = useTransform(progress, (p) => {
+    const radius = 90 * Math.pow(1 - p, 1.8);
+    const angle = startAngle + p * Math.PI * 2 * 3.5;
+    return CY + radius * Math.sin(angle) - SIZE / 2;
+  });
+  // Smooth continuous fade — opacity gently rolls off over the whole spiral
+  // so orbs dissolve as they shrink (no hard cliff).
+  const opacity = useTransform(progress, [0, 0.5, 1], [1, 0.85, 0]);
+  // Big at the start, tiny at the merge — 1.2 → 0.15 exponential shrink.
+  const scale = useTransform(progress, (p) => 1.2 * Math.pow(1 - p, 1.5) + 0.05);
+  // Blur increases as the orb shrinks — reads as "dissolving into the surface".
+  const filter = useTransform(progress, (p) => `blur(${p * 6}px)`);
 
   return (
     <motion.div
       className="pointer-events-none absolute left-0 top-0"
-      style={{ width: SIZE, height: SIZE, x, y, opacity, scale }}
+      style={{ width: SIZE, height: SIZE, x, y, opacity, scale, filter }}
     >
       <AgentOrb size={SIZE} blob={ORB_BLOBS[agent]} />
     </motion.div>
