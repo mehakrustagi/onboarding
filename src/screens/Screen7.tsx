@@ -41,6 +41,11 @@ type Car = {
   name: string;
   brand: string;
   tagline: string;
+  /** Per-car scale multiplier for the hero image inside the fixed slot.
+   *  Tesla's PNG has a narrower aspect than the sports cars, so
+   *  object-contain fits it to full slot height and it visually reads as
+   *  much bigger. Shrinking Tesla brings all three to similar perceived size. */
+  imgScale?: number;
 };
 
 const CARS: Car[] = [
@@ -50,6 +55,7 @@ const CARS: Car[] = [
     name: "Tesla Cybertruck",
     brand: "/assets/supercar/brand-tesla.png",
     tagline: "All-electric performance • 4+ luggage slots",
+    imgScale: 0.72,
   },
   {
     key: "porsche",
@@ -317,6 +323,8 @@ function CarSlot({
           height: "100%",
           objectFit: "contain",
           objectPosition: "center",
+          transform: car.imgScale ? `scale(${car.imgScale})` : undefined,
+          transformOrigin: "center",
         }}
       />
     </motion.div>
