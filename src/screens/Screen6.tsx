@@ -1,29 +1,86 @@
 "use client";
 
+import { useEffect, useState } from "react";
 import Image from "next/image";
-import { motion } from "framer-motion";
+import {
+  animate,
+  motion,
+  useMotionValue,
+  useTransform,
+  type MotionValue,
+  type PanInfo,
+} from "framer-motion";
 import Card3D from "@/components/Card3D";
 
 /* -----------------------------------------------------------------------------
  * Screen 6 — "Your WorldPass is issued"
- *   Header: ID scan icon + laurel-decorated title
- *   Middle: WorldPass card (globe video + pill + name + ID) with peek of next
- *   Below:  "Scroll down" + "View all 24 benefits" pill
- *   Bottom: soft-gradient "Confirm Details & Activate Benefits" CTA + Skip
+ *   Two-card horizontal carousel:
+ *     0) WorldPass card (shared visual with Screen 5's finale card)
+ *     1) "Build your household" (dashed placeholder, + icon)
+ *   As user drags left, the strip snaps to the next card. When scrolled,
+ *   the header subtitle stays, the CTA switches to "Confirm & Claim", and the
+ *   Skip link becomes a scarier "No, I want to lose my benefits".
  * ---------------------------------------------------------------------------*/
 
 const IN_EASE = [0.22, 1, 0.36, 1] as const;
 const STAGGER = 0.15;
 
-export default function Screen6() {
-  // NOTE: Screen 6 is layered on top of Screen 5 (still mounted below) so the
-  // globe video keeps playing across the transition. We render a TRANSPARENT
-  // background and DO NOT re-render the main WorldPass card — Screen 5's card
-  // shows through this layer and is the shared element between the two screens.
+const CARD_W = 230;
+const CARD_H = 330;
+const CARD_GAP = 22;
+const STRIDE = CARD_W + CARD_GAP;
+const PHONE_W = 440;
+const STRIP_PAD_X = (PHONE_W - CARD_W) / 2; // center the first card
+const CARD_TOP = 317; // matches Screen 5's finale card position
+
+export default function Screen6({
+  screen5CardVisibility,
+}: {
+  /** MotionValue owned by OnboardingFlow — Screen 6 drives 1→0 as user
+   *  swipes to the household card so Screen 5's underlying WorldPass card
+   *  fades out in sync with the strip. */
+  screen5CardVisibility?: MotionValue<number>;
+} = {}) {
+  const [activeIdx, setActiveIdx] = useState(0);
+  const x = useMotionValue(0);
+  const scrollProgress = useTransform(x, [-STRIDE, 0], [1, 0], { clamp: true });
+  const s5CardOpacity = useTransform(scrollProgress, [0, 0.4], [1, 0]);
+  const worldPassOpacity = useTransform(scrollProgress, [0, 0.15], [0, 1]);
+  const bgOverlayOpacity = useTransform(scrollProgress, [0, 0.35, 1], [0, 0, 1]);
+
+  // Bubble Screen 5's card visibility upward — synced to s5CardOpacity so
+  // the card underneath fades exactly as our overlays take over.
+  useEffect(() => {
+    if (!screen5CardVisibility) return;
+    const unsub = s5CardOpacity.on("change", (v) => screen5CardVisibility.set(v));
+    return () => unsub();
+  }, [s5CardOpacity, screen5CardVisibility]);
+
+  const handleDragEnd = (_: unknown, info: PanInfo) => {
+    const projected = info.offset.x + info.velocity.x * 0.12;
+    const target = Math.max(
+      -STRIDE,
+      Math.min(0, projected < -STRIDE / 2 ? -STRIDE : 0),
+    );
+    animate(x, target, { type: "spring", stiffness: 320, damping: 32 });
+    setActiveIdx(target === 0 ? 0 : 1);
+  };
+
+  const scrolled = activeIdx > 0;
+
   return (
     <div className="relative h-full w-full overflow-hidden rounded-[44px]">
-      {/* Scan icon pill — 65×65 white circle with subtle drop shadow, scan
-          frame + person centered per Figma node 561:25931. */}
+      {/* Overlay that fades Screen 5's card as the strip scrolls. */}
+      <motion.div
+        className="pointer-events-none absolute inset-0"
+        style={{
+          background:
+            "linear-gradient(to bottom, var(--bg-screen-start), var(--bg-screen-end))",
+          opacity: bgOverlayOpacity,
+        }}
+      />
+
+      {/* Scan icon pill */}
       <motion.div
         className="absolute left-1/2 -translate-x-1/2 flex items-center justify-center rounded-full text-[color:var(--ink)]"
         style={{
@@ -41,13 +98,10 @@ export default function Screen6() {
         <ScanIcon />
       </motion.div>
 
-      {/* Title with laurel decorations — laurels hug the title with a small
-          gap on each side (native SVG aspect 306.9:60, ~5.1:1). Keep width
-          close to Figma spec so the leaves sit next to the text, not floating
-          way out at the phone frame edges. */}
+      {/* Title with laurel decorations */}
       <motion.div
         className="absolute left-1/2 -translate-x-1/2 flex items-center justify-center"
-        style={{ top: 205, width: 330, height: 64 }}
+        style={{ top: 155, width: 330, height: 64 }}
         initial={{ opacity: 0, y: 8 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ delay: STAGGER, duration: 0.6, ease: IN_EASE }}
@@ -69,71 +123,100 @@ export default function Screen6() {
         </p>
       </motion.div>
 
-      {/* Name + divider + ID overlay — positioned INSIDE Screen 5's card,
-          which sits at y 317 → 647 on the canvas. The block anchors near the
-          card's bottom edge (like the original summary text) so nothing spills
-          out. */}
-      <motion.div
-        className="pointer-events-none absolute left-1/2 -translate-x-1/2 text-center"
-        style={{ top: 560, width: 180 }}
+      {/* Subtitle */}
+      <motion.p
+        className="absolute left-1/2 -translate-x-1/2 text-center text-[12px] font-semibold leading-[16px] tracking-[-0.01em] text-neutral-500"
+        style={{ top: 232, maxWidth: 210 }}
         initial={{ opacity: 0, y: 6 }}
         animate={{ opacity: 1, y: 0 }}
+        transition={{ delay: STAGGER * 1.5, duration: 0.6, ease: IN_EASE }}
+      >
+        Complete quick KYC to activate your pass and unlock all benefits
+      </motion.p>
+
+      {/* Name + divider + ID overlay — pinned to Screen 5's card interior;
+          fades out as user scrolls to the household card. */}
+      <motion.div
+        className="pointer-events-none absolute left-1/2 -translate-x-1/2 text-center"
+        style={{ top: 560, width: 180, opacity: s5CardOpacity }}
+      >
+        <motion.div
+          initial={{ opacity: 0, y: 6 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: STAGGER * 2, duration: 0.6, ease: IN_EASE }}
+        >
+          <p className="subtext-gradient text-[15px] font-medium leading-[22px] tracking-[-0.02em]">
+            mohak n.
+          </p>
+          <div
+            className="mt-[8px]"
+            style={{
+              height: 1,
+              background:
+                "linear-gradient(90deg, rgba(255,255,255,0) 0%, rgba(255,255,255,0.2) 50%, rgba(255,255,255,0) 100%)",
+            }}
+          />
+          <p className="mt-[8px] font-mono text-[11px] tracking-[0.16em] text-white/25">
+            6190001
+          </p>
+        </motion.div>
+      </motion.div>
+
+      {/* Card strip — draggable horizontally with snap to two positions.
+          Slot 0: our own WorldPass replica, hidden while at rest (Screen 5's
+                  card shows through), fades in as user starts to drag so
+                  the card travels WITH the strip.
+          Slot 1: Build your household. */}
+      <motion.div
+        className="absolute cursor-grab active:cursor-grabbing"
+        style={{
+          top: CARD_TOP,
+          left: 0,
+          x,
+          paddingLeft: STRIP_PAD_X,
+          paddingRight: STRIP_PAD_X,
+          display: "flex",
+          gap: CARD_GAP,
+          touchAction: "pan-y",
+        }}
+        drag="x"
+        dragConstraints={{ left: -STRIDE, right: 0 }}
+        dragElastic={0.15}
+        onDragEnd={handleDragEnd}
+        initial={{ opacity: 0 }}
+        animate={{ opacity: 1 }}
         transition={{ delay: STAGGER * 2, duration: 0.6, ease: IN_EASE }}
       >
-        <p className="subtext-gradient text-[15px] font-medium leading-[22px] tracking-[-0.02em]">
-          mohak n.
-        </p>
-        <div
-          className="mt-[8px]"
+        {/* Slot 0 — WorldPass card (opacity ramps from 0 → 1 as user drags) */}
+        <motion.div
           style={{
-            height: 1,
-            background:
-              "linear-gradient(90deg, rgba(255,255,255,0) 0%, rgba(255,255,255,0.2) 50%, rgba(255,255,255,0) 100%)",
-          }}
-        />
-        <p className="mt-[8px] font-mono text-[11px] tracking-[0.16em] text-white/25">
-          6190001
-        </p>
-      </motion.div>
-
-      {/* Peek of next card — slides in from off-screen right after the rest
-          of the "issued" UI has settled, hinting at horizontal scroll. */}
-      <motion.div
-        className="absolute"
-        style={{ top: 317, left: 250 }}
-        initial={{ opacity: 0, x: 220 }}
-        animate={{ opacity: 0.85, x: 100 }}
-        transition={{ delay: STAGGER * 5, duration: 0.9, ease: IN_EASE }}
-      >
-        <IssuedCard name="mohak n." id="6190001" width={230} height={330} />
-      </motion.div>
-
-      {/* Scroll down + View all 24 benefits pill */}
-      <motion.div
-        className="absolute left-1/2 -translate-x-1/2 flex flex-col items-center gap-2"
-        style={{ top: 675 }}
-        initial={{ opacity: 0, y: 8 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ delay: STAGGER * 3, duration: 0.6, ease: IN_EASE }}
-      >
-        <p className="text-[13px] font-medium leading-[16px] tracking-[-0.01em] text-neutral-500">
-          Scroll down
-        </p>
-        <button
-          className="relative flex h-[32px] w-[152px] items-center justify-center rounded-full text-[13px] font-medium tracking-[-0.01em] text-[color:var(--ink)]"
-          style={{
-            background: "rgba(255,255,255,0.6)",
-            border: "1px solid rgba(0,0,0,0.05)",
-            boxShadow: "0 4px 14px -6px rgba(0,0,0,0.08)",
-            backdropFilter: "blur(8px)",
+            flexShrink: 0,
+            opacity: worldPassOpacity,
           }}
         >
-          View all 24 benefits
-        </button>
+          <WorldPassCard />
+        </motion.div>
+        {/* Slot 1 — Build your household */}
+        <div style={{ flexShrink: 0 }}>
+          <HouseholdCard />
+        </div>
+      </motion.div>
+
+      {/* Scroll hint (only when not scrolled) */}
+      <motion.div
+        className="pointer-events-none absolute left-1/2 -translate-x-1/2 flex flex-col items-center gap-[6px]"
+        style={{ top: 685 }}
+        initial={{ opacity: 0, y: 8 }}
+        animate={{ opacity: scrolled ? 0 : 1, y: 0 }}
+        transition={{ delay: STAGGER * 3, duration: 0.6, ease: IN_EASE }}
+      >
+        <p className="text-[12px] font-semibold leading-[16px] tracking-[-0.01em] text-[color:var(--ink)]">
+          Scroll to view all benefits
+        </p>
         <ChevronDown />
       </motion.div>
 
-      {/* Bottom sheet — Confirm CTA + Skip */}
+      {/* Bottom sheet — CTA + link. Text swaps once user is on household card. */}
       <motion.div
         className="absolute bottom-0 left-0 w-full pt-6 pb-8"
         style={{
@@ -146,7 +229,7 @@ export default function Screen6() {
       >
         <div className="flex flex-col items-center gap-4 px-[30px]">
           <button
-            className="relative h-[50px] w-full overflow-hidden rounded-full text-[15px] font-semibold text-[color:var(--ink)]"
+            className="relative h-[50px] w-full overflow-hidden rounded-full text-[14px] font-semibold tracking-[-0.01em] text-[color:var(--ink)]"
             style={{
               background:
                 "linear-gradient(90deg, rgba(80,87,234,0.35) 0%, rgba(217,70,239,0.28) 35%, rgba(239,68,68,0.32) 65%, rgba(237,215,88,0.35) 100%)",
@@ -154,10 +237,12 @@ export default function Screen6() {
               border: "1px solid rgba(255,255,255,0.7)",
             }}
           >
-            Confirm Details & Activate Benefits
+            {scrolled
+              ? "Confirm Details & Claim Benefits"
+              : "Confirm Details & Activate Benefits"}
           </button>
-          <button className="text-[15px] font-medium underline underline-offset-4 text-[color:var(--ink)]">
-            Skip
+          <button className="text-[14px] font-semibold underline underline-offset-4 text-[color:var(--ink)]">
+            {scrolled ? "No, I want to lose my benefits" : "Skip"}
           </button>
         </div>
       </motion.div>
@@ -165,38 +250,27 @@ export default function Screen6() {
   );
 }
 
-function IssuedCard({
-  name,
-  id,
-  width = 230,
-  height = 330,
-}: {
-  name: string;
-  id: string;
-  width?: number;
-  height?: number;
-}) {
-  // Globe scales with card; anchor everything to card width for a stable ratio.
-  const globeSize = Math.round(width * 0.87);
+/* ---------------------------------------------------------------------------
+ * Cards
+ * -------------------------------------------------------------------------*/
+
+function WorldPassCard() {
   return (
-    <div className="shrink-0" style={{ width }}>
-      <Card3D width={width} height={height} radius={26} static>
-        {/* "+ atlys worldpass" pill */}
+    <div style={{ width: CARD_W }}>
+      <Card3D width={CARD_W} height={CARD_H} radius={26} static>
         <p
-          className="subtext-gradient absolute left-1/2 -translate-x-1/2 whitespace-nowrap text-[12px] font-medium tracking-[-0.01em]"
-          style={{ top: 20 }}
+          className="subtext-gradient pointer-events-none absolute left-1/2 -translate-x-1/2 whitespace-nowrap text-[11px] font-medium tracking-[-0.01em]"
+          style={{ top: 18 }}
         >
           + atlys worldpass
         </p>
-        {/* Globe */}
         <div
           className="pointer-events-none absolute left-1/2 -translate-x-1/2"
           style={{
-            top: 45,
-            width: globeSize,
-            height: globeSize,
-            maskImage:
-              "radial-gradient(circle, black 38%, transparent 55%)",
+            top: 40,
+            width: 220,
+            height: 220,
+            maskImage: "radial-gradient(circle, black 38%, transparent 55%)",
             WebkitMaskImage:
               "radial-gradient(circle, black 38%, transparent 55%)",
           }}
@@ -211,21 +285,20 @@ function IssuedCard({
             style={{ width: "100%", height: "100%", objectFit: "cover" }}
           />
         </div>
-        {/* Name + divider + ID */}
         <div className="absolute inset-x-6" style={{ bottom: 22 }}>
           <p className="subtext-gradient text-center text-[15px] font-medium leading-[22px] tracking-[-0.02em]">
-            {name}
+            mohak n.
           </p>
           <div
-            className="mt-[10px]"
+            className="mt-[8px]"
             style={{
               height: 1,
               background:
-                "linear-gradient(90deg, rgba(255,255,255,0) 0%, rgba(255,255,255,0.18) 50%, rgba(255,255,255,0) 100%)",
+                "linear-gradient(90deg, rgba(255,255,255,0) 0%, rgba(255,255,255,0.2) 50%, rgba(255,255,255,0) 100%)",
             }}
           />
-          <p className="mt-[10px] text-center font-mono text-[11px] tracking-[0.16em] text-white/25">
-            {id}
+          <p className="mt-[8px] text-center font-mono text-[11px] tracking-[0.16em] text-white/25">
+            6190001
           </p>
         </div>
       </Card3D>
@@ -233,13 +306,56 @@ function IssuedCard({
   );
 }
 
-/** Person-inside-scan-frame icon, mirroring Figma node 561:25931.
- *  24×24 frame: four L-corner brackets at each corner + person glyph centered. */
+function HouseholdCard() {
+  return (
+    <div
+      className="relative flex flex-col items-center justify-center"
+      style={{
+        width: CARD_W,
+        height: CARD_H,
+        borderRadius: 30,
+        border: "1px dashed #D6D9DC",
+        background: "transparent",
+      }}
+    >
+      {/* + icon in a bordered circle */}
+      <div
+        className="mb-6 flex items-center justify-center rounded-full"
+        style={{
+          width: 60,
+          height: 60,
+          border: "1px solid #D6D9DC",
+        }}
+      >
+        <svg width="24" height="24" viewBox="0 0 24 24" fill="none">
+          <path
+            d="M12 5v14M5 12h14"
+            stroke="#1a1a1a"
+            strokeWidth="1.6"
+            strokeLinecap="round"
+          />
+        </svg>
+      </div>
+      <p className="text-center text-[14px] font-semibold leading-[19px] tracking-[-0.01em] text-black">
+        Build your household
+      </p>
+      <p
+        className="mt-2 text-center text-[12px] font-semibold leading-[16px] tracking-[-0.01em] text-neutral-500"
+        style={{ maxWidth: 190 }}
+      >
+        Add family members to extend WorldPass perks and automate their travel
+      </p>
+    </div>
+  );
+}
+
+/* ---------------------------------------------------------------------------
+ * Icons
+ * -------------------------------------------------------------------------*/
+
 function ScanIcon() {
-  const BRACKET = 6.73;
   return (
     <div className="relative" style={{ width: 24, height: 24 }}>
-      {/* Person figure — 18.068×18.068 centered */}
       <svg
         className="absolute"
         style={{
@@ -253,13 +369,10 @@ function ScanIcon() {
       >
         <path d="M6.02262 6.02262C7.68637 6.02262 9.03393 4.67506 9.03393 3.01131C9.03393 1.34756 7.68637 0 6.02262 0C4.35887 0 3.01131 1.34756 3.01131 3.01131C3.01131 4.67506 4.35887 6.02262 6.02262 6.02262ZM6.02262 7.52827C4.01257 7.52827 0 8.53706 0 10.5396V12.0452H12.0452V10.5396C12.0452 8.53706 8.03267 7.52827 6.02262 7.52827Z" />
       </svg>
-      {/* Four L-brackets at corners */}
       <Bracket style={{ top: 0, left: 0 }} />
       <Bracket style={{ top: 0, right: 0, transform: "rotate(90deg)" }} />
       <Bracket style={{ bottom: 0, right: 0, transform: "rotate(180deg)" }} />
       <Bracket style={{ bottom: 0, left: 0, transform: "rotate(-90deg)" }} />
-      {/* keep constant to appease TS-unused */}
-      <span className="hidden">{BRACKET}</span>
     </div>
   );
 }
@@ -284,20 +397,13 @@ function ChevronDown() {
   return (
     <svg
       width="18"
-      height="24"
-      viewBox="0 0 18 24"
+      height="10"
+      viewBox="0 0 18 10"
       fill="none"
       className="text-[color:var(--ink)]/60"
     >
       <path
-        d="M4 7l5 5 5-5"
-        stroke="currentColor"
-        strokeWidth="1.6"
-        strokeLinecap="round"
-        strokeLinejoin="round"
-      />
-      <path
-        d="M4 14l5 5 5-5"
+        d="M2 2l7 6 7-6"
         stroke="currentColor"
         strokeWidth="1.6"
         strokeLinecap="round"

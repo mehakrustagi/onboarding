@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
-import { AnimatePresence, motion } from "framer-motion";
+import { AnimatePresence, motion, useMotionValue } from "framer-motion";
 import Screen1 from "./Screen1";
 import Screen2 from "./Screen2";
 import Screen3 from "./Screen3";
@@ -30,6 +30,9 @@ const AUTO_ADVANCE_MS: Record<number, number> = {
 export default function OnboardingFlow() {
   const [index, setIndex] = useState(0);
   const [checkpointIdx, setCheckpointIdx] = useState(-1);
+  // Shared: Screen 6 drives this 1 → 0 as user swipes to the household card;
+  // Screen 5 reads it to fade out its finale WorldPass card in sync.
+  const screen5CardVisibility = useMotionValue(1);
 
   const next = useCallback(() => {
     setIndex((i) => Math.min(i + 1, SCREENS.length - 1));
@@ -103,12 +106,13 @@ export default function OnboardingFlow() {
               initialPhase={index === 5 ? "final" : screen5Phase}
               onComplete={next}
               hideFinaleSummary={index === 5}
+              finaleCardOpacity={index === 5 ? screen5CardVisibility : undefined}
             />
           </div>
         )}
         {index === 5 && (
           <div className="absolute inset-0">
-            <Screen6 />
+            <Screen6 screen5CardVisibility={screen5CardVisibility} />
           </div>
         )}
       </div>
