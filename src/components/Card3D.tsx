@@ -1,7 +1,14 @@
 "use client";
 
 import { useRef, type ReactNode } from "react";
-import { motion, useMotionValue, useSpring, useTransform } from "framer-motion";
+import {
+  motion,
+  useMotionValue,
+  useSpring,
+  useTime,
+  useTransform,
+  type MotionValue,
+} from "framer-motion";
 
 type Card3DProps = {
   width?: number;
@@ -11,6 +18,10 @@ type Card3DProps = {
   tiltMax?: number;
   static?: boolean;
   className?: string;
+  /** 0–1 motion value that drives the top-to-bottom "activation" light
+   *  sweep. Animate 0 → 1 → 0 to make the dot pattern briefly glow as
+   *  a bright band passes from card top to bottom. */
+  activatePulse?: MotionValue<number>;
 };
 
 /**
@@ -34,6 +45,7 @@ export default function Card3D({
   tiltMax = 14,
   static: isStatic = false,
   className,
+  activatePulse,
 }: Card3DProps) {
   const ref = useRef<HTMLDivElement | null>(null);
   const rx = useMotionValue(0);
@@ -41,8 +53,39 @@ export default function Card3D({
   const rxSpring = useSpring(rx, { stiffness: 220, damping: 22 });
   const rySpring = useSpring(ry, { stiffness: 220, damping: 22 });
 
+  // A single, very slow-drifting ambient light — moves across the surface
+  // over ~30s. Only enough to keep the card from feeling perfectly frozen.
+  const time = useTime();
+  const ambientX = useTransform(time, (t) => 40 + Math.sin(t * 0.00018) * 15);
+  const ambientY = useTransform(time, (t) => 45 + Math.sin(t * 0.00014 + 1.4) * 18);
+  const ambientBg = useTransform(
+    [ambientX, ambientY],
+    ([ax, ay]: (string | number)[]) =>
+      `radial-gradient(ellipse at ${ax}% ${ay}%, rgba(255,255,255,0.05), transparent 65%)`,
+  );
+
   const shineX = useTransform(rySpring, [-tiltMax, tiltMax], ["25%", "75%"]);
   const shineY = useTransform(rxSpring, [-tiltMax, tiltMax], ["75%", "25%"]);
+
+  // Activation pulse — when driven 0→1, a bright dot layer reveals from the
+  // top of the card to the bottom (like the surface "powering on"). Fallback
+  // to a constant 0 so the effect is invisible when no pulse is passed.
+  const localPulse = useMotionValue(0);
+  const pulse = activatePulse ?? localPulse;
+  // Radial pulse: a ring expands OUT from the orb's landing spot (near the
+  // top-center of the card) — like a ripple travelling across the surface.
+  // Center is fixed at the orb's rest position (50% x, 23% y relative to card).
+  const activationMask = useTransform(pulse, (p) => {
+    // Radius grows from 0 → ~140% so the ring passes over the whole card.
+    const r = p * 140;
+    return `radial-gradient(circle at 50% 23%,
+      transparent ${Math.max(0, r - 22)}%,
+      rgba(0,0,0,0.55) ${Math.max(0, r - 6)}%,
+      rgba(0,0,0,1) ${r}%,
+      rgba(0,0,0,0.55) ${r + 6}%,
+      transparent ${r + 22}%)`;
+  });
+  const activationOpacity = useTransform(pulse, [0, 0.1, 0.9, 1], [0, 1, 1, 0]);
 
   const handleMove = (e: React.MouseEvent<HTMLDivElement>) => {
     if (isStatic) return;
@@ -98,31 +141,19 @@ export default function Card3D({
           overflow: "hidden",
         }}
       >
-        {/* Embossed dot texture — each dot is highlight top-left + shadow
-            bottom-right so it reads as a raised bump. Two background layers
-            offset by 1px produce the emboss illusion. */}
+        {/* Base embossed dot texture — tiny raised bumps (highlight top-left
+            + shadow bottom-right offset by 0.6px). Dots kept small and quiet. */}
         <div
           className="pointer-events-none absolute inset-0"
           style={{
             backgroundImage: `
-              radial-gradient(circle at 30% 30%, rgba(255,255,255,0.10) 0.9px, transparent 1.6px),
-              radial-gradient(circle at 70% 70%, rgba(0,0,0,0.55) 0.9px, transparent 1.6px)
+              radial-gradient(circle at 30% 30%, rgba(255,255,255,0.08) 0.5px, transparent 1px),
+              radial-gradient(circle at 70% 70%, rgba(0,0,0,0.55) 0.5px, transparent 1px)
             `,
-            backgroundSize: "12px 12px, 12px 12px",
+            backgroundSize: "8px 8px, 8px 8px",
             backgroundPosition: "0 0, 1px 1px",
             mixBlendMode: "screen",
-            opacity: 0.9,
-          }}
-        />
-        {/* Second, sharper dot layer for finer relief */}
-        <div
-          className="pointer-events-none absolute inset-0"
-          style={{
-            backgroundImage: `
-              radial-gradient(circle, rgba(255,255,255,0.05) 0.6px, transparent 0.9px)
-            `,
-            backgroundSize: "12px 12px",
-            opacity: 0.7,
+            opacity: 0.8,
           }}
         />
 
@@ -135,12 +166,49 @@ export default function Card3D({
           }}
         />
 
+        {/* Ambient drifting light — slowly moves across the card even when
+            the cursor isn't hovering. Gives the surface a "living" feel. */}
+        <motion.div
+          className="pointer-events-none absolute inset-0"
+          style={{
+            background: ambientBg,
+            mixBlendMode: "screen",
+          }}
+        />
+
+        {/* Activation dot layer — same tiny dots, slightly brighter, revealed
+            through a soft band that traverses vertically row-by-row. */}
+        <motion.div
+          className="pointer-events-none absolute inset-0"
+          style={{
+            backgroundImage:
+              "radial-gradient(circle, rgba(255,255,255,0.35) 0.55px, transparent 1.1px)",
+            backgroundSize: "8px 8px",
+            mixBlendMode: "screen",
+            maskImage: activationMask,
+            WebkitMaskImage: activationMask,
+            opacity: activationOpacity,
+          }}
+        />
+
         {/* Cursor-tracked specular gloss — moves with tilt */}
         <motion.div
           className="pointer-events-none absolute inset-0"
           style={{
             background: shineBg,
             mixBlendMode: "screen",
+          }}
+        />
+
+        {/* Subtle grain overlay — SVG turbulence noise for a tactile,
+            printed-material texture. Very low opacity so it doesn't
+            overpower the dots. */}
+        <div
+          className="pointer-events-none absolute inset-0"
+          style={{
+            backgroundImage: `url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='140' height='140'><filter id='n'><feTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='2' stitchTiles='stitch'/><feColorMatrix values='0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0.4 0'/></filter><rect width='100%' height='100%' filter='url(%23n)'/></svg>")`,
+            opacity: 0.15,
+            mixBlendMode: "overlay",
           }}
         />
 

@@ -18,12 +18,15 @@ export default function CuboidText({
   style,
   duration = 0.7,
   height,
+  delay = 0,
 }: {
   text: string;
   className?: string;
   style?: CSSProperties;
   duration?: number;
   height: number;
+  /** Seconds to wait before revealing new text. */
+  delay?: number;
 }) {
   return (
     <div
@@ -44,9 +47,16 @@ export default function CuboidText({
             backfaceVisibility: "hidden",
           }}
           initial={{ rotateX: 90, opacity: 0 }}
-          animate={{ rotateX: 0, opacity: 1 }}
-          exit={{ rotateX: -90, opacity: 0 }}
-          transition={{ duration, ease: [0.22, 1, 0.36, 1] }}
+          animate={{
+            rotateX: 0,
+            opacity: 1,
+            transition: { delay, duration, ease: [0.22, 1, 0.36, 1] },
+          }}
+          exit={{
+            rotateX: -90,
+            opacity: 0,
+            transition: { duration: 0.5, ease: [0.4, 0, 0.2, 1] },
+          }}
         >
           <p className={className}>{text}</p>
         </motion.div>
