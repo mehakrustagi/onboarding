@@ -120,7 +120,11 @@ const CARD_ORB_SIZE = 52;
 
 // Where each orb sits at the moment Screen 4 hands us over — matches
 // Screen 4's welcome-row positions so the handoff has no jump.
-const HANDOFF_Y = 425;
+// Handoff position — matches Screen 7's Staged orb row (cy=530, size 48,
+// X centers 130/190/250/310). Screen 5 mounts with its queue orbs at this
+// exact spot so the swap from Staged is invisible; the orbs then rise
+// from 530→205 as part of the card-rise entrance.
+const HANDOFF_Y = 530;
 const HANDOFF_SIZE = 48;
 const HANDOFF_XS: Record<OrbKey, number> = {
   safety: 130,
@@ -821,8 +825,8 @@ function QueueOrb({
           filter: isConsumed ? "blur(4px)" : "blur(0px)",
         }}
         transition={{
-          y: { delay: 0.15, duration: 1.1, ease: [0.22, 1, 0.36, 1] },
-          scale: { delay: 0.15, duration: 1.1, ease: [0.22, 1, 0.36, 1] },
+          y: { delay: 0.15, duration: 1.3, ease: [0.22, 1, 0.36, 1] },
+          scale: { delay: 0.15, duration: 1.3, ease: [0.22, 1, 0.36, 1] },
           // Slower + heavier spring — orbs shift as if pulled by a rope,
           // with a slight lag that reads as coupled motion.
           x: {

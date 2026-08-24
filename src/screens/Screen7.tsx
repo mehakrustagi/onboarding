@@ -401,7 +401,7 @@ function StagedView({ car }: { car: Car }) {
         <WordReveal
           text="Your ride is staged"
           className="text-[20px] font-medium leading-[25px] tracking-[-0.04em] text-[#787878] whitespace-nowrap"
-          delay={2.95}
+          delay={3.2}
           staggerMs={140}
           perWordDurationMs={480}
         />
@@ -416,7 +416,7 @@ function StagedView({ car }: { car: Car }) {
         <WordReveal
           text={`${car.name} locked for\nyour airport pickup`}
           className="text-[20px] font-medium leading-[25px] tracking-[-0.04em] text-black"
-          delay={3.5}
+          delay={3.9}
           staggerMs={140}
           perWordDurationMs={480}
         />
@@ -425,8 +425,8 @@ function StagedView({ car }: { car: Car }) {
       {/* Exhaust cloud — billows in from bottom, then keeps drifting/
           breathing so it feels alive. Two layers offset horizontally for
           parallax so the smoke reads as three-dimensional. */}
-      <SmokeLayer delay={0.35} offsetX={-14} scaleAmp={0.06} drift={12} loopMs={5200} />
-      <SmokeLayer delay={0.55} offsetX={14} scaleAmp={0.05} drift={-10} loopMs={6800} opacity={0.45} />
+      <SmokeLayer delay={0.35} offsetX={-14} scaleAmp={0.06} drift={12} loopMs={10400} />
+      <SmokeLayer delay={0.55} offsetX={14} scaleAmp={0.05} drift={-10} loopMs={13600} opacity={0.45} />
     </motion.div>
 
       {/* Agent orbs — mount at Screen 4's team-perks positions
@@ -454,7 +454,7 @@ function FloatingOrb({
   orb,
   orbIndex,
 }: {
-  orb: { blob: string; left: number };
+  orb: { blob: string; cx: number };
   orbIndex: number;
 }) {
   const time = useTime();
@@ -466,8 +466,8 @@ function FloatingOrb({
     <motion.div
       className="absolute"
       style={{
-        left: orb.left,
-        top: STAGED_ORB_Y,
+        left: orb.cx - STAGED_ORB_SIZE / 2,
+        top: STAGED_ORB_CY - STAGED_ORB_SIZE / 2,
         width: STAGED_ORB_SIZE,
         height: STAGED_ORB_SIZE,
         y: waveY,
@@ -560,13 +560,14 @@ function SmokeLayer({
       }}
       initial={{ opacity: 0 }}
       animate={{
-        // Cloud emerges from below, billows up past the anchor, then fades
-        // out as it clears the plume line. Opacity is 0 at both endpoints
-        // → seamless loop.
-        y: [80, -180],
+        // Cloud starts fully off-screen below (top edge of cloud sits at
+        // the base of the phone), rises up through the frame, then clears
+        // out past the anchor line at the top. Seamless loop — opacity is
+        // 0 at both endpoints so the reset is invisible.
+        y: [275, -220],
         opacity: [0, opacity, opacity, 0],
         x: [offsetX, offsetX + drift, offsetX],
-        scale: [0.9, 1 + scaleAmp, 1.12],
+        scale: [0.92, 1 + scaleAmp, 1.14],
       }}
       transition={{
         y: {
@@ -612,16 +613,17 @@ function SmokeLayer({
   );
 }
 
-/** Staged-screen agent orbs — exact positions from Figma node 617:27283:
- *  container (143.125, 514.6), 153.75×50 → four 30×30 orbs at these left
- *  coords. cy = 529.6 for all four. */
-const STAGED_ORB_SIZE = 30;
-const STAGED_ORB_Y = 514.6; // top-left y of each orb
-const STAGED_ORBS: Array<{ blob: string; left: number }> = [
-  { blob: "/assets/orb/blob-safety.png", left: 143.125 },  // safety (leftmost)
-  { blob: "/assets/orb/blob-forex.png", left: 184.375 },   // forex
-  { blob: "/assets/orb/blob-flight.png", left: 225.625 },  // flight
-  { blob: "/assets/orb/ellipse.png", left: 266.875 },      // visa (rightmost)
+/** Staged-screen agent orbs — size matches Screen 4 team-perks and
+ *  Screen 5 queue orbs (48), same X centers (130/190/250/310) so the
+ *  orbs look identical across Team perks → Staged → Card rise. cy stays
+ *  at Figma's 530 (staged row Y). */
+const STAGED_ORB_SIZE = 48;
+const STAGED_ORB_CY = 530;
+const STAGED_ORBS: Array<{ blob: string; cx: number }> = [
+  { blob: "/assets/orb/blob-safety.png", cx: 130 },   // safety (leftmost)
+  { blob: "/assets/orb/blob-forex.png", cx: 190 },    // forex
+  { blob: "/assets/orb/blob-flight.png", cx: 250 },   // flight
+  { blob: "/assets/orb/ellipse.png", cx: 310 },       // visa (rightmost)
 ];
 
 /* ---------------------------------------------------------------------------
