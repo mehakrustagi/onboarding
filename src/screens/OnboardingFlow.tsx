@@ -78,17 +78,36 @@ export default function OnboardingFlow() {
         onClick={next}
         className="relative h-[965px] w-[440px] cursor-pointer select-none overflow-hidden rounded-[44px] bg-white shadow-[0_40px_80px_-20px_rgba(0,0,0,0.5)]"
       >
+        {/* Screens 1–4 (splash → agent flow) swap through AnimatePresence.
+            Screens 5 & 6 share a single canvas — Screen 5 stays mounted
+            once index reaches 4 so its globe video keeps playing without
+            a reload when Screen 6 layers on top at index 5. */}
         <AnimatePresence mode="wait">
-          <motion.div key={index} className="absolute inset-0">
-            {index === 3 ? (
-              <Screen4 checkpointMatcher={innerMatcher} onComplete={next} />
-            ) : index === 4 ? (
-              <Screen5 key={screen5Key} initialPhase={screen5Phase} onComplete={next} />
-            ) : (
-              <Current />
-            )}
-          </motion.div>
+          {index <= 3 && (
+            <motion.div key={index} className="absolute inset-0">
+              {index === 3 ? (
+                <Screen4 checkpointMatcher={innerMatcher} onComplete={next} />
+              ) : (
+                <Current />
+              )}
+            </motion.div>
+          )}
         </AnimatePresence>
+        {index >= 4 && (
+          <div className="absolute inset-0">
+            <Screen5
+              key={screen5Key}
+              initialPhase={index === 5 ? "final" : screen5Phase}
+              onComplete={next}
+              hideFinaleSummary={index === 5}
+            />
+          </div>
+        )}
+        {index === 5 && (
+          <div className="absolute inset-0">
+            <Screen6 />
+          </div>
+        )}
       </div>
     </>
   );

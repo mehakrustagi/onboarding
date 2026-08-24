@@ -168,6 +168,7 @@ function clockwiseSemicircle(
 export default function Screen5({
   initialPhase,
   onComplete,
+  hideFinaleSummary = false,
 }: {
   /** Optional phase to seed on mount — used by the dev checkpoint panel to
    *  jump directly to a specific state (skips prior auto-advance timers). */
@@ -175,6 +176,10 @@ export default function Screen5({
   /** Called once the WorldPass finale has settled — used to auto-advance
    *  to Screen 6 ("Your WorldPass is issued"). */
   onComplete?: () => void;
+  /** When Screen 6 is layered on top (shared-canvas transition), the card
+   *  stays but the "All your benefits. One WorldPass." summary is replaced
+   *  by the name + ID overlay from Screen 6. */
+  hideFinaleSummary?: boolean;
 } = {}) {
   const [phase, setPhase] = useState<
     "intro" | "cardEmpty" | number | "final"
@@ -503,7 +508,7 @@ export default function Screen5({
                 </div>
               </>
             )}
-            {phase === "final" && (
+            {phase === "final" && !hideFinaleSummary && (
               <motion.div
                 key="final-summary"
                 className="pointer-events-none absolute inset-x-0"

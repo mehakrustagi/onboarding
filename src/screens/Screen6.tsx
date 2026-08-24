@@ -16,14 +16,12 @@ const IN_EASE = [0.22, 1, 0.36, 1] as const;
 const STAGGER = 0.15;
 
 export default function Screen6() {
+  // NOTE: Screen 6 is layered on top of Screen 5 (still mounted below) so the
+  // globe video keeps playing across the transition. We render a TRANSPARENT
+  // background and DO NOT re-render the main WorldPass card — Screen 5's card
+  // shows through this layer and is the shared element between the two screens.
   return (
-    <div
-      className="relative h-full w-full overflow-hidden rounded-[44px]"
-      style={{
-        background:
-          "linear-gradient(to bottom, var(--bg-screen-start), var(--bg-screen-end))",
-      }}
-    >
+    <div className="relative h-full w-full overflow-hidden rounded-[44px]">
       {/* Scan icon pill — 65×65 white circle with subtle drop shadow, scan
           frame + person centered per Figma node 561:25931. */}
       <motion.div
@@ -43,10 +41,12 @@ export default function Screen6() {
         <ScanIcon />
       </motion.div>
 
-      {/* Title with laurel decorations */}
+      {/* Title with laurel decorations — laurels span most of the canvas
+          width and the title sits in the gap between the two halves. Native
+          SVG aspect is 306.9 : 60 (~5.1:1); we scale by width only. */}
       <motion.div
-        className="absolute left-1/2 -translate-x-1/2 flex items-center gap-3"
-        style={{ top: 155 }}
+        className="absolute left-1/2 -translate-x-1/2 flex items-center justify-center"
+        style={{ top: 205, width: 400, height: 78 }}
         initial={{ opacity: 0, y: 8 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ delay: STAGGER, duration: 0.6, ease: IN_EASE }}
@@ -54,36 +54,63 @@ export default function Screen6() {
         <Image
           src="/assets/worldpass/laurels.svg"
           alt=""
-          width={306}
-          height={60}
-          style={{ width: 306, height: "auto", opacity: 0.65 }}
+          width={400}
+          height={78}
+          style={{ width: 400, height: "auto", opacity: 0.55 }}
         />
-        <div className="absolute inset-0 flex flex-col items-center justify-center px-6 text-center">
-          <p className="text-[22px] font-medium leading-[26px] tracking-[-0.03em] text-[color:var(--ink)]">
-            Your WorldPass is
-            <br />
-            issued
-          </p>
-        </div>
+        <p
+          className="absolute text-center text-[24px] font-medium leading-[30px] tracking-[-0.03em] text-[color:var(--ink)]"
+          style={{ maxWidth: 220 }}
+        >
+          Your WorldPass is
+          <br />
+          issued
+        </p>
       </motion.div>
 
-      {/* Main WorldPass card + peek of next */}
+      {/* Main WorldPass card is NOT rendered here — Screen 5's card underneath
+          is the shared element, so its globe video keeps looping unaffected.
+          We only overlay the name + divider + ID inside the card's footer,
+          fading in where Screen 5's "All your benefits. One WorldPass." was. */}
       <motion.div
-        className="absolute left-0 top-[260px] flex w-full items-start gap-[15px] pl-[94px]"
-        initial={{ opacity: 0, y: 24 }}
+        className="pointer-events-none absolute left-1/2 -translate-x-1/2 text-center"
+        style={{ top: 587, width: 180 }}
+        initial={{ opacity: 0, y: 6 }}
         animate={{ opacity: 1, y: 0 }}
-        transition={{ delay: STAGGER * 2, duration: 0.75, ease: IN_EASE }}
+        transition={{ delay: STAGGER * 2, duration: 0.6, ease: IN_EASE }}
       >
-        <IssuedCard name="mohak n." id="6190001" />
-        <div className="opacity-100" style={{ transform: "translateX(0px)" }}>
-          <IssuedCard name="mohak n." id="6190001" />
-        </div>
+        <p className="subtext-gradient text-[15px] font-medium leading-[22px] tracking-[-0.02em]">
+          mohak n.
+        </p>
+        <div
+          className="mt-[10px]"
+          style={{
+            height: 1,
+            background:
+              "linear-gradient(90deg, rgba(255,255,255,0) 0%, rgba(255,255,255,0.18) 50%, rgba(255,255,255,0) 100%)",
+          }}
+        />
+        <p className="mt-[10px] font-mono text-[11px] tracking-[0.16em] text-white/25">
+          6190001
+        </p>
+      </motion.div>
+
+      {/* Peek of next card — slides in from off-screen right after the rest
+          of the "issued" UI has settled, hinting at horizontal scroll. */}
+      <motion.div
+        className="absolute"
+        style={{ top: 317, left: 250 }}
+        initial={{ opacity: 0, x: 220 }}
+        animate={{ opacity: 0.85, x: 100 }}
+        transition={{ delay: STAGGER * 5, duration: 0.9, ease: IN_EASE }}
+      >
+        <IssuedCard name="mohak n." id="6190001" width={230} height={330} />
       </motion.div>
 
       {/* Scroll down + View all 24 benefits pill */}
       <motion.div
         className="absolute left-1/2 -translate-x-1/2 flex flex-col items-center gap-2"
-        style={{ top: 660 }}
+        style={{ top: 675 }}
         initial={{ opacity: 0, y: 8 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ delay: STAGGER * 3, duration: 0.6, ease: IN_EASE }}
@@ -137,10 +164,22 @@ export default function Screen6() {
   );
 }
 
-function IssuedCard({ name, id }: { name: string; id: string }) {
+function IssuedCard({
+  name,
+  id,
+  width = 230,
+  height = 330,
+}: {
+  name: string;
+  id: string;
+  width?: number;
+  height?: number;
+}) {
+  // Globe scales with card; anchor everything to card width for a stable ratio.
+  const globeSize = Math.round(width * 0.87);
   return (
-    <div className="shrink-0" style={{ width: 252 }}>
-      <Card3D width={252} height={350} radius={26} static>
+    <div className="shrink-0" style={{ width }}>
+      <Card3D width={width} height={height} radius={26} static>
         {/* "+ atlys worldpass" pill */}
         <p
           className="subtext-gradient absolute left-1/2 -translate-x-1/2 whitespace-nowrap text-[12px] font-medium tracking-[-0.01em]"
@@ -153,8 +192,8 @@ function IssuedCard({ name, id }: { name: string; id: string }) {
           className="pointer-events-none absolute left-1/2 -translate-x-1/2"
           style={{
             top: 45,
-            width: 220,
-            height: 220,
+            width: globeSize,
+            height: globeSize,
             maskImage:
               "radial-gradient(circle, black 38%, transparent 55%)",
             WebkitMaskImage:
