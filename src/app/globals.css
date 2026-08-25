@@ -91,17 +91,34 @@
   -webkit-text-fill-color: transparent;
 }
 
+/* WorldPass card summary ("All your benefits. One WorldPass.") — Figma
+ * 646:11181. Inter Semi Bold 12/16 tracking -0.12, gradient #666 → #eaeaea.
+ * Narrow width (~98px) forces the copy into 2 lines. */
+.worldpass-summary {
+  font-family: var(--font-inter), Inter, ui-sans-serif, system-ui, sans-serif;
+  font-weight: 600;
+  font-size: 13px;
+  line-height: 17px;
+  letter-spacing: -0.12px;
+  /* Brighter gradient so the copy reads clearly against the globe */
+  background: linear-gradient(90deg, #d0d0d0 0%, #ffffff 100%);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+  -webkit-text-fill-color: transparent;
+}
+
 /* WorldPass card ID number ("6190001") — Figma 561:26093.
  *   font: Enhanced Dot Digital-7 Regular 20/19.5, tracking 1px
  *   gradient: #1a1a1a → #808080
- *   Not shipping the LCD font; monospace + gap-heavy letter-spacing +
- *   text-shadow gives the dashed-digit read without the font file. */
+ *   Doto is Google's dotted-digital display font — visually the closest
+ *   match to Figma's Enhanced Dot Digital-7 (segmented dots per glyph). */
 .worldpass-id {
-  font-family: var(--font-vt323), "VT323", ui-monospace, monospace;
-  font-weight: 400;
+  font-family: var(--font-doto), ui-monospace, monospace;
+  font-weight: 500;
   font-size: 20px;
   line-height: 19.5px;
-  letter-spacing: 3px;
+  letter-spacing: 1px;
   background: linear-gradient(90deg, #1a1a1a 0%, #808080 100%);
   -webkit-background-clip: text;
   background-clip: text;

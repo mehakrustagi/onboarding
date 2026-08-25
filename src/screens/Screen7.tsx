@@ -4,6 +4,7 @@ import { useEffect, useRef, useState } from "react";
 import Image from "next/image";
 import AgentOrb from "@/components/AgentOrb";
 import WordReveal from "@/components/WordReveal";
+import { haptic } from "@/lib/haptics";
 import {
   animate,
   AnimatePresence,
@@ -150,7 +151,9 @@ export default function Screen7({
     const projected = x.get() + info.velocity.x * 0.12;
     const target = Math.round(projected / STRIDE) * STRIDE;
     animate(x, target, { type: "spring", stiffness: 320, damping: 32 });
-    setActiveIdx(mod(-target / STRIDE, CARS.length));
+    const nextIdx = mod(-target / STRIDE, CARS.length);
+    if (nextIdx !== activeIdx) haptic("carouselSnap");
+    setActiveIdx(nextIdx);
   };
 
 
@@ -298,6 +301,7 @@ export default function Screen7({
       <motion.button
         onClick={(e) => {
           e.stopPropagation();
+          haptic("stagedLock");
           setPhase("staged");
         }}
         whileTap={{ scale: 0.97 }}

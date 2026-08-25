@@ -13,6 +13,7 @@ import {
 import AgentOrb from "@/components/AgentOrb";
 import Card3D from "@/components/Card3D";
 import WordReveal from "@/components/WordReveal";
+import { haptic } from "@/lib/haptics";
 
 /* -----------------------------------------------------------------------------
  * Screen 5 — "Issuing your Atlys WorldPass"
@@ -105,9 +106,11 @@ function consumedAgents(benefitIdx: number): Set<OrbKey> {
 }
 // Card position: pulled up so there's less empty space between the
 // header title and the card. All orb-landing constants derive from this.
-const CARD_BOTTOM = 190; // was 90 → moved card up 100px
-const CARD_HEIGHT = 330;
-const CARD_TOP_Y = 965 - CARD_BOTTOM - CARD_HEIGHT; // = 445
+const CARD_WIDTH = 252;
+const CARD_HEIGHT = 350;
+const CARD_RADIUS = 30;
+const CARD_BOTTOM = 180; // finale card sits roughly centered on screen
+const CARD_TOP_Y = 965 - CARD_BOTTOM - CARD_HEIGHT; // = 435
 // Card orb trajectory:
 //   Stage 1 (arc): row slot → arrives centered on the card's TOP edge (small).
 //   Stage 2 (descend + grow): slides down INTO the card and swells.
@@ -256,12 +259,18 @@ export default function Screen5({
       timers.push(window.setTimeout(action, delay));
     };
 
-    schedule(cardEmptyAt, 1, () => setPhase("cardEmpty"));
+    schedule(cardEmptyAt, 1, () => {
+      haptic("cardRise");
+      setPhase("cardEmpty");
+    });
     schedule(firstBenefitAt, 2, () => setPhase(0));
     for (let i = 1; i < BENEFITS.length; i++) {
       schedule(benefitAt(i), 2 + i, () => setPhase(i));
     }
-    schedule(finalAt, 2 + BENEFITS.length, () => setPhase("final"));
+    schedule(finalAt, 2 + BENEFITS.length, () => {
+      haptic("finaleReveal");
+      setPhase("final");
+    });
     return () => timers.forEach((t) => window.clearTimeout(t));
   }, []);
 
@@ -325,6 +334,7 @@ export default function Screen5({
     if (!isNewAgent) return;
     const landingDelayMs = 1500;
     const t = window.setTimeout(() => {
+      haptic("benefitLand");
       cardPressY.set(6);
       cardPressScale.set(0.99);
       animate(cardPressY, 0, {
@@ -465,20 +475,18 @@ export default function Screen5({
         <motion.div style={{ y: cardShiftY }}>
         <motion.div style={{ y: cardPressY, scale: cardPressScale }}>
         <Card3D
-          width={230}
-          height={330}
-          radius={26}
+          width={CARD_WIDTH}
+          height={CARD_HEIGHT}
+          radius={CARD_RADIUS}
           activatePulse={cardActivate}
         >
-          {/* Globe — fills the entire card background (object-cover). The
-              video's own black background matches the card, so the globe
-              floats naturally with no visible edge. Rendered FIRST so all
-              overlay text (worldpass header, benefits, summary) sits on
-              top of it. */}
+          {/* Globe — fills the entire card background (object-cover).
+              Rendered FIRST so the dot pattern + all text overlays sit on
+              top of it. Only visible in the final phase. */}
           {phase === "final" && (
             <motion.div
               className="pointer-events-none absolute inset-0 overflow-hidden"
-              style={{ borderRadius: 26 }}
+              style={{ borderRadius: CARD_RADIUS }}
               initial={{ opacity: 0, scale: 0.94 }}
               animate={{ opacity: 1, scale: 1 }}
               transition={{ delay: 2.5, duration: 2.4, ease: [0.4, 0, 0.2, 1] }}
@@ -499,17 +507,43 @@ export default function Screen5({
             </motion.div>
           )}
 
-          {/* "+ atlys worldpass" pill — sits ON TOP of the globe video.
-              Font/size/gradient/opacity per Figma node 561:26097. */}
+          {/* Dot texture — shown during card-rise → benefit cycling
+              (whirlpool) phases. Hidden on finale so the globe reads clean. */}
+          {phase !== "intro" && phase !== "final" && (
+            <div
+              className="pointer-events-none absolute inset-0"
+              style={{ opacity: 0.55, mixBlendMode: "screen" }}
+            >
+              <Image
+                src="/assets/worldpass/card-dots.svg"
+                alt=""
+                width={CARD_WIDTH}
+                height={CARD_HEIGHT}
+                style={{ width: "100%", height: "100%" }}
+              />
+            </div>
+          )}
+
+          {/* Title header — "+ atlys worldpass". Real SVG "+" logo
+              (Figma node 633:27927, 13.948×13.948) alongside the wordmark.
+              Gradient runs edge-to-edge across the text (Figma stops:
+              #FFFFFF 0% → #5B5B5B 100%) — full opacity, no dimming. */}
           {phase === "final" && (
             <motion.div
-              className="worldpass-header pointer-events-none absolute left-1/2 -translate-x-1/2 whitespace-nowrap"
-              style={{ top: 22, zIndex: 2 }}
+              className="pointer-events-none absolute left-1/2 -translate-x-1/2 flex items-center gap-[6px] whitespace-nowrap"
+              style={{ top: 20, zIndex: 2 }}
               initial={{ opacity: 0, y: -6 }}
-              animate={{ opacity: 0.4, y: 0 }}
+              animate={{ opacity: 1, y: 0 }}
               transition={{ delay: 2.5, duration: 0.6, ease: [0.22, 1, 0.36, 1] }}
             >
-              + atlys worldpass
+              <Image
+                src="/assets/worldpass/plus-logo.svg"
+                alt=""
+                width={14}
+                height={14}
+                style={{ width: 14, height: 14 }}
+              />
+              <span className="worldpass-header">atlys worldpass</span>
             </motion.div>
           )}
 
@@ -536,8 +570,14 @@ export default function Screen5({
             {phase === "final" && !hideFinaleSummary && (
               <motion.div
                 key="final-summary"
-                className="pointer-events-none absolute inset-x-0"
-                style={{ bottom: 60 }}
+                className="worldpass-summary pointer-events-none absolute left-1/2 -translate-x-1/2 text-center"
+                style={{
+                  width: 130,
+                  // Position in the darker lower-third of the card, past
+                  // the bright equator of the globe so the copy pops.
+                  top: CARD_HEIGHT * 0.68,
+                  textShadow: "0 1px 8px rgba(0,0,0,0.75)",
+                }}
                 initial={{ opacity: 0, filter: "blur(10px)", scale: 0.85 }}
                 animate={{ opacity: 1, filter: "blur(0px)", scale: 1 }}
                 transition={{
@@ -546,19 +586,22 @@ export default function Screen5({
                   ease: [0.22, 1, 0.36, 1],
                 }}
               >
-                <p className="subtext-gradient text-[15px] font-medium leading-[20px] tracking-[-0.02em]">
-                  All your benefits.
-                </p>
-                <p className="subtext-gradient text-[15px] font-medium leading-[20px] tracking-[-0.02em]">
-                  One WorldPass.
-                </p>
+                All your benefits. One WorldPass.
               </motion.div>
             )}
           </div>
 
-          {/* Percentage bottom-left — hidden once we hit the final summary. */}
+          {/* Percentage bottom-left — Figma 649:11526 spec: Inter Medium
+              19.535/22.791, tracking -0.7814, white. Hidden at finale. */}
           {phase !== "final" && (
-            <p className="absolute bottom-5 left-5 text-[19.5px] font-medium leading-[22.8px] tracking-[-0.04em] text-white">
+            <p
+              className="absolute bottom-5 left-5 text-white font-medium whitespace-nowrap"
+              style={{
+                fontSize: 19.535,
+                lineHeight: "22.791px",
+                letterSpacing: "-0.7814px",
+              }}
+            >
               {displayPercent.toString().padStart(2, "0")}%
             </p>
           )}

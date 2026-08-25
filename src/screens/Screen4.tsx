@@ -16,6 +16,7 @@ import GradientText from "@/components/GradientText";
 import StatusIndicator from "@/components/StatusIndicator";
 import WordReveal from "@/components/WordReveal";
 import { CHECKPOINTS_INNER } from "./checkpoints";
+import { haptic } from "@/lib/haptics";
 
 /* =============================================================================
  * Screen 4 — the full agent choreography.
@@ -865,6 +866,7 @@ export default function Screen4({
       const nextAgent = nextEntry.step.agentIdx;
       if (nextAgent > currentAgent) {
         // Promote — animate promoteLevel up before switching step.
+        haptic("orbLand");
         animate(promoteLevel, nextAgent, {
           duration: HOLD.promote / 1000,
           ease: SETTLE_EASE as unknown as [number, number, number, number],

@@ -121,12 +121,15 @@ export default function Screen6({
         Complete quick KYC to activate your pass and unlock all benefits
       </motion.p>
 
-      {/* Name + divider + ID overlay — pinned to Screen 5's card interior
-          and slides along with it via the shared x. Sizes/gradients match
-          Figma node 561:26082. Fades quickly as user leaves the WorldPass. */}
+      {/* Name + divider + ID overlay — pinned to Screen 5's card interior.
+          Screen 5's card shifts UP by 128px in the final phase, so its
+          effective top is 435 − 128 = 307. Overlay lives inside the
+          shifted card at Figma-relative y=253 (canvas y ≈ 560).
+          Positions per Figma node 633:27923. Slides horizontally with
+          the shared x MotionValue. */}
       <motion.div
         className="pointer-events-none absolute left-1/2 -translate-x-1/2 text-center"
-        style={{ top: 540, width: 212, opacity: s5NameOpacity, x }}
+        style={{ top: 307 + 253, width: 212, opacity: s5NameOpacity, x }}
       >
         <motion.div
           initial={{ opacity: 0, y: 6 }}
@@ -151,7 +154,7 @@ export default function Screen6({
                 "linear-gradient(90deg, rgba(255,255,255,0) 0%, rgba(255,255,255,0.22) 50%, rgba(255,255,255,0) 100%)",
             }}
           />
-          <p className="worldpass-id mt-[10px]">6190001</p>
+          <p className="worldpass-id mt-[15px]">6190001</p>
         </motion.div>
       </motion.div>
 
