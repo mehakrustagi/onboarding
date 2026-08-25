@@ -144,9 +144,10 @@ const INTRO_HOLD_MS = 900;
 const CARD_RISE_MS = 1100;
 const CARD_EMPTY_HOLD_MS = 500;
 // Each benefit stays on the card long enough to read (title + tagline
-// word-reveal + a beat) before the next orb lands.
-const BENEFIT_HOLD_MS = 2800;
-const BENEFIT_TRANSITION_MS = 900;
+// word-reveal + a beat) before the next orb lands. Scaled 30% shorter
+// for the tighter benefit-cycle pacing on checkpoints 5b–5e.
+const BENEFIT_HOLD_MS = 1960;
+const BENEFIT_TRANSITION_MS = 630;
 
 /** Sample a clockwise semicircular arc from `start` to `end` (bulges right,
  *  i.e., a 12→3→6 sweep when start is above end). Returns arrays of x and y
@@ -310,7 +311,7 @@ export default function Screen5({
       else break;
     }
     const phaseWindowMs = BENEFIT_HOLD_MS + BENEFIT_TRANSITION_MS; // 4100ms
-    const arriveDelayMs = 1500; // orb arrival time on card
+    const arriveDelayMs = 1050; // orb arrival time on card (30% faster)
     // Fill spans the full agent window (no minus) so this animation ends
     // exactly when the NEXT agent's fill begins — counter is continuous with
     // no gap between percentage steps.
@@ -340,7 +341,7 @@ export default function Screen5({
   useEffect(() => {
     if (typeof phase !== "number") return;
     if (!isNewAgent) return;
-    const landingDelayMs = 1500;
+    const landingDelayMs = 1050;
     const t = window.setTimeout(() => {
       haptic("benefitLand");
       cardPressY.set(6);
@@ -389,15 +390,14 @@ export default function Screen5({
   useEffect(() => {
     if (phase !== "final") return;
     if (!onComplete) return;
-    // Sequence:
+    // Sequence (tightened — no dead pause after the summary lands):
     //   0–2.5s   whirlpool spirals inward
-    //   2.5–3.4s summary + dots fade in
-    //   3.4–4.5s summary + dots alone at full brightness
-    //   4.5–7s   globe fades UP behind still-crisp text (the reference
-    //            transition frame — both elements co-exist and readable)
-    //   7–8.1s   summary + dots fade out; globe reaches 90%
-    //   8.1–9.5s clean globe holds before hand-off to Screen 6
-    const t = window.setTimeout(onComplete, 9500);
+    //   2.5s     summary + dots snap in crisp on black card
+    //   3.2–5.8s globe fades up behind still-visible text (co-exist beat)
+    //   4.5–5.5s summary + dots fade out at ~globe 88%
+    //   5.5–6.2s clean globe holds briefly before hand-off
+    //   6.2s     Screen 6 mounts and name/ID start typing
+    const t = window.setTimeout(onComplete, 6200);
     return () => window.clearTimeout(t);
   }, [phase, onComplete]);
 
@@ -405,9 +405,9 @@ export default function Screen5({
   const cardVisible = phase !== "intro";
 
   // Text appears the MOMENT the orb touches the card (matches landingDelayMs
-  // = 1.5s) so the user can read the benefit before the whirlpool fires.
+  // = 1.05s) so the user can read the benefit before the whirlpool fires.
   // For same-agent swaps the swap happens immediately.
-  const textRevealDelay = isNewAgent ? 1.5 : 0;
+  const textRevealDelay = isNewAgent ? 1.05 : 0;
 
   return (
     <div
@@ -506,7 +506,7 @@ export default function Screen5({
               style={{ borderRadius: CARD_RADIUS }}
               initial={{ opacity: 0, scale: 0.94 }}
               animate={{ opacity: 1, scale: 1 }}
-              transition={{ delay: 4.5, duration: 4.0, ease: [0.4, 0, 0.2, 1] }}
+              transition={{ delay: 3.2, duration: 2.6, ease: [0.4, 0, 0.2, 1] }}
             >
               <video
                 src="/assets/globe/globe.mp4"
@@ -551,10 +551,10 @@ export default function Screen5({
               animate={{ opacity: [0, 0.55, 0.55, 0] }}
               transition={{
                 // Snap-in with the summary the instant the whirlpool ends,
-                // then fade out with it at t=8.1s (globe at 90%).
+                // fade out at t=5.5s alongside the summary text.
                 delay: 2.5,
-                duration: 5.6,
-                times: [0, 0.001, 0.80, 1],
+                duration: 3.0,
+                times: [0, 0.001, 0.65, 1],
                 ease: "linear",
               }}
             >
@@ -597,20 +597,32 @@ export default function Screen5({
           <div className="relative flex h-full flex-col justify-center px-6 text-center">
             {activeBenefit && (
               <div key={activeBenefit.orb} className="contents">
-                <WordReveal
-                  text={activeBenefit.title}
+                {/* Whole-line fluid fade-in — the title materialises as
+                    a single soft blur clearing, not word-by-word. */}
+                <motion.p
                   className={`text-[15px] font-semibold leading-[19px] tracking-[-0.02em] ${activeBenefit.titleGradientClass}`}
-                  delay={textRevealDelay}
-                  staggerMs={70}
-                />
-                <div className="mt-3">
-                  <WordReveal
-                    text={activeBenefit.desc}
-                    className="subtext-gradient text-[12px] font-normal leading-[16px] tracking-[-0.01em]"
-                    delay={textRevealDelay + 0.25}
-                    staggerMs={45}
-                  />
-                </div>
+                  initial={{ opacity: 0, filter: "blur(8px)", y: 6 }}
+                  animate={{ opacity: 1, filter: "blur(0px)", y: 0 }}
+                  transition={{
+                    delay: textRevealDelay,
+                    duration: 0.7,
+                    ease: [0.22, 1, 0.36, 1],
+                  }}
+                >
+                  {activeBenefit.title}
+                </motion.p>
+                <motion.p
+                  className="subtext-gradient mt-3 text-[12px] font-normal leading-[16px] tracking-[-0.01em]"
+                  initial={{ opacity: 0, filter: "blur(6px)", y: 4 }}
+                  animate={{ opacity: 1, filter: "blur(0px)", y: 0 }}
+                  transition={{
+                    delay: textRevealDelay + 0.22,
+                    duration: 0.8,
+                    ease: [0.22, 1, 0.36, 1],
+                  }}
+                >
+                  {activeBenefit.desc}
+                </motion.p>
               </div>
             )}
             {phase === "final" && !hideFinaleSummary && (
@@ -628,13 +640,13 @@ export default function Screen5({
                 initial={{ opacity: 0 }}
                 animate={{ opacity: [0, 1, 1, 0] }}
                 transition={{
-                  // Text pops in crisp the instant the whirlpool ends
-                  // (no fade-in), holds through the globe rise, then
-                  // fades out at t=8.1s — the moment the globe reaches
-                  // 90% opacity (globe delay 4.5s + 4.0s × 0.9).
+                  // Text pops in crisp the moment the whirlpool ends
+                  // (no fade-in), holds through the early globe rise,
+                  // then fades out at t=5.5s — the globe is at ~88%
+                  // opacity by then (globe delay 3.2s + 2.6s × 0.88).
                   delay: 2.5,
-                  duration: 5.6,
-                  times: [0, 0.001, 0.80, 1],
+                  duration: 3.0,
+                  times: [0, 0.001, 0.65, 1],
                   ease: "linear",
                 }}
               >
@@ -751,10 +763,10 @@ export default function Screen5({
                   opacity: opacities,
                   transition: {
                     // 1.15s arc + 0.65s slow descend + grow = 1.8s total.
-                    x: { duration: 1.8, ease: "linear", times },
-                    y: { duration: 1.8, ease: "linear", times },
+                    x: { duration: 1.26, ease: "linear", times },
+                    y: { duration: 1.26, ease: "linear", times },
                     scale: {
-                      duration: 1.8,
+                      duration: 1.26,
                       ease: [0.22, 1, 0.36, 1],
                       times,
                     },
