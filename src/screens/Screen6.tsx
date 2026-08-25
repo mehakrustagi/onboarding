@@ -45,12 +45,6 @@ export default function Screen6({
   const x = useMotionValue(0);
   const scrollProgress = useTransform(x, [-STRIDE, 0], [1, 0], { clamp: true });
   const s5NameOpacity = useTransform(scrollProgress, [0, 0.2], [1, 0]);
-  // Hint-block opacity mirrors Screen 7's carousel text fade — it tracks
-  // the drag position continuously rather than snapping on activeIdx.
-  // WorldPass-viewing pill fades OUT as user drags left; the simpler
-  // "Scroll to view all benefits" fades IN over the same range.
-  const worldpassHintOpacity = useTransform(scrollProgress, [0, 0.6], [1, 0]);
-  const householdHintOpacity = useTransform(scrollProgress, [0.4, 1], [0, 1]);
 
   // Slide Screen 5's card along with the strip. Values are identical to `x`
   // so the two cards move as one — no crossfade required.
@@ -233,15 +227,13 @@ export default function Screen6({
         </div>
       </motion.div>
 
-      {/* Scroll hint block — WorldPass-viewing state (activeIdx = 0).
-          Figma node 561:26043: "Scroll down" label, gradient pill
-          "View all 24 benefits" with sweeping shine, double chevron
-          below, plus two decorative sparkles. Fades out once the user
-          has scrolled onto the household card — the simpler variant
-          below takes over. */}
+      {/* Scroll hint block — Figma node 561:26043. "Scroll down" label,
+          gradient pill "View all 24 benefits" with sweeping shine, double
+          chevron below, plus two decorative sparkles. Stays constant
+          across horizontal scroll (both card states show the same hint). */}
       <motion.div
         className="pointer-events-none absolute inset-x-0"
-        style={{ top: 683, height: 105, opacity: worldpassHintOpacity }}
+        style={{ top: 683, height: 105 }}
       >
         {/* "Scroll down" label — y=660 in Figma → 0 within this block */}
         <p className="absolute left-1/2 -translate-x-1/2 top-0 text-[12px] font-semibold leading-[16px] tracking-[-0.12px] text-black text-center">
@@ -318,43 +310,17 @@ export default function Screen6({
         <Sparkle style={{ position: "absolute", left: 299.85, top: 21, width: 6, height: 6 }} />
       </motion.div>
 
-      {/* Scrolled-state hint — Figma node 561:26059 (activeIdx = 1, viewing
-          household card). Simpler "Scroll to view all benefits" text + a
-          single chevron, no pill or sparkles. Fades in once the user has
-          scrolled to the household card. */}
+      {/* Bottom sheet — distinct rounded white panel that sits behind the
+          CTA + Skip link. Copy stays constant across the horizontal
+          scroll so the primary action reads the same on both cards. */}
       <motion.div
-        className="pointer-events-none absolute inset-x-0 flex flex-col items-center gap-[10px]"
-        style={{ top: 707, opacity: householdHintOpacity }}
-      >
-        <p className="text-[12px] font-semibold leading-[16px] tracking-[-0.12px] text-black text-center">
-          Scroll to view all benefits
-        </p>
-        {/* Double chevron with a top → bottom brightness wave — mirrors
-            the WorldPass-viewing hint's chevron animation for consistency. */}
-        <div className="relative" style={{ width: 20, height: 27 }}>
-          <motion.div
-            className="absolute left-0 top-0"
-            animate={{ opacity: [0.35, 1, 0.35, 0.35] }}
-            transition={{ duration: 1.6, repeat: Infinity, ease: "easeInOut" }}
-          >
-            <ChevronDown />
-          </motion.div>
-          <motion.div
-            className="absolute left-0"
-            style={{ top: 7 }}
-            animate={{ opacity: [0.35, 0.35, 1, 0.35] }}
-            transition={{ duration: 1.6, repeat: Infinity, ease: "easeInOut" }}
-          >
-            <ChevronDown />
-          </motion.div>
-        </div>
-      </motion.div>
-
-      {/* Bottom sheet — CTA + link. Text swaps once user is on household card.
-          Solid white bg per Figma (not a gradient fade). */}
-      <motion.div
-        className="absolute bottom-0 left-0 w-full pt-6 pb-8"
-        style={{ background: "#ffffff" }}
+        className="absolute bottom-0 left-0 w-full pt-7 pb-8"
+        style={{
+          background: "#ffffff",
+          borderTopLeftRadius: 30,
+          borderTopRightRadius: 30,
+          boxShadow: "0 -12px 30px -14px rgba(15,15,20,0.14)",
+        }}
         initial={{ opacity: 0, y: 40 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ delay: STAGGER * 4, duration: 0.75, ease: IN_EASE }}
@@ -369,12 +335,10 @@ export default function Screen6({
               border: "1px solid rgba(255,255,255,0.7)",
             }}
           >
-            {scrolled
-              ? "Confirm Details & Claim Benefits"
-              : "Confirm Details & Activate Benefits"}
+            Confirm Details & Activate Benefits
           </button>
           <button className="text-[14px] font-semibold underline underline-offset-4 text-[color:var(--ink)]">
-            {scrolled ? "No, I want to lose my benefits" : "Skip"}
+            Skip
           </button>
         </div>
       </motion.div>
