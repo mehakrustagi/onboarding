@@ -272,11 +272,12 @@ const AGENTS: Agent[] = [
 ];
 
 /* ---------------- Timing ---------------- */
-// Text stays visible for the entire orb arc + settle. Only blurs out once
-// the orbs have reached their vertical-column resting positions.
-const TEXT_IN = 1.1;
-const TEXT_HOLD = 3.3; // spans rope arc + settle
-const TEXT_OUT = 0.55;
+// Text stays visible for most of the arc + settle window, then blurs out
+// as the orbs finish settling. Timings tightened so the agent card
+// crossfades in while the last orb is still settling — no dead beat.
+const TEXT_IN = 1.0;
+const TEXT_HOLD = 2.3; // ends just before the settle finishes
+const TEXT_OUT = 0.5;
 const TEXT_TOTAL = TEXT_IN + TEXT_HOLD + TEXT_OUT;
 
 const ROPE_DURATION = 2.0;
@@ -286,20 +287,23 @@ const ROPE_DELAY = TEXT_IN + 0.2;
 const SETTLE_DURATION = 2.1;
 const SETTLE_DELAY = ROPE_DELAY + ROPE_DURATION * 0.55;
 
-const CARD_FADE_IN = 0.6;
-// Card fades in only after the headline text has finished blurring out.
-const CARD_DELAY = TEXT_TOTAL + 0.05;
+const CARD_FADE_IN = 0.8;
+// Card starts fading in AS the headline begins to blur out — the two
+// crossfade, so the agent copy is already on-screen the moment the
+// last orb finishes settling into its column.
+const CARD_DELAY = TEXT_IN + TEXT_HOLD;
 
 const WATER_DROPLET_EASE = [0.16, 1, 0.3, 1] as const;
 const SETTLE_EASE = [0.45, 0, 0.25, 1] as const;
 
 // Uniform hold + transition timing across the whole agent lifecycle.
+// Cumulative speed-up: original × 0.5 × 0.7 ≈ 65% faster overall.
 const HOLD = {
-  workingLine: 2400,
-  statusFirst: 2400,
-  status: 2400,
-  summary: 2400,
-  promote: 1100,
+  workingLine: 840,
+  statusFirst: 840,
+  status: 840,
+  summary: 840,
+  promote: 385,
 };
 // Every text/component roll (subtitle, status, card) uses the same duration + ease.
 const ROLL_DURATION = 0.55;
@@ -563,14 +567,18 @@ function PillRow({
     return lerpArr([PILL_1, PILL_2, PILL_3], slot - 1) - PILL_ROW_HEIGHT / 2;
   });
   const opacity = useTransform(promoteLevel, [agentIdx, agentIdx + 0.4], [0, 1]);
+  // Slide the pill UP into its slot as the orb rises — the y offset
+  // starts +34px (roughly where the active card's title sat) and
+  // resolves to 0 over the same promote window.
+  const enterY = useTransform(promoteLevel, [agentIdx, agentIdx + 0.5], [34, 0]);
   return (
     <motion.div
       className="absolute left-[135px] w-[265px]"
-      style={{ top: targetY, height: PILL_ROW_HEIGHT, opacity }}
+      style={{ top: targetY, height: PILL_ROW_HEIGHT, opacity, y: enterY }}
     >
       <div className="flex h-full items-center justify-between gap-2">
         <p className="text-[14px] font-semibold leading-[19px] tracking-[-0.01em] text-[#999]">
-          {AGENTS[agentIdx].summary.text}
+          {AGENTS[agentIdx].title}
         </p>
         <CheckmarkBadge />
       </div>
@@ -713,15 +721,21 @@ function ActiveCard({ step }: { step: Step }) {
 
   return (
     <>
-      <motion.p
-        key={`title-${step.agentIdx}`}
-        initial={{ opacity: 0, y: -8 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ duration: ROLL_DURATION, ease: ROLL_EASE }}
-        className="text-[16px] font-semibold leading-[20px] tracking-[-0.04em] text-[#0b0b0b]"
-      >
-        {agent.title}
-      </motion.p>
+      {/* Agent name — rides up with its orb. New name enters from below
+          (with the arriving orb); on the way out, the old name drifts
+          UPWARD as its orb rises into the completed row. */}
+      <AnimatePresence mode="popLayout" initial={false}>
+        <motion.p
+          key={`title-${step.agentIdx}`}
+          initial={{ opacity: 0, y: 32 }}
+          animate={{ opacity: 1, y: 0 }}
+          exit={{ opacity: 0, y: -32 }}
+          transition={{ duration: ROLL_DURATION, ease: ROLL_EASE }}
+          className="text-[16px] font-semibold leading-[20px] tracking-[-0.04em] text-[#0b0b0b]"
+        >
+          {agent.title}
+        </motion.p>
+      </AnimatePresence>
 
       <div className="relative mt-1 h-[100px] overflow-hidden">
         <AnimatePresence initial={false} mode="popLayout">
@@ -731,10 +745,17 @@ function ActiveCard({ step }: { step: Step }) {
                 ? `summary-${step.agentIdx}`
                 : `line-${step.agentIdx}-${step.lineIdx}`
             }
-            initial={{ y: -60, opacity: 0 }}
-            animate={{ y: 0, opacity: 1 }}
-            exit={{ y: 60, opacity: 0 }}
-            transition={{ duration: ROLL_DURATION, ease: ROLL_EASE }}
+            // Working line + status fade in beneath the agent name
+            // (no downward slide, just opacity) — the name is the
+            // element that "arrives" with motion, the rest settles in.
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            transition={{
+              duration: ROLL_DURATION,
+              ease: ROLL_EASE,
+              delay: 0.18,
+            }}
             className="absolute inset-0"
           >
             <div className="flex items-center justify-between gap-2">
@@ -768,10 +789,14 @@ function ActiveCard({ step }: { step: Step }) {
                 {!isSummary && status && (
                   <motion.div
                     key={`status-${step.agentIdx}-${step.lineIdx}-${step.statusIdx}`}
-                    initial={{ y: -38, opacity: 0 }}
-                    animate={{ y: 0, opacity: 1 }}
-                    exit={{ y: 38, opacity: 0 }}
-                    transition={{ duration: ROLL_DURATION, ease: ROLL_EASE }}
+                    initial={{ opacity: 0 }}
+                    animate={{ opacity: 1 }}
+                    exit={{ opacity: 0 }}
+                    transition={{
+                      duration: ROLL_DURATION,
+                      ease: ROLL_EASE,
+                      delay: 0.1,
+                    }}
                     className="absolute inset-0 text-[13px] leading-[19px] tracking-[-0.01em]"
                   >
                     <p className="grey-shine-text font-medium">{status.line1}</p>
@@ -787,10 +812,10 @@ function ActiveCard({ step }: { step: Step }) {
   );
 }
 
-const WELCOME_HOLD_MS = 1800;
-const WELCOME_DURATION = 1.6;
+const WELCOME_HOLD_MS = 900;
+const WELCOME_DURATION = 0.8;
 // After the Welcome text has been visible for this long, swap to the "Your team..." message.
-const WELCOME_TEXT_ADVANCE_MS = 2200;
+const WELCOME_TEXT_ADVANCE_MS = 1100;
 
 const WELCOME_TEXTS: Array<{ line1: string; line2: string }> = [
   { line1: "Your team doesn't just\nhandle the work", line2: "They bring the perks" },
@@ -844,7 +869,9 @@ export default function Screen4({
       delay: SETTLE_DELAY,
       ease: SETTLE_EASE as unknown as [number, number, number, number],
     });
-    const startCardMs = (CARD_DELAY + CARD_FADE_IN + 0.4) * 1000;
+    // Kick off the agent lifecycle right as the card finishes fading in
+    // (no extra pad). Reads as a continuous hand-off from splash → agents.
+    const startCardMs = (CARD_DELAY + CARD_FADE_IN) * 1000;
     const startCard = window.setTimeout(() => setTimelineIdx(0), startCardMs);
 
     // Rope bead haptics — fire a soft tick as each of the four active

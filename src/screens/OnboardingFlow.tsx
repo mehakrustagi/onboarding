@@ -33,7 +33,7 @@ const SCREENS = [Screen1, Screen2, Screen3, Screen4, Screen7, Screen5, Screen6] 
 
 const AUTO_ADVANCE_MS: Record<number, number> = {
   0: 2200,
-  1: 3000,
+  1: 2100,
   2: 1400,
 };
 

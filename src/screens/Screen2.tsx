@@ -16,10 +16,10 @@ export default function Screen2() {
     const timers: number[] = [];
     // Headline word-reveal starts at t=0; first word lands ~150ms in.
     timers.push(window.setTimeout(() => haptic("textReveal"), 150));
-    // Subtitle: delay 1.5 + i * 0.42 (per Screen2 JSX)
+    // Subtitle: delay 0.9 + i * 0.28 (per Screen2 JSX)
     for (let i = 0; i < 4; i++) {
       timers.push(
-        window.setTimeout(() => haptic("textReveal"), 1500 + i * 420 + 120),
+        window.setTimeout(() => haptic("textReveal"), 900 + i * 280 + 100),
       );
     }
     return () => timers.forEach((t) => window.clearTimeout(t));
@@ -40,8 +40,8 @@ export default function Screen2() {
           as="h2"
           text={"All your life,\nyou’ve been your own travel agent."}
           className="text-[22px] font-medium leading-[28px] tracking-[-0.04em] text-[color:var(--ink)]"
-          staggerMs={110}
-          perWordDurationMs={420}
+          staggerMs={70}
+          perWordDurationMs={300}
         />
 
         {/* Subtitle — sentences appear one by one after the headline finishes. */}
@@ -61,9 +61,9 @@ export default function Screen2() {
                   initial={{ opacity: 0, filter: "blur(10px)", y: 6 }}
                   animate={{ opacity: 1, filter: "blur(0px)", y: 0 }}
                   transition={{
-                    // Head-start delay = time for headline word-by-word to finish (~1.3s)
-                    delay: 1.5 + i * 0.42,
-                    duration: 0.55,
+                    // Sped up so the whole intro clears in ~2s.
+                    delay: 0.9 + i * 0.28,
+                    duration: 0.45,
                     ease: [0.22, 1, 0.36, 1],
                   }}
                 >
