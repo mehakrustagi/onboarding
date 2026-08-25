@@ -872,7 +872,12 @@ export default function Screen4({
     // Kick off the agent lifecycle right as the card finishes fading in
     // (no extra pad). Reads as a continuous hand-off from splash → agents.
     const startCardMs = (CARD_DELAY + CARD_FADE_IN) * 1000;
-    const startCard = window.setTimeout(() => setTimelineIdx(0), startCardMs);
+    const startCard = window.setTimeout(() => {
+      // First agent (Visa) gets the same peak-moment activation pattern
+      // that later promotes fire — otherwise Visa's appearance is silent.
+      haptic("agentActivate");
+      setTimelineIdx(0);
+    }, startCardMs);
 
     // Rope bead haptics — fire a soft tick as each of the four active
     // agent beads lands into its slot, then a settled accord after the

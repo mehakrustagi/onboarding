@@ -341,6 +341,10 @@ export default function Screen5({
   useEffect(() => {
     if (typeof phase !== "number") return;
     if (!isNewAgent) return;
+    // Orb has just started its arc from the row → card. Fire the
+    // travel pattern immediately so the vibration accompanies the
+    // full visual motion, ending right as the orb touches down.
+    haptic("orbTravel");
     const landingDelayMs = 1050;
     const t = window.setTimeout(() => {
       haptic("benefitLand");

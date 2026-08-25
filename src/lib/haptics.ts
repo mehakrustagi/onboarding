@@ -26,7 +26,8 @@ type Trigger =
   | "agentActivate"    // Screen 4: an agent takes the spotlight — the peak
   | "agentComplete"    // Screen 4: agent finishes and green check lands
   | "textReveal"       // Screens 1–3: word / line reveal beats
-  | "splashLand";      // Screen 1: visa logo lands into place
+  | "splashLand"       // Screen 1: visa logo lands into place
+  | "orbTravel";       // Screen 5: orb traveling row → card
 
 const PATTERNS: Record<Trigger, number | number[]> = {
   orbLand: 12,
@@ -73,6 +74,10 @@ const PATTERNS: Record<Trigger, number | number[]> = {
   textReveal: 5,
   // Screen 1: logo settles into the splash — soft "thunk".
   splashLand: 18,
+  // Screen 5: orb in motion (row → card). Accelerating rope of ticks
+  // over ~950ms — gaps shrink so the sensation grows tighter as the
+  // orb approaches the card. Terminated by benefitLand's stronger tick.
+  orbTravel: [4, 280, 6, 220, 8, 170, 12, 120, 16, 90],
 };
 
 export function haptic(trigger: Trigger) {
