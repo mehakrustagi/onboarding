@@ -1,11 +1,29 @@
 "use client";
 
+import { useEffect } from "react";
 import { motion } from "framer-motion";
 import GradientText from "@/components/GradientText";
 import WordReveal from "@/components/WordReveal";
 import { blurInVariants } from "./motion";
+import { haptic } from "@/lib/haptics";
 
 export default function Screen2() {
+  // Fire a soft tick as each of the 4 subtitle sentences lands
+  // ("Filling visa forms.", "Hunting slots.", …). The headline uses
+  // WordReveal with a fast stagger — one tick when the first word lands
+  // gives it presence without turning into a buzz.
+  useEffect(() => {
+    const timers: number[] = [];
+    // Headline word-reveal starts at t=0; first word lands ~150ms in.
+    timers.push(window.setTimeout(() => haptic("textReveal"), 150));
+    // Subtitle: delay 1.5 + i * 0.42 (per Screen2 JSX)
+    for (let i = 0; i < 4; i++) {
+      timers.push(
+        window.setTimeout(() => haptic("textReveal"), 1500 + i * 420 + 120),
+      );
+    }
+    return () => timers.forEach((t) => window.clearTimeout(t));
+  }, []);
   return (
     <motion.div
       className="relative h-full w-full overflow-hidden rounded-[44px]"

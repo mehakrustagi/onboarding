@@ -846,10 +846,30 @@ export default function Screen4({
     });
     const startCardMs = (CARD_DELAY + CARD_FADE_IN + 0.4) * 1000;
     const startCard = window.setTimeout(() => setTimelineIdx(0), startCardMs);
+
+    // Rope bead haptics — fire a soft tick as each of the four active
+    // agent beads lands into its slot, then a settled accord after the
+    // last one arrives. Timed to the tail of the settle animation.
+    const beadStartMs =
+      (SETTLE_DELAY + SETTLE_DURATION * 0.55) * 1000;
+    const beadTimers: number[] = [];
+    for (let i = 0; i < 4; i++) {
+      beadTimers.push(
+        window.setTimeout(() => haptic("ropeBeadLand"), beadStartMs + i * 130),
+      );
+    }
+    beadTimers.push(
+      window.setTimeout(
+        () => haptic("ropeSettled"),
+        beadStartMs + 4 * 130 + 240,
+      ),
+    );
+
     return () => {
       arcCtrl.stop();
       settleCtrl.stop();
       window.clearTimeout(startCard);
+      beadTimers.forEach((t) => window.clearTimeout(t));
     };
   }, [arcProgress, settleProgress]);
 
@@ -865,8 +885,9 @@ export default function Screen4({
       const currentAgent = entry.step.agentIdx;
       const nextAgent = nextEntry.step.agentIdx;
       if (nextAgent > currentAgent) {
-        // Promote — animate promoteLevel up before switching step.
-        haptic("orbLand");
+        // Promote — the new agent takes the spotlight. Peak moment of
+        // the whole Screen 4 sequence.
+        haptic("agentActivate");
         animate(promoteLevel, nextAgent, {
           duration: HOLD.promote / 1000,
           ease: SETTLE_EASE as unknown as [number, number, number, number],
@@ -877,7 +898,17 @@ export default function Screen4({
           HOLD.promote * 0.55,
         );
       } else {
-        haptic("statusFlip");
+        // Within the same agent — either a status roll or the final
+        // hand-off from the last working step into the summary card
+        // (green check lands = agent complete).
+        if (
+          nextEntry.step.kind === "summary" &&
+          entry.step.kind === "working"
+        ) {
+          haptic("agentComplete");
+        } else {
+          haptic("statusFlip");
+        }
         setTimelineIdx(timelineIdx + 1);
       }
     };

@@ -1,9 +1,28 @@
 "use client";
 
+import { useEffect } from "react";
 import { motion } from "framer-motion";
 import WordReveal from "@/components/WordReveal";
+import { haptic } from "@/lib/haptics";
 
 export default function Screen3() {
+  // "That job is over." — 4 words at 90ms stagger. One tick per word
+  // gives the line a decisive, staccato cadence.
+  useEffect(() => {
+    const words = 4;
+    const stagger = 90;
+    const firstWordLandsAt = 140; // word blur-in resolves ~140ms after start
+    const timers: number[] = [];
+    for (let i = 0; i < words; i++) {
+      timers.push(
+        window.setTimeout(
+          () => haptic("textReveal"),
+          firstWordLandsAt + i * stagger,
+        ),
+      );
+    }
+    return () => timers.forEach((t) => window.clearTimeout(t));
+  }, []);
   return (
     <motion.div
       className="relative h-full w-full overflow-hidden rounded-[44px]"

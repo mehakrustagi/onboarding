@@ -20,7 +20,13 @@ type Trigger =
   | "screenMount"      // Screen 7: initial car reveal / entrance thump
   | "whirlpoolSwirl"   // Screen 5: orbs spiral inward → final card reveal
   | "carDriveOff"      // Screen 7: Reserve tap → car accelerates off-screen
-  | "typeChar";        // Screen 6: name / ID typing effect, per character
+  | "typeChar"         // Screen 6: name / ID typing effect, per character
+  | "ropeBeadLand"     // Screen 4: one bead of the rope arc arriving
+  | "ropeSettled"      // Screen 4: all beads settled into the column
+  | "agentActivate"    // Screen 4: an agent takes the spotlight — the peak
+  | "agentComplete"    // Screen 4: agent finishes and green check lands
+  | "textReveal"       // Screens 1–3: word / line reveal beats
+  | "splashLand";      // Screen 1: visa logo lands into place
 
 const PATTERNS: Record<Trigger, number | number[]> = {
   orbLand: 12,
@@ -54,6 +60,19 @@ const PATTERNS: Record<Trigger, number | number[]> = {
   // the WorldPass card. 3ms is short enough to feel like a soft pulse,
   // not a buzz, when fired every ~100ms.
   typeChar: 3,
+  // A single bead dropping onto the row — soft, discrete.
+  ropeBeadLand: 8,
+  // All beads settled — a short "confirmation" accord after the last bead.
+  ropeSettled: [6, 40, 12],
+  // Agent takes the spotlight — layered "rising into focus" pattern.
+  agentActivate: [10, 30, 22],
+  // Agent completes — short "triumphant" accord ending on a longer beat.
+  agentComplete: [15, 25, 30],
+  // Word / line reveals on intro screens — nearly imperceptible on its own,
+  // but adds cadence when several fire in quick succession.
+  textReveal: 5,
+  // Screen 1: logo settles into the splash — soft "thunk".
+  splashLand: 18,
 };
 
 export function haptic(trigger: Trigger) {

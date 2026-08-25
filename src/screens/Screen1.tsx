@@ -1,11 +1,19 @@
 "use client";
 
+import { useEffect } from "react";
 import Image from "next/image";
 import { motion } from "framer-motion";
 import WordReveal from "@/components/WordReveal";
 import { blurInVariants } from "./motion";
+import { haptic } from "@/lib/haptics";
 
 export default function Screen1() {
+  // The blurInVariants land the logo at ~250ms after mount. Fire a soft
+  // thump on that beat so the splash has a physical entrance.
+  useEffect(() => {
+    const t = window.setTimeout(() => haptic("splashLand"), 260);
+    return () => window.clearTimeout(t);
+  }, []);
   return (
     <motion.div
       className="relative h-full w-full overflow-hidden rounded-[44px]"
