@@ -786,10 +786,10 @@ function ActiveCard({ step }: { step: Step }) {
   );
 }
 
-const WELCOME_HOLD_MS = 2800;
+const WELCOME_HOLD_MS = 1800;
 const WELCOME_DURATION = 1.6;
 // After the Welcome text has been visible for this long, swap to the "Your team..." message.
-const WELCOME_TEXT_ADVANCE_MS = 3200;
+const WELCOME_TEXT_ADVANCE_MS = 2200;
 
 const WELCOME_TEXTS: Array<{ line1: string; line2: string }> = [
   { line1: "Your team doesn't just\nhandle the work", line2: "They bring the perks" },

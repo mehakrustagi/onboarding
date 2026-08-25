@@ -106,7 +106,7 @@ export default function Screen7({
   //   9.5s       decor fully faded → Screen 5 mounts (orbs handoff at 425)
   useEffect(() => {
     if (phase !== "staged" || !onComplete) return;
-    const t = window.setTimeout(onComplete, 9500);
+    const t = window.setTimeout(onComplete, 6500);
     return () => window.clearTimeout(t);
   }, [phase, onComplete]);
 
@@ -225,17 +225,31 @@ export default function Screen7({
               marginLeft: -HALO_SIZE / 2,
               marginTop: -HALO_SIZE / 2,
               border: "1.5px solid rgba(0,0,0,0.28)",
+              willChange: "transform, opacity",
             }}
-            initial={{ scale: 0.2, opacity: 0.85 }}
+            initial={{ scale: 0.2, opacity: 0 }}
             animate={{
               scale: [0.2, 1],
-              opacity: [0.85, 0],
+              // Opacity is 0 at BOTH endpoints so the loop restart is
+              // invisible — no more flicker/glitch when scale snaps back
+              // from 1 → 0.2. The ring blooms in, holds visible around
+              // half-radius, then fades out before the ring fully expands.
+              opacity: [0, 0.75, 0],
             }}
             transition={{
-              duration: 3.5,
-              delay: i * 0.7,
-              repeat: Infinity,
-              ease: [0.22, 1, 0.36, 1],
+              scale: {
+                duration: 3.5,
+                delay: i * 0.7,
+                repeat: Infinity,
+                ease: "easeOut",
+              },
+              opacity: {
+                duration: 3.5,
+                delay: i * 0.7,
+                repeat: Infinity,
+                ease: "easeInOut",
+                times: [0, 0.35, 1],
+              },
             }}
           />
         ))}
@@ -337,7 +351,7 @@ function StagedView({ car }: { car: Car }) {
   // screen when the swap happens — clean, seamless handoff.
   const [isExiting, setIsExiting] = useState(false);
   useEffect(() => {
-    const t = window.setTimeout(() => setIsExiting(true), 8000);
+    const t = window.setTimeout(() => setIsExiting(true), 5000);
     return () => window.clearTimeout(t);
   }, []);
 

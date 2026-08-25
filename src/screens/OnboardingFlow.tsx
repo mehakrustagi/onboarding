@@ -31,9 +31,9 @@ type InnerMatcher = (typeof CHECKPOINTS_INNER)[number]["matcher"];
 const SCREENS = [Screen1, Screen2, Screen3, Screen4, Screen7, Screen5, Screen6] as const;
 
 const AUTO_ADVANCE_MS: Record<number, number> = {
-  0: 3000,
-  1: 4200,
-  2: 2000,
+  0: 2200,
+  1: 3000,
+  2: 1400,
 };
 
 export default function OnboardingFlow() {

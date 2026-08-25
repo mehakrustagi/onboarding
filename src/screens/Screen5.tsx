@@ -137,10 +137,12 @@ const HANDOFF_XS: Record<OrbKey, number> = {
 // Time we hold in the intro phase — just enough for the orbs to complete
 // their shift-up (1.1s + 0.15s delay). No intro text anymore, so this is
 // purely to let the orbs settle before the card rises.
-const INTRO_HOLD_MS = 1350;
+const INTRO_HOLD_MS = 900;
 const CARD_RISE_MS = 1100;
-const CARD_EMPTY_HOLD_MS = 900;
-const BENEFIT_HOLD_MS = 3200;
+const CARD_EMPTY_HOLD_MS = 500;
+// Each benefit stays on the card long enough to read (title + tagline
+// word-reveal + a beat) before the next orb lands.
+const BENEFIT_HOLD_MS = 2800;
 const BENEFIT_TRANSITION_MS = 900;
 
 /** Sample a clockwise semicircular arc from `start` to `end` (bulges right,
@@ -362,14 +364,14 @@ export default function Screen5({
     return () => window.clearTimeout(t);
   }, [phase, cardShiftY]);
 
-  // Auto-advance to Screen 6 once the finale has been on screen long enough
-  // for the "All your benefits. One WorldPass." text to land.
+  // Auto-advance to Screen 6 once the WorldPass finale has been on screen
+  // long enough to breathe. Globe fade-in completes ~4.9s; text lands
+  // ~4.2s. Holding at 7s gives the user ~2 solid seconds of the fully-
+  // rendered WorldPass card before it hands off to Screen 6.
   useEffect(() => {
     if (phase !== "final") return;
     if (!onComplete) return;
-    // Fires after the finale content has landed (~4.4s in) with a beat
-    // to read "All your benefits. One WorldPass." before advancing.
-    const t = window.setTimeout(onComplete, 4000);
+    const t = window.setTimeout(onComplete, 7000);
     return () => window.clearTimeout(t);
   }, [phase, onComplete]);
 
