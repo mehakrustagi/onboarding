@@ -746,7 +746,7 @@ function ActiveCard({ step }: { step: Step }) {
               >
                 {isSummary ? agent.summary.text : line!.text}
               </GradientText>
-              {isFinalSummary ? <CheckmarkBadge /> : <StatusIndicator />}
+              {isSummary ? <CheckmarkBadge /> : <StatusIndicator />}
             </div>
 
             {/* Status/desc line — a single row for summary desc or the rolling status */}

@@ -195,18 +195,76 @@ export default function Screen6({
         </div>
       </motion.div>
 
-      {/* Scroll hint (only when not scrolled) */}
+      {/* Scroll hint block — Figma node 561:26043. "Scroll down" label,
+          gradient pill "View all 24 benefits" with sweeping shine, double
+          chevron below, plus two decorative sparkles. Fades out once
+          user has scrolled to the household card. */}
       <motion.div
-        className="pointer-events-none absolute left-1/2 -translate-x-1/2 flex flex-col items-center gap-[6px]"
-        style={{ top: 685 }}
+        className="pointer-events-none absolute inset-x-0"
+        style={{ top: 660, height: 105 }}
         initial={{ opacity: 0, y: 8 }}
         animate={{ opacity: scrolled ? 0 : 1, y: 0 }}
         transition={{ delay: STAGGER * 3, duration: 0.6, ease: IN_EASE }}
       >
-        <p className="text-[12px] font-semibold leading-[16px] tracking-[-0.01em] text-[color:var(--ink)]">
-          Scroll to view all benefits
+        {/* "Scroll down" label — y=660 in Figma → 0 within this block */}
+        <p className="absolute left-1/2 -translate-x-1/2 top-0 text-[12px] font-semibold leading-[16px] tracking-[-0.12px] text-black text-center">
+          Scroll down
         </p>
-        <ChevronDown />
+
+        {/* Gradient pill with shine sweep — y=691 → 31 within block */}
+        <div
+          className="absolute left-1/2 -translate-x-1/2 flex items-center justify-center overflow-hidden"
+          style={{
+            top: 31,
+            width: 152,
+            height: 32,
+            borderRadius: 50,
+            background: "linear-gradient(90deg, #e5e5e5 0%, #f2ecfe 100%)",
+          }}
+        >
+          {/* Twin shine bars — matches Figma's rotate-30 masked whites.
+              Sweeps left→right on a loop. */}
+          <motion.div
+            className="absolute top-1/2 -translate-y-1/2 flex items-center gap-[7px] pointer-events-none"
+            style={{ left: 0 }}
+            animate={{ x: [-30, 180] }}
+            transition={{ duration: 2.6, repeat: Infinity, ease: [0.4, 0, 0.2, 1] }}
+          >
+            <div
+              style={{
+                width: 8,
+                height: 65,
+                background: "rgba(255,255,255,0.35)",
+                transform: "rotate(30deg)",
+              }}
+            />
+            <div
+              style={{
+                width: 4,
+                height: 63,
+                background: "rgba(255,255,255,0.3)",
+                transform: "rotate(30deg)",
+              }}
+            />
+          </motion.div>
+          <p className="relative text-[12px] font-semibold leading-[16px] tracking-[-0.12px] text-black text-center">
+            View all 24 benefits
+          </p>
+        </div>
+
+        {/* Double chevron — Figma shows two overlapping keyboard_arrow_down
+            SVGs (y=738 and y=745) for a subtle "V V" indicator. */}
+        <div
+          className="absolute left-1/2 -translate-x-1/2"
+          style={{ top: 78, width: 20, height: 27 }}
+        >
+          <ChevronDown className="absolute left-0 top-0" />
+          <ChevronDown className="absolute left-0" style={{ top: 7, opacity: 0.5 }} />
+        </div>
+
+        {/* Decorative sparkles — Figma positions relative to 440×965 canvas */}
+        <Sparkle style={{ position: "absolute", left: 133.85, top: 65, width: 8, height: 8 }} />
+        <Sparkle style={{ position: "absolute", left: 299.85, top: 21, width: 6, height: 6 }} />
       </motion.div>
 
       {/* Bottom sheet — CTA + link. Text swaps once user is on household card. */}
@@ -334,14 +392,21 @@ function Bracket({ style }: { style: React.CSSProperties }) {
   );
 }
 
-function ChevronDown() {
+function ChevronDown({
+  className,
+  style,
+}: {
+  className?: string;
+  style?: React.CSSProperties;
+}) {
   return (
     <svg
       width="18"
       height="10"
       viewBox="0 0 18 10"
       fill="none"
-      className="text-[color:var(--ink)]/60"
+      className={`text-[color:var(--ink)]/60 ${className ?? ""}`}
+      style={style}
     >
       <path
         d="M2 2l7 6 7-6"
@@ -349,6 +414,20 @@ function ChevronDown() {
         strokeWidth="1.6"
         strokeLinecap="round"
         strokeLinejoin="round"
+      />
+    </svg>
+  );
+}
+
+/* Four-point sparkle glyph — matches the two decorative stars in Figma
+   node 561:26043 (small hint stars around the "View all 24 benefits" pill). */
+function Sparkle({ style }: { style?: React.CSSProperties }) {
+  return (
+    <svg viewBox="0 0 10 10" fill="none" style={style}>
+      <path
+        d="M5 0.5c.4 2 1.1 3.6 4.5 4.5-3.4.9-4.1 2.5-4.5 4.5-.4-2-1.1-3.6-4.5-4.5C3.9 4.1 4.6 2.5 5 .5z"
+        fill="#0b0b0b"
+        opacity="0.55"
       />
     </svg>
   );
