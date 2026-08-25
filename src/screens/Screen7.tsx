@@ -96,6 +96,11 @@ export default function Screen7({
   // "select" = swipeable carousel; "staged" = locked-in state after Reserve.
   const [phase, setPhase] = useState<"select" | "staged">("select");
 
+  // Entrance thump when the carousel first mounts (featured car scales in).
+  useEffect(() => {
+    haptic("screenMount");
+  }, []);
+
   // Auto-advance from the staged screen after 9.5s. Full timeline:
   //   0.0–1.75s  car drives off + tracks/smoke bloom
   //   1.85–2.86s orbs bloom in staggered (car has left the frame)

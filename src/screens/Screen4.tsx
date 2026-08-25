@@ -877,6 +877,7 @@ export default function Screen4({
           HOLD.promote * 0.55,
         );
       } else {
+        haptic("statusFlip");
         setTimelineIdx(timelineIdx + 1);
       }
     };

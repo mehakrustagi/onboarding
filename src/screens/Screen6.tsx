@@ -10,6 +10,7 @@ import {
   type MotionValue,
   type PanInfo,
 } from "framer-motion";
+import { haptic } from "@/lib/haptics";
 
 /* -----------------------------------------------------------------------------
  * Screen 6 — "Your WorldPass is issued"
@@ -60,7 +61,9 @@ export default function Screen6({
       Math.min(0, projected < -STRIDE / 2 ? -STRIDE : 0),
     );
     animate(x, target, { type: "spring", stiffness: 320, damping: 32 });
-    setActiveIdx(target === 0 ? 0 : 1);
+    const nextIdx = target === 0 ? 0 : 1;
+    if (nextIdx !== activeIdx) haptic("cardSwipeReveal");
+    setActiveIdx(nextIdx);
   };
 
   const scrolled = activeIdx > 0;

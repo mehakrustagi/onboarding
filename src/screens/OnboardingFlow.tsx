@@ -17,6 +17,7 @@ import {
   type CheckpointOrInner,
   type Screen5Phase,
 } from "./checkpoints";
+import { haptic } from "@/lib/haptics";
 
 type InnerMatcher = (typeof CHECKPOINTS_INNER)[number]["matcher"];
 
@@ -45,8 +46,19 @@ export default function OnboardingFlow() {
   const screen5CardX = useMotionValue(0);
 
   const next = useCallback(() => {
-    setIndex((i) => Math.min(i + 1, SCREENS.length - 1));
+    setIndex((i) => {
+      if (i >= SCREENS.length - 1) return i;
+      haptic("screenAdvance");
+      return i + 1;
+    });
   }, []);
+
+  // Extra tick when the user taps to advance on the intro screens (1–3).
+  // Auto-advanced screens don't fire this — only the explicit tap does.
+  const handleTap = useCallback(() => {
+    if (index <= 2) haptic("tapAdvance");
+    next();
+  }, [index, next]);
 
   useEffect(() => {
     // Only auto-advance when user hasn't jumped to a checkpoint.
@@ -88,7 +100,7 @@ export default function OnboardingFlow() {
         onJump={(i) => setCheckpointIdx(i)}
       />
       <div
-        onClick={next}
+        onClick={handleTap}
         className="relative h-[965px] w-[440px] cursor-pointer select-none overflow-hidden rounded-[44px] bg-white shadow-[0_40px_80px_-20px_rgba(0,0,0,0.5)]"
       >
         {/* Screens 1–4 + Screen 7 (Supercar) swap through AnimatePresence.

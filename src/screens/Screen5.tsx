@@ -317,10 +317,18 @@ export default function Screen5({
     const residencyMs = benefitsInGroup * phaseWindowMs;
 
     const t = window.setTimeout(() => {
+      let lastMilestone = Math.floor(percent.get() / 25);
       animate(percent, targetPercent, {
         duration: residencyMs / 1000,
         ease: "linear",
-        onUpdate: (v) => setDisplayPercent(Math.round(v)),
+        onUpdate: (v) => {
+          setDisplayPercent(Math.round(v));
+          const milestone = Math.floor(v / 25);
+          if (milestone > lastMilestone) {
+            lastMilestone = milestone;
+            haptic("milestoneTick");
+          }
+        },
       });
     }, arriveDelayMs);
     return () => window.clearTimeout(t);
