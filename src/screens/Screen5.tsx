@@ -268,7 +268,7 @@ export default function Screen5({
       schedule(benefitAt(i), 2 + i, () => setPhase(i));
     }
     schedule(finalAt, 2 + BENEFITS.length, () => {
-      haptic("finaleReveal");
+      haptic("whirlpoolSwirl");
       setPhase("final");
     });
     return () => timers.forEach((t) => window.clearTimeout(t));

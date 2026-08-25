@@ -17,7 +17,8 @@ type Trigger =
   | "cardSwipeReveal"  // Screen 6: name+ID card slides into view
   | "milestoneTick"    // Screen 5: percentage counter crosses 25/50/75/100
   | "statusFlip"       // Screen 4: agent status flips (Working → Done)
-  | "screenMount";     // Screen 7: initial car reveal / entrance thump
+  | "screenMount"      // Screen 7: initial car reveal / entrance thump
+  | "whirlpoolSwirl";  // Screen 5: orbs spiral inward → final card reveal
 
 const PATTERNS: Record<Trigger, number | number[]> = {
   orbLand: 12,
@@ -32,6 +33,14 @@ const PATTERNS: Record<Trigger, number | number[]> = {
   milestoneTick: 5,
   statusFlip: 6,
   screenMount: 14,
+  // Accelerating rope of ticks over ~1.5s, ending with a final thump.
+  // Gaps shrink from 200ms → 20ms so the sensation "tightens" like the
+  // spiral collapsing inward. Final 60ms pulse = the eye closing.
+  whirlpoolSwirl: [
+    10, 200, 10, 175, 10, 150, 10, 130, 10, 110,
+    10, 90, 10, 75, 10, 60, 10, 48, 10, 38,
+    10, 30, 15, 25, 20, 22, 25, 20, 60,
+  ],
 };
 
 export function haptic(trigger: Trigger) {

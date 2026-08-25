@@ -1,5 +1,7 @@
 "use client";
 
+import { useState } from "react";
+
 /**
  * Dev checkpoint definitions — used by the CheckpointPanel to jump the app
  * to any moment in the flow.
@@ -133,28 +135,41 @@ export function CheckpointPanel({
   activeIdx: number;
   onJump: (idx: number) => void;
 }) {
+  const [open, setOpen] = useState(true);
+
   return (
-    <div className="fixed right-4 top-1/2 z-50 flex max-h-[90vh] -translate-y-1/2 flex-col gap-1 overflow-y-auto rounded-2xl bg-black/60 p-2 text-[11px] font-medium text-white backdrop-blur">
-      <div className="px-2 pb-1 pt-1 text-[10px] uppercase tracking-wider text-white/50">
-        Checkpoints
-      </div>
-      {ALL_CHECKPOINTS.map((cp, i) => (
-        <button
-          key={i}
-          type="button"
-          onClick={(e) => {
-            e.stopPropagation();
-            onJump(i);
-          }}
-          className={`whitespace-nowrap rounded-md px-3 py-1.5 text-left transition-colors ${
-            activeIdx === i
-              ? "bg-white text-black"
-              : "bg-white/10 hover:bg-white/20"
-          }`}
-        >
-          {cp.label}
-        </button>
-      ))}
+    <div className="fixed right-4 top-1/2 z-50 -translate-y-1/2">
+      <button
+        type="button"
+        onClick={(e) => {
+          e.stopPropagation();
+          setOpen((v) => !v);
+        }}
+        className="mb-2 flex h-8 w-full items-center justify-center rounded-full bg-black/60 px-3 text-[10px] font-medium uppercase tracking-wider text-white backdrop-blur hover:bg-black/70"
+      >
+        {open ? "Hide" : "Show"} checkpoints
+      </button>
+      {open && (
+        <div className="flex max-h-[80vh] flex-col gap-1 overflow-y-auto rounded-2xl bg-black/60 p-2 text-[11px] font-medium text-white backdrop-blur">
+          {ALL_CHECKPOINTS.map((cp, i) => (
+            <button
+              key={i}
+              type="button"
+              onClick={(e) => {
+                e.stopPropagation();
+                onJump(i);
+              }}
+              className={`whitespace-nowrap rounded-md px-3 py-1.5 text-left transition-colors ${
+                activeIdx === i
+                  ? "bg-white text-black"
+                  : "bg-white/10 hover:bg-white/20"
+              }`}
+            >
+              {cp.label}
+            </button>
+          ))}
+        </div>
+      )}
     </div>
   );
 }

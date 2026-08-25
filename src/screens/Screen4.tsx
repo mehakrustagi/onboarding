@@ -17,6 +17,7 @@ import StatusIndicator from "@/components/StatusIndicator";
 import WordReveal from "@/components/WordReveal";
 import { CHECKPOINTS_INNER } from "./checkpoints";
 import { haptic } from "@/lib/haptics";
+import { playSound } from "@/lib/sound";
 
 /* =============================================================================
  * Screen 4 — the full agent choreography.
@@ -845,7 +846,10 @@ export default function Screen4({
       ease: SETTLE_EASE as unknown as [number, number, number, number],
     });
     const startCardMs = (CARD_DELAY + CARD_FADE_IN + 0.4) * 1000;
-    const startCard = window.setTimeout(() => setTimelineIdx(0), startCardMs);
+    const startCard = window.setTimeout(() => {
+      playSound("orbActivate");
+      setTimelineIdx(0);
+    }, startCardMs);
     return () => {
       arcCtrl.stop();
       settleCtrl.stop();
@@ -867,6 +871,7 @@ export default function Screen4({
       if (nextAgent > currentAgent) {
         // Promote — animate promoteLevel up before switching step.
         haptic("orbLand");
+        playSound("orbActivate");
         animate(promoteLevel, nextAgent, {
           duration: HOLD.promote / 1000,
           ease: SETTLE_EASE as unknown as [number, number, number, number],
