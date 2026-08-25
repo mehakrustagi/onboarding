@@ -70,16 +70,22 @@ export default function Screen6({
 
   return (
     <div className="relative h-full w-full overflow-hidden rounded-[44px]">
-      {/* Scan icon pill */}
+      {/* Face-scan button — Figma node 657:11528.
+          Layer by layer:
+            1. bg — 65×65 circle, fill rgba(255,255,255,0.1),
+               shadow 0 4.643px 13.929px rgba(0,0,0,0.06)
+            2. icon frame — 24×24, rotated 180deg (per Figma)
+            3. person — 18.068px glyph centered inside four scan brackets
+          Sits on the light page bg so the fill is nearly invisible — the
+          shadow is what defines the button. */}
       <motion.div
         className="absolute left-1/2 -translate-x-1/2 flex items-center justify-center rounded-full text-[color:var(--ink)]"
         style={{
           top: 60,
           width: 65,
           height: 65,
-          background: "#fff",
-          boxShadow:
-            "0 4.643px 13.929px 0 rgba(0,0,0,0.06), inset 0 0 0 1px rgba(0,0,0,0.03)",
+          background: "rgba(255,255,255,0.1)",
+          boxShadow: "0 4.643px 13.929px 0 rgba(0,0,0,0.06)",
         }}
         initial={{ opacity: 0, y: -10, scale: 0.92 }}
         animate={{ opacity: 1, y: 0, scale: 1 }}
@@ -201,7 +207,7 @@ export default function Screen6({
           user has scrolled to the household card. */}
       <motion.div
         className="pointer-events-none absolute inset-x-0"
-        style={{ top: 660, height: 105 }}
+        style={{ top: 683, height: 105 }}
         initial={{ opacity: 0, y: 8 }}
         animate={{ opacity: scrolled ? 0 : 1, y: 0 }}
         transition={{ delay: STAGGER * 3, duration: 0.6, ease: IN_EASE }}
@@ -267,13 +273,11 @@ export default function Screen6({
         <Sparkle style={{ position: "absolute", left: 299.85, top: 21, width: 6, height: 6 }} />
       </motion.div>
 
-      {/* Bottom sheet — CTA + link. Text swaps once user is on household card. */}
+      {/* Bottom sheet — CTA + link. Text swaps once user is on household card.
+          Solid white bg per Figma (not a gradient fade). */}
       <motion.div
         className="absolute bottom-0 left-0 w-full pt-6 pb-8"
-        style={{
-          background:
-            "linear-gradient(to top, rgba(255,255,255,0.98) 0%, rgba(255,255,255,0.9) 60%, rgba(255,255,255,0) 100%)",
-        }}
+        style={{ background: "#ffffff" }}
         initial={{ opacity: 0, y: 40 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ delay: STAGGER * 4, duration: 0.75, ease: IN_EASE }}
