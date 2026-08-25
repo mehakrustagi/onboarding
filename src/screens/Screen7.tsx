@@ -306,7 +306,7 @@ export default function Screen7({
       <motion.button
         onClick={(e) => {
           e.stopPropagation();
-          haptic("stagedLock");
+          haptic("carDriveOff");
           setPhase("staged");
         }}
         whileTap={{ scale: 0.97 }}

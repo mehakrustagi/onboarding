@@ -18,7 +18,8 @@ type Trigger =
   | "milestoneTick"    // Screen 5: percentage counter crosses 25/50/75/100
   | "statusFlip"       // Screen 4: agent status flips (Working → Done)
   | "screenMount"      // Screen 7: initial car reveal / entrance thump
-  | "whirlpoolSwirl";  // Screen 5: orbs spiral inward → final card reveal
+  | "whirlpoolSwirl"   // Screen 5: orbs spiral inward → final card reveal
+  | "carDriveOff";     // Screen 7: Reserve tap → car accelerates off-screen
 
 const PATTERNS: Record<Trigger, number | number[]> = {
   orbLand: 12,
@@ -40,6 +41,13 @@ const PATTERNS: Record<Trigger, number | number[]> = {
     10, 200, 10, 175, 10, 150, 10, 130, 10, 110,
     10, 90, 10, 75, 10, 60, 10, 48, 10, 38,
     10, 30, 15, 25, 20, 22, 25, 20, 60,
+  ],
+  // Car drive-off (~1.7s): pulses grow LONGER and gaps grow SHORTER over
+  // time — perceived intensity ramps as the car accelerates. Ends with a
+  // strong 150ms thump the moment the car leaves the frame.
+  carDriveOff: [
+    6, 180, 10, 150, 14, 130, 18, 110, 24, 90,
+    32, 72, 42, 55, 55, 42, 72, 32, 95, 20, 150,
   ],
 };
 
