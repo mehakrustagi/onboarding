@@ -389,7 +389,15 @@ export default function Screen5({
   useEffect(() => {
     if (phase !== "final") return;
     if (!onComplete) return;
-    const t = window.setTimeout(onComplete, 7000);
+    // Sequence:
+    //   0–2.5s   whirlpool spirals inward
+    //   2.5–3.4s summary + dots fade in
+    //   3.4–4.5s summary + dots alone at full brightness
+    //   4.5–7s   globe fades UP behind still-crisp text (the reference
+    //            transition frame — both elements co-exist and readable)
+    //   7–8.1s   summary + dots fade out; globe reaches 90%
+    //   8.1–9.5s clean globe holds before hand-off to Screen 6
+    const t = window.setTimeout(onComplete, 9500);
     return () => window.clearTimeout(t);
   }, [phase, onComplete]);
 
@@ -489,15 +497,16 @@ export default function Screen5({
           activatePulse={cardActivate}
         >
           {/* Globe — fills the entire card background (object-cover).
-              Rendered FIRST so the dot pattern + all text overlays sit on
-              top of it. Only visible in the final phase. */}
+              Delayed until AFTER the summary + dots have been on screen so
+              the sequence reads: whirlpool ends → dots+summary → globe
+              rises behind them → summary+dots fade out → globe alone. */}
           {phase === "final" && (
             <motion.div
               className="pointer-events-none absolute inset-0 overflow-hidden"
               style={{ borderRadius: CARD_RADIUS }}
               initial={{ opacity: 0, scale: 0.94 }}
               animate={{ opacity: 1, scale: 1 }}
-              transition={{ delay: 2.5, duration: 2.4, ease: [0.4, 0, 0.2, 1] }}
+              transition={{ delay: 4.5, duration: 4.0, ease: [0.4, 0, 0.2, 1] }}
             >
               <video
                 src="/assets/globe/globe.mp4"
@@ -515,21 +524,50 @@ export default function Screen5({
             </motion.div>
           )}
 
-          {/* Dot texture — shown during card-rise → benefit cycling
-              (whirlpool) phases. Hidden on finale so the globe reads clean. */}
+          {/* Dot texture — visible during card-rise → benefit cycling, and
+              during the first beat of the finale (with the summary text).
+              Fades out as the globe takes over. */}
           {phase !== "intro" && phase !== "final" && (
             <div
               className="pointer-events-none absolute inset-0"
               style={{ opacity: 0.55, mixBlendMode: "screen" }}
             >
+              {/* Figma 561:24812 — 214×304 centred inside the 252×350 card
+                  (19px horiz inset, 23px vert inset). */}
               <Image
                 src="/assets/worldpass/card-dots.svg"
                 alt=""
-                width={CARD_WIDTH}
-                height={CARD_HEIGHT}
-                style={{ width: "100%", height: "100%" }}
+                width={214}
+                height={304}
+                style={{ position: "absolute", left: 19, top: 23, width: 214, height: 304 }}
               />
             </div>
+          )}
+          {phase === "final" && (
+            <motion.div
+              className="pointer-events-none absolute inset-0"
+              style={{ mixBlendMode: "screen" }}
+              initial={{ opacity: 0 }}
+              animate={{ opacity: [0, 0.55, 0.55, 0] }}
+              transition={{
+                // Snap-in with the summary the instant the whirlpool ends,
+                // then fade out with it at t=8.1s (globe at 90%).
+                delay: 2.5,
+                duration: 5.6,
+                times: [0, 0.001, 0.80, 1],
+                ease: "linear",
+              }}
+            >
+              {/* Figma 561:24812 — 214×304 centred inside the 252×350 card
+                  (19px horiz inset, 23px vert inset). */}
+              <Image
+                src="/assets/worldpass/card-dots.svg"
+                alt=""
+                width={214}
+                height={304}
+                style={{ position: "absolute", left: 19, top: 23, width: 214, height: 304 }}
+              />
+            </motion.div>
           )}
 
           {/* Title header — "+ atlys worldpass". Real SVG "+" logo
@@ -580,21 +618,29 @@ export default function Screen5({
                 key="final-summary"
                 className="worldpass-summary pointer-events-none absolute left-1/2 -translate-x-1/2 text-center"
                 style={{
-                  width: 130,
-                  // Position in the darker lower-third of the card, past
-                  // the bright equator of the globe so the copy pops.
-                  top: CARD_HEIGHT * 0.68,
-                  textShadow: "0 1px 8px rgba(0,0,0,0.75)",
+                  // Auto width + whiteSpace nowrap + explicit <br /> forces
+                  // exactly two lines: "All your benefits." / "One WorldPass."
+                  width: "auto",
+                  whiteSpace: "nowrap",
+                  // Card-center — same point where the whirlpool converges.
+                  top: 152,
                 }}
-                initial={{ opacity: 0, filter: "blur(10px)", scale: 0.85 }}
-                animate={{ opacity: 1, filter: "blur(0px)", scale: 1 }}
+                initial={{ opacity: 0 }}
+                animate={{ opacity: [0, 1, 1, 0] }}
                 transition={{
-                  delay: 2.4,
-                  duration: 0.8,
-                  ease: [0.22, 1, 0.36, 1],
+                  // Text pops in crisp the instant the whirlpool ends
+                  // (no fade-in), holds through the globe rise, then
+                  // fades out at t=8.1s — the moment the globe reaches
+                  // 90% opacity (globe delay 4.5s + 4.0s × 0.9).
+                  delay: 2.5,
+                  duration: 5.6,
+                  times: [0, 0.001, 0.80, 1],
+                  ease: "linear",
                 }}
               >
-                All your benefits. One WorldPass.
+                All your benefits.
+                <br />
+                One WorldPass.
               </motion.div>
             )}
           </div>

@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import Image from "next/image";
 import {
   animate,
@@ -45,6 +45,12 @@ export default function Screen6({
   const x = useMotionValue(0);
   const scrollProgress = useTransform(x, [-STRIDE, 0], [1, 0], { clamp: true });
   const s5NameOpacity = useTransform(scrollProgress, [0, 0.2], [1, 0]);
+  // Hint-block opacity mirrors Screen 7's carousel text fade — it tracks
+  // the drag position continuously rather than snapping on activeIdx.
+  // WorldPass-viewing pill fades OUT as user drags left; the simpler
+  // "Scroll to view all benefits" fades IN over the same range.
+  const worldpassHintOpacity = useTransform(scrollProgress, [0, 0.6], [1, 0]);
+  const householdHintOpacity = useTransform(scrollProgress, [0.4, 1], [0, 1]);
 
   // Slide Screen 5's card along with the strip. Values are identical to `x`
   // so the two cards move as one — no crossfade required.
@@ -70,22 +76,47 @@ export default function Screen6({
 
   return (
     <div className="relative h-full w-full overflow-hidden rounded-[44px]">
-      {/* Face-scan button — Figma node 657:11528.
-          Layer by layer:
-            1. bg — 65×65 circle, fill rgba(255,255,255,0.1),
-               shadow 0 4.643px 13.929px rgba(0,0,0,0.06)
-            2. icon frame — 24×24, rotated 180deg (per Figma)
-            3. person — 18.068px glyph centered inside four scan brackets
-          Sits on the light page bg so the fill is nearly invisible — the
-          shadow is what defines the button. */}
+      {/* Face-scan button — Figma node 657:11528 with a Glass effect.
+          CSS approximation of Figma's "Glass" fill layer:
+            • backdrop-filter: blur → refraction/frost
+            • 10% white base fill
+            • -45° highlight gradient (top-left bright, bottom-right dark)
+              simulates Figma's Light -45° at 80% intensity
+            • inset white border top-left / dark inset bottom-right for
+              the depth (149) + splay (100) edge treatment
+            • dispersion hint via subtle inner chromatic edge highlight */}
+      {/* Scan button — solid white 3D-embossed puck.
+          Layer stack:
+            • soft top→bottom gradient fill (bright top, muted bottom) →
+              catches the reference "light from above" shading
+            • bright inset ring at the top edge → the raised bevel
+            • dark inset ring at the bottom edge → the shaded underside
+            • two-tier outer drop shadow → elevation + soft ambient
+              contact shadow directly beneath */}
       <motion.div
         className="absolute left-1/2 -translate-x-1/2 flex items-center justify-center rounded-full text-[color:var(--ink)]"
         style={{
           top: 60,
           width: 65,
           height: 65,
-          background: "rgba(255,255,255,0.1)",
-          boxShadow: "0 4.643px 13.929px 0 rgba(0,0,0,0.06)",
+          background:
+            // Glass-orb fill: bright rim top, cooler grey belly, subtle
+            // bright touch at bottom for reflection.
+            "linear-gradient(180deg, #ffffff 0%, #f5f6f9 32%, #e8eaef 62%, #f1f3f6 100%)",
+          boxShadow: [
+            // Outer ambient elevation
+            "0 10px 22px -6px rgba(15,15,20,0.22)",
+            "0 3px 6px -1px rgba(15,15,20,0.10)",
+            // Very bright inset top rim — the "light-caught" curved edge
+            "inset 0 2px 1px -0.5px rgba(255,255,255,1)",
+            // A soft inner glow just below the rim to sell the dome
+            "inset 0 6px 8px -6px rgba(255,255,255,0.9)",
+            // Bottom-edge shading — the underside curve catches less light
+            "inset 0 -1.5px 1px -0.5px rgba(15,15,20,0.10)",
+            "inset 0 -6px 8px -6px rgba(15,15,20,0.07)",
+            // Silhouette hairline — very light so the rim highlight leads
+            "inset 0 0 0 0.5px rgba(15,15,20,0.08)",
+          ].join(", "),
         }}
         initial={{ opacity: 0, y: -10, scale: 0.92 }}
         animate={{ opacity: 1, y: 0, scale: 1 }}
@@ -140,31 +171,32 @@ export default function Screen6({
         className="pointer-events-none absolute left-1/2 -translate-x-1/2 text-center"
         style={{ top: 307 + 253, width: 212, opacity: s5NameOpacity, x }}
       >
-        <motion.div
-          initial={{ opacity: 0, y: 6 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: STAGGER * 2, duration: 0.6, ease: IN_EASE }}
-        >
-          <p
-            className="text-white font-medium"
-            style={{
-              fontSize: 18,
-              lineHeight: "22px",
-              letterSpacing: "-0.72px",
-            }}
-          >
-            mohak n.
-          </p>
-          <div
-            className="mt-[15px]"
-            style={{
-              height: 1,
-              background:
-                "linear-gradient(90deg, rgba(255,255,255,0) 0%, rgba(255,255,255,0.22) 50%, rgba(255,255,255,0) 100%)",
-            }}
-          />
-          <p className="worldpass-id mt-[15px]">6190001</p>
-        </motion.div>
+        <TypingText
+          text="mohak n."
+          delay={400}
+          charMs={90}
+          className="text-white font-medium"
+          style={{
+            fontSize: 18,
+            lineHeight: "22px",
+            letterSpacing: "-0.72px",
+          }}
+        />
+        <div
+          className="mt-[15px]"
+          style={{
+            height: 1,
+            background:
+              "linear-gradient(90deg, rgba(255,255,255,0) 0%, rgba(255,255,255,0.22) 50%, rgba(255,255,255,0) 100%)",
+          }}
+        />
+        <TypingText
+          text="6190001"
+          delay={1500}
+          charMs={130}
+          className="worldpass-id"
+          style={{ display: "block", marginTop: 15 }}
+        />
       </motion.div>
 
       {/* Card strip — draggable horizontally with snap to two positions.
@@ -201,16 +233,15 @@ export default function Screen6({
         </div>
       </motion.div>
 
-      {/* Scroll hint block — Figma node 561:26043. "Scroll down" label,
-          gradient pill "View all 24 benefits" with sweeping shine, double
-          chevron below, plus two decorative sparkles. Fades out once
-          user has scrolled to the household card. */}
+      {/* Scroll hint block — WorldPass-viewing state (activeIdx = 0).
+          Figma node 561:26043: "Scroll down" label, gradient pill
+          "View all 24 benefits" with sweeping shine, double chevron
+          below, plus two decorative sparkles. Fades out once the user
+          has scrolled onto the household card — the simpler variant
+          below takes over. */}
       <motion.div
         className="pointer-events-none absolute inset-x-0"
-        style={{ top: 683, height: 105 }}
-        initial={{ opacity: 0, y: 8 }}
-        animate={{ opacity: scrolled ? 0 : 1, y: 0 }}
-        transition={{ delay: STAGGER * 3, duration: 0.6, ease: IN_EASE }}
+        style={{ top: 683, height: 105, opacity: worldpassHintOpacity }}
       >
         {/* "Scroll down" label — y=660 in Figma → 0 within this block */}
         <p className="absolute left-1/2 -translate-x-1/2 top-0 text-[12px] font-semibold leading-[16px] tracking-[-0.12px] text-black text-center">
@@ -259,18 +290,64 @@ export default function Screen6({
         </div>
 
         {/* Double chevron — Figma shows two overlapping keyboard_arrow_down
-            SVGs (y=738 and y=745) for a subtle "V V" indicator. */}
+            SVGs (y=738 and y=745) for a subtle "V V" indicator. A brightness
+            wave sweeps top → bottom on loop, hinting "scroll down". */}
         <div
           className="absolute left-1/2 -translate-x-1/2"
           style={{ top: 78, width: 20, height: 27 }}
         >
-          <ChevronDown className="absolute left-0 top-0" />
-          <ChevronDown className="absolute left-0" style={{ top: 7, opacity: 0.5 }} />
+          <motion.div
+            className="absolute left-0 top-0"
+            animate={{ opacity: [0.35, 1, 0.35, 0.35] }}
+            transition={{ duration: 1.6, repeat: Infinity, ease: "easeInOut" }}
+          >
+            <ChevronDown />
+          </motion.div>
+          <motion.div
+            className="absolute left-0"
+            style={{ top: 7 }}
+            animate={{ opacity: [0.35, 0.35, 1, 0.35] }}
+            transition={{ duration: 1.6, repeat: Infinity, ease: "easeInOut" }}
+          >
+            <ChevronDown />
+          </motion.div>
         </div>
 
         {/* Decorative sparkles — Figma positions relative to 440×965 canvas */}
         <Sparkle style={{ position: "absolute", left: 133.85, top: 65, width: 8, height: 8 }} />
         <Sparkle style={{ position: "absolute", left: 299.85, top: 21, width: 6, height: 6 }} />
+      </motion.div>
+
+      {/* Scrolled-state hint — Figma node 561:26059 (activeIdx = 1, viewing
+          household card). Simpler "Scroll to view all benefits" text + a
+          single chevron, no pill or sparkles. Fades in once the user has
+          scrolled to the household card. */}
+      <motion.div
+        className="pointer-events-none absolute inset-x-0 flex flex-col items-center gap-[10px]"
+        style={{ top: 707, opacity: householdHintOpacity }}
+      >
+        <p className="text-[12px] font-semibold leading-[16px] tracking-[-0.12px] text-black text-center">
+          Scroll to view all benefits
+        </p>
+        {/* Double chevron with a top → bottom brightness wave — mirrors
+            the WorldPass-viewing hint's chevron animation for consistency. */}
+        <div className="relative" style={{ width: 20, height: 27 }}>
+          <motion.div
+            className="absolute left-0 top-0"
+            animate={{ opacity: [0.35, 1, 0.35, 0.35] }}
+            transition={{ duration: 1.6, repeat: Infinity, ease: "easeInOut" }}
+          >
+            <ChevronDown />
+          </motion.div>
+          <motion.div
+            className="absolute left-0"
+            style={{ top: 7 }}
+            animate={{ opacity: [0.35, 0.35, 1, 0.35] }}
+            transition={{ duration: 1.6, repeat: Infinity, ease: "easeInOut" }}
+          >
+            <ChevronDown />
+          </motion.div>
+        </div>
       </motion.div>
 
       {/* Bottom sheet — CTA + link. Text swaps once user is on household card.
@@ -420,6 +497,62 @@ function ChevronDown({
         strokeLinejoin="round"
       />
     </svg>
+  );
+}
+
+/* Character-by-character typing effect with a haptic tick per character.
+   Preserves layout by rendering the full text invisibly underneath — the
+   line never reflows as characters land. */
+function TypingText({
+  text,
+  delay,
+  charMs,
+  className,
+  style,
+}: {
+  text: string;
+  delay: number;
+  charMs: number;
+  className?: string;
+  style?: React.CSSProperties;
+}) {
+  const [shown, setShown] = useState("");
+  const timers = useRef<number[]>([]);
+
+  useEffect(() => {
+    timers.current.forEach((t) => window.clearTimeout(t));
+    timers.current = [];
+    setShown("");
+    for (let i = 1; i <= text.length; i++) {
+      const t = window.setTimeout(() => {
+        setShown(text.slice(0, i));
+        // Skip haptic on plain space characters — feels off to buzz on air.
+        if (text[i - 1] !== " ") haptic("typeChar");
+      }, delay + i * charMs);
+      timers.current.push(t);
+    }
+    return () => timers.current.forEach((t) => window.clearTimeout(t));
+  }, [text, delay, charMs]);
+
+  // Non-breaking space reserves line height before the first char lands,
+  // so the surrounding layout doesn't jump.
+  const display = shown.length > 0 ? shown : " ";
+  return (
+    <p className={className} style={style}>
+      {display}
+      <span
+        aria-hidden
+        style={{
+          display: "inline-block",
+          width: 1,
+          marginLeft: 1,
+          background: "currentColor",
+          height: "0.9em",
+          verticalAlign: "middle",
+          opacity: shown.length < text.length && shown.length > 0 ? 0.6 : 0,
+        }}
+      />
+    </p>
   );
 }
 

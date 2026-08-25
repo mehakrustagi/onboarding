@@ -19,7 +19,8 @@ type Trigger =
   | "statusFlip"       // Screen 4: agent status flips (Working → Done)
   | "screenMount"      // Screen 7: initial car reveal / entrance thump
   | "whirlpoolSwirl"   // Screen 5: orbs spiral inward → final card reveal
-  | "carDriveOff";     // Screen 7: Reserve tap → car accelerates off-screen
+  | "carDriveOff"      // Screen 7: Reserve tap → car accelerates off-screen
+  | "typeChar";        // Screen 6: name / ID typing effect, per character
 
 const PATTERNS: Record<Trigger, number | number[]> = {
   orbLand: 12,
@@ -49,6 +50,10 @@ const PATTERNS: Record<Trigger, number | number[]> = {
     6, 180, 10, 150, 14, 130, 18, 110, 24, 90,
     32, 72, 42, 55, 55, 42, 72, 32, 95, 20, 150,
   ],
+  // Featherweight tick — one per character as text types itself onto
+  // the WorldPass card. 3ms is short enough to feel like a soft pulse,
+  // not a buzz, when fired every ~100ms.
+  typeChar: 3,
 };
 
 export function haptic(trigger: Trigger) {
