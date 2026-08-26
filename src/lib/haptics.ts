@@ -20,6 +20,7 @@ type Trigger =
   | "screenMount"      // Screen 7: initial car reveal / entrance thump
   | "whirlpoolSwirl"   // Screen 5: orbs spiral inward → final card reveal
   | "carDriveOff"      // Screen 7: Reserve tap → car accelerates off-screen
+  | "carParked"        // Screen 7: car decelerates and parks at the top
   | "typeChar"         // Screen 6: name / ID typing effect, per character
   | "ropeBeadLand"     // Screen 4: one bead of the rope arc arriving
   | "ropeSettled"      // Screen 4: all beads settled into the column
@@ -50,13 +51,17 @@ const PATTERNS: Record<Trigger, number | number[]> = {
     10, 90, 10, 75, 10, 60, 10, 48, 10, 38,
     10, 30, 15, 25, 20, 22, 25, 20, 60,
   ],
-  // Car drive-off (~1.7s): pulses grow LONGER and gaps grow SHORTER over
-  // time — perceived intensity ramps as the car accelerates. Ends with a
-  // strong 150ms thump the moment the car leaves the frame.
+  // Car drive-off (~1.0s of the 1.7s launch): pulses grow LONGER and
+  // gaps grow SHORTER as the car accelerates off the line. Trails off
+  // before the car reaches the top so the deceleration+park is felt as
+  // a separate carParked tick, not a mid-drive slam.
   carDriveOff: [
-    6, 180, 10, 150, 14, 130, 18, 110, 24, 90,
-    32, 72, 42, 55, 55, 42, 72, 32, 95, 20, 150,
+    6, 180, 10, 150, 14, 130, 20, 110, 28, 85,
+    38, 62, 50, 45, 65,
   ],
+  // Fired the moment the car settles into its parked position at the
+  // top of the frame — soft two-part thump (arrival + settle).
+  carParked: [22, 55, 32],
   // Featherweight tick — one per character as text types itself onto
   // the WorldPass card. 3ms is short enough to feel like a soft pulse,
   // not a buzz, when fired every ~100ms.

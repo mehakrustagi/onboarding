@@ -326,11 +326,20 @@ export default function Screen7({
         onClick={(e) => {
           if (prepLaunch) return;
           e.stopPropagation();
-          haptic("carDriveOff");
+          // Soft immediate feedback on the tap.
+          haptic("tapAdvance");
           // Kick off the prep beat: non-car UI fades, carousel slides
-          // down. After ~650ms hand off to the staged phase.
+          // down. Then hand off to staged and fire the drive-off pattern
+          // exactly when the car actually starts launching.
           setPrepLaunch(true);
-          window.setTimeout(() => setPhase("staged"), 650);
+          window.setTimeout(() => {
+            setPhase("staged");
+            haptic("carDriveOff");
+          }, 650);
+          // Park thump — fires the moment the car decelerates into its
+          // resting position at the top of the frame (prep 650ms +
+          // launch 1700ms = 2350ms after tap).
+          window.setTimeout(() => haptic("carParked"), 2350);
         }}
         whileTap={{ scale: 0.97 }}
         className="absolute overflow-hidden rounded-full text-[14px] font-semibold tracking-[-0.01em] text-black"
@@ -374,9 +383,20 @@ export default function Screen7({
       )}
       </AnimatePresence>
 
+      {/* Exhaust cloud — starts blooming as soon as the user taps
+          Reserve (during the prep beat, well before the car actually
+          launches). Persists into the staged phase so the smoke doesn't
+          restart on the phase swap. */}
+      {(prepLaunch || phase === "staged") && (
+        <>
+          <SmokeLayer delay={0} offsetX={-14} scaleAmp={0.06} drift={12} loopMs={10400} />
+          <SmokeLayer delay={0.08} offsetX={14} scaleAmp={0.05} drift={-10} loopMs={13600} opacity={0.45} />
+        </>
+      )}
+
       {/* STAGED phase — the reserved car drives forward off-screen, tire
-          tracks trail behind, agent orbs + confirmation text fade in, and
-          exhaust cloud billows up from the bottom. */}
+          tracks trail behind, agent orbs + confirmation text fade in.
+          (Smoke is rendered above so it can start during the prep beat.) */}
       {phase === "staged" && <StagedView car={CARS[activeIdx]} />}
     </div>
   );
@@ -454,9 +474,9 @@ function StagedView({ car }: { car: Car }) {
         <WordReveal
           text="Your ride is staged"
           className="text-[20px] font-medium leading-[25px] tracking-[-0.04em] text-[#787878] whitespace-nowrap"
-          delay={3.2}
-          staggerMs={140}
-          perWordDurationMs={480}
+          delay={2.2}
+          staggerMs={80}
+          perWordDurationMs={300}
         />
       </div>
 
@@ -470,17 +490,12 @@ function StagedView({ car }: { car: Car }) {
         <WordReveal
           text={`${car.name} locked for\nyour airport pickup`}
           className="whitespace-nowrap text-[20px] font-medium leading-[25px] tracking-[-0.04em] text-black"
-          delay={3.9}
-          staggerMs={140}
-          perWordDurationMs={480}
+          delay={2.8}
+          staggerMs={80}
+          perWordDurationMs={300}
         />
       </div>
 
-      {/* Exhaust cloud — billows in from bottom, then keeps drifting/
-          breathing so it feels alive. Two layers offset horizontally for
-          parallax so the smoke reads as three-dimensional. */}
-      <SmokeLayer delay={0.35} offsetX={-14} scaleAmp={0.06} drift={12} loopMs={10400} />
-      <SmokeLayer delay={0.55} offsetX={14} scaleAmp={0.05} drift={-10} loopMs={13600} opacity={0.45} />
     </motion.div>
 
       {/* Agent orbs — mount at Screen 4's team-perks positions
@@ -649,7 +664,9 @@ function SmokeLayer({
           duration: loopMs / 1000,
           repeat: Infinity,
           ease: "easeInOut",
-          times: [0, 0.18, 0.75, 1],
+          // Bloom in faster — cloud reaches full opacity well before
+          // the staged orbs arrive at t≈1.85s.
+          times: [0, 0.08, 0.75, 1],
         },
         x: {
           delay,
