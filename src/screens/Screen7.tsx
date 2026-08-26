@@ -95,9 +95,6 @@ export default function Screen7({
   const [activeIdx, setActiveIdx] = useState(0);
   // "select" = swipeable carousel; "staged" = locked-in state after Reserve.
   const [phase, setPhase] = useState<"select" | "staged">("select");
-  // Prep beat between select and staged — non-car UI fades, all cars
-  // slide DOWN together to the bottom edge, then the launch fires.
-  const [prepLaunch, setPrepLaunch] = useState(false);
 
   // Entrance thump when the carousel first mounts (featured car scales in).
   useEffect(() => {
@@ -202,8 +199,8 @@ export default function Screen7({
       <motion.div
         className="absolute left-1/2 top-[70px] -translate-x-1/2 flex flex-col items-center"
         initial={{ opacity: 0, y: -8 }}
-        animate={{ opacity: prepLaunch ? 0 : 1, y: 0 }}
-        transition={{ duration: prepLaunch ? 0.35 : 0.6, ease: IN_EASE }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ duration: 0.6, ease: IN_EASE }}
       >
         <SeatIcon />
         <p className="mt-[20px] whitespace-nowrap text-[20px] font-medium leading-[25px] tracking-[-0.04em] text-[#0b0b0b] text-center">
@@ -221,13 +218,10 @@ export default function Screen7({
 
       {/* Ripple halo behind hero car — 5 concentric rings expand and fade.
           Rings are darker + staggered tighter so at any moment 3–4 are on
-          screen at different radii, giving a continuous water-drop feel.
-          During prep-launch the halo slides DOWN with the cars and fades. */}
-      <motion.div
+          screen at different radii, giving a continuous water-drop feel. */}
+      <div
         className="pointer-events-none absolute left-1/2 -translate-x-1/2"
         style={{ top: HALO_TOP, width: HALO_SIZE, height: HALO_SIZE }}
-        animate={{ opacity: prepLaunch ? 0 : 1, y: prepLaunch ? 330 : 0 }}
-        transition={{ duration: 0.6, ease: [0.55, 0, 0.85, 0.45] }}
       >
         {[0, 1, 2, 3, 4].map((i) => (
           <motion.div
@@ -267,12 +261,10 @@ export default function Screen7({
             }}
           />
         ))}
-      </motion.div>
+      </div>
 
       {/* Full-width drag surface — car layer sits behind title, above halo.
-          Each car floats at its own wrap-around x, driven by the shared drag.
-          During prep-launch the whole carousel slides DOWN so all three
-          cars end at the bottom of the frame together. */}
+          Each car floats at its own wrap-around x, driven by the shared drag. */}
       <motion.div
         className="absolute left-0 cursor-grab active:cursor-grabbing"
         style={{
@@ -285,12 +277,8 @@ export default function Screen7({
         onPan={handlePan}
         onPanEnd={handlePanEnd}
         initial={{ opacity: 0, y: 30 }}
-        animate={{ opacity: 1, y: prepLaunch ? 330 : 0 }}
-        transition={{
-          delay: prepLaunch ? 0 : 0.25,
-          duration: prepLaunch ? 0.6 : 0.7,
-          ease: prepLaunch ? [0.55, 0, 0.85, 0.45] : IN_EASE,
-        }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ delay: 0.25, duration: 0.7, ease: IN_EASE }}
       >
         {CARS.map((car, i) => (
           <CarSlot
@@ -304,42 +292,22 @@ export default function Screen7({
 
       {/* Info panel — brand logo + car name + tagline. Three copies, one per
           car, panning left/right with the carousel so the text tracks the
-          swipe direction (fades in the direction the user drags). Fades
-          out together on prep-launch. */}
-      <motion.div
-        className="pointer-events-none absolute inset-0"
-        animate={{ opacity: prepLaunch ? 0 : 1 }}
-        transition={{ duration: 0.3, ease: IN_EASE }}
-      >
-        {CARS.map((car, i) => (
-          <InfoSlot
-            key={car.key}
-            car={car}
-            wrappedX={carXs[i]}
-            dist={carDists[i]}
-          />
-        ))}
-      </motion.div>
+          swipe direction (fades in the direction the user drags). */}
+      {CARS.map((car, i) => (
+        <InfoSlot
+          key={car.key}
+          car={car}
+          wrappedX={carXs[i]}
+          dist={carDists[i]}
+        />
+      ))}
 
       {/* Reserve my car — 380×50 pill at y 833 (left 30). */}
       <motion.button
         onClick={(e) => {
-          if (prepLaunch) return;
           e.stopPropagation();
-          // Soft immediate feedback on the tap.
-          haptic("tapAdvance");
-          // Kick off the prep beat: non-car UI fades, carousel slides
-          // down. Then hand off to staged and fire the drive-off pattern
-          // exactly when the car actually starts launching.
-          setPrepLaunch(true);
-          window.setTimeout(() => {
-            setPhase("staged");
-            haptic("carDriveOff");
-          }, 650);
-          // Park thump — fires the moment the car decelerates into its
-          // resting position at the top of the frame (prep 650ms +
-          // launch 1700ms = 2350ms after tap).
-          window.setTimeout(() => haptic("carParked"), 2350);
+          haptic("carDriveOff");
+          setPhase("staged");
         }}
         whileTap={{ scale: 0.97 }}
         className="absolute overflow-hidden rounded-full text-[14px] font-semibold tracking-[-0.01em] text-black"
@@ -354,12 +322,8 @@ export default function Screen7({
           border: "1px solid rgba(255,255,255,0.6)",
         }}
         initial={{ opacity: 0, y: 30 }}
-        animate={{ opacity: prepLaunch ? 0 : 1, y: 0 }}
-        transition={{
-          delay: prepLaunch ? 0 : 0.4,
-          duration: prepLaunch ? 0.3 : 0.7,
-          ease: IN_EASE,
-        }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ delay: 0.4, duration: 0.7, ease: IN_EASE }}
       >
         Reserve my car
       </motion.button>
@@ -369,12 +333,8 @@ export default function Screen7({
         className="absolute left-1/2 -translate-x-1/2 text-center text-[12px] font-semibold leading-[16px] tracking-[-0.01em] text-[#999]"
         style={{ top: 903, width: 242 }}
         initial={{ opacity: 0, y: 30 }}
-        animate={{ opacity: prepLaunch ? 0 : 1, y: 0 }}
-        transition={{
-          delay: prepLaunch ? 0 : 0.45,
-          duration: prepLaunch ? 0.3 : 0.7,
-          ease: IN_EASE,
-        }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ delay: 0.45, duration: 0.7, ease: IN_EASE }}
       >
         Included with membership. Switch models anytime in Settings
       </motion.p>
@@ -383,20 +343,9 @@ export default function Screen7({
       )}
       </AnimatePresence>
 
-      {/* Exhaust cloud — starts blooming as soon as the user taps
-          Reserve (during the prep beat, well before the car actually
-          launches). Persists into the staged phase so the smoke doesn't
-          restart on the phase swap. */}
-      {(prepLaunch || phase === "staged") && (
-        <>
-          <SmokeLayer delay={0} offsetX={-14} scaleAmp={0.06} drift={12} loopMs={10400} />
-          <SmokeLayer delay={0.08} offsetX={14} scaleAmp={0.05} drift={-10} loopMs={13600} opacity={0.45} />
-        </>
-      )}
-
       {/* STAGED phase — the reserved car drives forward off-screen, tire
-          tracks trail behind, agent orbs + confirmation text fade in.
-          (Smoke is rendered above so it can start during the prep beat.) */}
+          tracks trail behind, agent orbs + confirmation text fade in, and
+          exhaust cloud billows up from the bottom. */}
       {phase === "staged" && <StagedView car={CARS[activeIdx]} />}
     </div>
   );
@@ -427,25 +376,26 @@ function StagedView({ car }: { car: Car }) {
           drive so the tracks appear to reveal from behind the wheels. */}
       <TireTracks />
 
-      {/* Car staging drive — the prep beat already dropped the car to
-          the bottom of the frame. Here it drives straight UP and comes
-          to REST near the top of the canvas, with only its rear half
-          visible in-frame (front clipped by the top edge). Ease is
-          in-then-out so it accelerates off the line and decelerates
-          into its parked position. */}
+      {/* Car drives forward — settle-back-and-launch: a small preview dip
+          before it accelerates off the top of the phone. Ease-in curve gives
+          a real "hitting the throttle" feel (slow start → whoosh). */}
       <motion.div
         className="pointer-events-none absolute left-1/2"
         style={{
-          top: CAR_TOP + 330,
+          top: CAR_TOP,
           width: CAR_W,
           height: CAR_H,
           translateX: "-50%",
         }}
-        initial={{ y: 0 }}
-        animate={{ y: -800 }}
+        initial={{ y: 0, scaleY: 1 }}
+        animate={{
+          y: [0, 8, -320],
+          scaleY: [1, 1, 1.06],
+        }}
         transition={{
-          duration: 1.7,
-          ease: [0.55, 0, 0.35, 1],
+          duration: 1.75,
+          times: [0, 0.14, 1],
+          ease: [0.55, 0, 0.9, 0.4],
         }}
       >
         <Image
@@ -474,9 +424,9 @@ function StagedView({ car }: { car: Car }) {
         <WordReveal
           text="Your ride is staged"
           className="text-[20px] font-medium leading-[25px] tracking-[-0.04em] text-[#787878] whitespace-nowrap"
-          delay={2.2}
-          staggerMs={80}
-          perWordDurationMs={300}
+          delay={3.2}
+          staggerMs={140}
+          perWordDurationMs={480}
         />
       </div>
 
@@ -490,12 +440,17 @@ function StagedView({ car }: { car: Car }) {
         <WordReveal
           text={`${car.name} locked for\nyour airport pickup`}
           className="whitespace-nowrap text-[20px] font-medium leading-[25px] tracking-[-0.04em] text-black"
-          delay={2.8}
-          staggerMs={80}
-          perWordDurationMs={300}
+          delay={3.9}
+          staggerMs={140}
+          perWordDurationMs={480}
         />
       </div>
 
+      {/* Exhaust cloud — billows in from bottom, then keeps drifting/
+          breathing so it feels alive. Two layers offset horizontally for
+          parallax so the smoke reads as three-dimensional. */}
+      <SmokeLayer delay={0.35} offsetX={-14} scaleAmp={0.06} drift={12} loopMs={10400} />
+      <SmokeLayer delay={0.55} offsetX={14} scaleAmp={0.05} drift={-10} loopMs={13600} opacity={0.45} />
     </motion.div>
 
       {/* Agent orbs — mount at Screen 4's team-perks positions
@@ -566,42 +521,33 @@ function FloatingOrb({
  * (157×258, at y 207). Bloom-in as the car pulls away.
  * -------------------------------------------------------------------------*/
 function TireTracks() {
-  // Single fixed-size tracks image (natural resolution — no stretch,
-  // no repeat). The image starts directly BEHIND the car's initial
-  // position and TRANSLATES upward with the same motion the car does,
-  // so the image reads as a physical trail sliding into view from below
-  // as the car drives away.
-  const NAT_H = 258;
-  const NAT_W = 157;
-  const CAR_START_TOP = CAR_TOP + 330; // where the car sits after the prep drop
+  // Figma spec (node 633:27899): (143, 207.6), 157×258.
   return (
-    <motion.img
-      src="/assets/supercar/tracks.png"
-      alt=""
-      width={NAT_W}
-      height={NAT_H}
-      className="pointer-events-none absolute"
+    <motion.div
+      className="pointer-events-none absolute overflow-hidden"
       style={{
         left: 143,
-        // Top 30% of the tracks image overlaps with the car's bottom —
-        // so the two shapes visually merge at the tail rather than
-        // meeting on an edge. Bottom of the car sits at CAR_START_TOP +
-        // CAR_H; pull the tracks up by 30% of the image height.
-        top: CAR_START_TOP + CAR_H - NAT_H * 0.3,
-        width: NAT_W,
-        height: NAT_H,
+        top: 207.6,
+        width: 157,
+        height: 258,
+        transformOrigin: "top center",
       }}
-      initial={{ y: 0, opacity: 1 }}
-      // Slides UP by the exact same distance as the car (−800) at the
-      // same duration & curve → tracks appear to trail directly beneath
-      // the car's rear as it drives up and parks near the top of the
-      // frame. Tracks then remain visible below the parked car until
-      // the whole staged view fades on exit.
-      animate={{ y: -800, opacity: 1 }}
+      initial={{ opacity: 0, scaleY: 0.55, y: -16 }}
+      animate={{ opacity: 1, scaleY: 1, y: 0 }}
       transition={{
-        y: { duration: 1.7, ease: [0.55, 0, 0.35, 1] },
+        delay: 0.4,
+        duration: 1.2,
+        ease: [0.4, 0, 0.2, 1],
       }}
-    />
+    >
+      <Image
+        src="/assets/supercar/tracks.png"
+        alt=""
+        width={157}
+        height={258}
+        style={{ width: "100%", height: "100%", objectFit: "fill" }}
+      />
+    </motion.div>
   );
 }
 
@@ -664,9 +610,7 @@ function SmokeLayer({
           duration: loopMs / 1000,
           repeat: Infinity,
           ease: "easeInOut",
-          // Bloom in faster — cloud reaches full opacity well before
-          // the staged orbs arrive at t≈1.85s.
-          times: [0, 0.08, 0.75, 1],
+          times: [0, 0.18, 0.75, 1],
         },
         x: {
           delay,
