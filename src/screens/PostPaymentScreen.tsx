@@ -50,19 +50,31 @@ const IN_EASE = [0.22, 1, 0.36, 1] as const;
 
 /* Bottom-bloom colour fields — the pastel wash across the lower half.
  *
- * These are the brand hues (#5057EA / #EF4646 / #EDD758) lifted toward
+ * All four brand hues (#5057EA indigo, #D946EF magenta, #EF4444 red,
+ * #EDD758 yellow), laid left to right so neighbours are adjacent on the
+ * wheel — indigo into magenta into red into yellow. Ordering matters here
+ * because the fields overlap and multiply: adjacent hues compound into
+ * colours that still belong to the set, where putting indigo next to
+ * yellow would mix toward mud.
+ *
+ * These sit well lighter than the target colour on purpose: multiply
+ * darkens whatever it lands on, so a field mixed at its true brightness
+ * comes out heavy, and two overlapping fields come out heavier still.
+ *
+ * These are those hues lifted toward
  * pastel rather than used at full strength. The screen is near-white, and
  * saturated colour on white reads as a graphic pasted on top; the same
  * hues tinted up read as light diffusing through the surface, which is
  * what the reference shows. Lavender left, rose through the middle, peach
  * on the right. */
 const BLOOM_FIELDS = [
+  // #5057EA — indigo
   {
-    color: "rgba(150,120,224,0.95)",
-    fade: "rgba(150,120,224,0.34)",
-    x: -230,
+    color: "rgba(188,168,238,0.95)",
+    fade: "rgba(188,168,238,0.34)",
+    x: -250,
     y: 250,
-    w: 660,
+    w: 640,
     h: 360,
     blur: 64,
     drift: 250,
@@ -70,31 +82,49 @@ const BLOOM_FIELDS = [
     swell: 1.14,
     dur: 5.6,
   },
+  // #D946EF — magenta
   {
-    color: "rgba(244,158,192,0.95)",
-    fade: "rgba(244,158,192,0.34)",
-    x: 30,
+    color: "rgba(240,182,250,0.95)",
+    fade: "rgba(240,182,250,0.34)",
+    x: -60,
     y: 300,
-    w: 630,
-    h: 330,
+    w: 620,
+    h: 340,
     blur: 70,
     drift: -215,
     lift: 84,
     swell: 1.17,
     dur: 7.1,
   },
+  // #EF4444 — red
   {
-    color: "rgba(253,186,124,0.95)",
-    fade: "rgba(253,186,124,0.34)",
-    x: 170,
+    color: "rgba(250,182,178,0.95)",
+    fade: "rgba(250,182,178,0.34)",
+    x: 110,
     y: 235,
-    w: 640,
+    w: 630,
     h: 350,
     blur: 66,
     drift: 230,
     lift: 62,
     swell: 1.12,
     dur: 4.8,
+  },
+  // #EDD758 — yellow
+  {
+    color: "rgba(250,238,186,0.95)",
+    fade: "rgba(250,238,186,0.34)",
+    x: 250,
+    y: 285,
+    w: 620,
+    h: 330,
+    blur: 68,
+    // Its own period again, prime-ish against the other three so the
+    // four never line up into a fixed arrangement.
+    drift: -240,
+    lift: 76,
+    swell: 1.15,
+    dur: 6.3,
   },
 ] as const;
 
@@ -434,7 +464,7 @@ export function PostPaymentStage({ active }: { active: boolean }) {
               height: 320,
               borderRadius: "50%",
               background:
-                "radial-gradient(closest-side, rgba(190,158,236,0.9) 0%, rgba(242,172,198,0.58) 52%, rgba(253,196,146,0.24) 100%)",
+                "radial-gradient(closest-side, rgba(200,182,240,0.86) 0%, rgba(238,186,246,0.58) 38%, rgba(250,188,182,0.4) 70%, rgba(250,236,186,0.24) 100%)",
               filter: "blur(72px)",
               mixBlendMode: "multiply",
             }}
