@@ -1,0 +1,9 @@
+<svg preserveAspectRatio="none" overflow="visible" style="display: block;" width="440" height="965" viewBox="0 0 440 965" fill="none" xmlns="http://www.w3.org/2000/svg">
+<path id="overlay screen" opacity="0.9" d="M0 44C0 19.6995 19.6995 0 44 0H396C420.301 0 440 19.6995 440 44V921C440 945.3 420.301 965 396 965H44C19.6995 965 0 945.301 0 921V44Z" fill="url(#paint0_linear_0_28)" fill-opacity="0.9"/>
+<defs>
+<linearGradient id="paint0_linear_0_28" x1="220.245" y1="0" x2="220.245" y2="840.387" gradientUnits="userSpaceOnUse">
+<stop stop-opacity="0"/>
+<stop offset="1"/>
+</linearGradient>
+</defs>
+</svg>

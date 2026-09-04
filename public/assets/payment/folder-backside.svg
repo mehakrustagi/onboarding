@@ -1,0 +1,6 @@
+<svg preserveAspectRatio="none" overflow="visible" style="display: block;" width="271" height="162" viewBox="0 0 271 162" fill="none" xmlns="http://www.w3.org/2000/svg">
+<foreignObject x="-4.38095" y="-4.38095" width="279.762" height="170.762"><div xmlns="http://www.w3.org/1999/xhtml" style="backdrop-filter:blur(2.19px);clip-path:url(#bgblur_0_0_5_clip_path);height:100%;width:100%"></div></foreignObject><path id="backside" opacity="0.4" data-figma-bg-blur-radius="4.38095" d="M0 17.5238C0 7.84567 7.84568 0 17.5238 0L41.7283 0C44.3546 0 46.9473 0.590326 49.3148 1.72733L61.0111 7.34467C63.3785 8.48167 65.9713 9.072 68.5976 9.072H253.476C263.154 9.072 271 16.9177 271 26.5958V144.476C271 154.154 263.154 162 253.476 162H17.5238C7.84567 162 0 154.154 0 144.476V17.5238Z" fill="white" fill-opacity="0.6"/>
+<defs>
+<clipPath id="bgblur_0_0_5_clip_path" transform="translate(4.38095 4.38095)"><path d="M0 17.5238C0 7.84567 7.84568 0 17.5238 0L41.7283 0C44.3546 0 46.9473 0.590326 49.3148 1.72733L61.0111 7.34467C63.3785 8.48167 65.9713 9.072 68.5976 9.072H253.476C263.154 9.072 271 16.9177 271 26.5958V144.476C271 154.154 263.154 162 253.476 162H17.5238C7.84567 162 0 154.154 0 144.476V17.5238Z"/>
+</clipPath></defs>
+</svg>
