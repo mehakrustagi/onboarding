@@ -1615,9 +1615,11 @@ const BORDER_INSET = 0.6;
 const BORDER_PERIMETER =
   4 * (FOLDER_SIZE - BORDER_INSET * 2 - 2 * (10 - BORDER_INSET)) +
   2 * Math.PI * (10 - BORDER_INSET);
-/* How much of the edge is lit at once — about a quarter, so it reads as a
- * run of light rather than a dot doing laps. */
-const BORDER_ARC = BORDER_PERIMETER * 0.26;
+/* The reference has the rim lit nearly all the way round — brightest down
+ * the right, fading out toward the bottom-left — rather than one short
+ * segment doing laps. So it is built as two strokes: a full ring carrying
+ * the gradient, and a long bright run travelling over it. */
+const BORDER_ARC = BORDER_PERIMETER * 0.62;
 
 /* The connection's colour, used by the links and the folder's edge alike.
  * Figma strokes the links #10B981→white, which next to a brand-gradient
@@ -1628,6 +1630,16 @@ const BRAND_STOPS = [
   { offset: 0, color: "#5057ea" },
   { offset: 0.45, color: "#ef4646" },
   { offset: 1, color: "#edd758" },
+] as const;
+
+/* Same hues with the ends taken to transparent, so a full ring fades out
+ * where it meets itself instead of butting one hue against another. */
+const RIM_STOPS = [
+  { offset: 0, color: "#5057ea", opacity: 0 },
+  { offset: 0.16, color: "#5057ea", opacity: 1 },
+  { offset: 0.5, color: "#ef4646", opacity: 1 },
+  { offset: 0.84, color: "#edd758", opacity: 1 },
+  { offset: 1, color: "#edd758", opacity: 0 },
 ] as const;
 
 /* Success green — the design's border-input-success / link gradient hue. */
@@ -1702,6 +1714,9 @@ function FetchingDocsStage() {
             top: FETCH_ROW_Y + i * (CHIP_SIZE + CHIP_GAP),
             width: CHIP_SIZE,
             height: CHIP_SIZE,
+            /* The reference sits each chip in a faint lavender halo, which
+               is what stops them reading as flat grey discs. */
+            boxShadow: "0 1px 6px rgba(80,87,234,0.12)",
           }}
           initial={{ opacity: 0, scale: 0.7 }}
           animate={{
@@ -1762,6 +1777,11 @@ function FetchingDocsStage() {
             /* Figma's 0.6 hairline all but disappears once it is carrying
                colour rather than a flat green, so it goes to 0.9. */
             strokeWidth={0.9}
+            /* The reference keeps these soft — the same hues as the rim,
+               well short of full strength, so the links read as the quiet
+               half of the connection and the folder's edge stays the loud
+               half. Full green once it lands. */
+            strokeOpacity={done ? 1 : 0.55}
             /* One path length's worth of dash, offset a whole length, is a
                line that hasn't been drawn yet; walking the offset to zero
                draws it from the chip toward the folder. */
@@ -1883,6 +1903,23 @@ function FetchingDocsStage() {
         >
           <defs>
             <linearGradient
+              id="folder-rim-grad"
+              x1="0"
+              y1="0"
+              x2={FOLDER_SIZE}
+              y2={FOLDER_SIZE}
+              gradientUnits="userSpaceOnUse"
+            >
+              {RIM_STOPS.map((stop) => (
+                <stop
+                  key={stop.offset}
+                  offset={stop.offset}
+                  stopColor={stop.color}
+                  stopOpacity={stop.opacity}
+                />
+              ))}
+            </linearGradient>
+            <linearGradient
               id="folder-border-grad"
               x1="0"
               y1="0"
@@ -1900,7 +1937,21 @@ function FetchingDocsStage() {
             </linearGradient>
           </defs>
 
-          {/* Travelling arc while loading. */}
+          {/* The rim itself — on the whole time the fetch is live. */}
+          <motion.rect
+            x={BORDER_INSET}
+            y={BORDER_INSET}
+            width={FOLDER_SIZE - BORDER_INSET * 2}
+            height={FOLDER_SIZE - BORDER_INSET * 2}
+            rx={10 - BORDER_INSET}
+            stroke="url(#folder-rim-grad)"
+            strokeWidth={1.2}
+            initial={{ opacity: 0 }}
+            animate={{ opacity: loading ? 0.75 : 0 }}
+            transition={{ duration: 0.35, ease: IN_EASE }}
+          />
+
+          {/* Bright run travelling over it. */}
           <motion.rect
             x={BORDER_INSET}
             y={BORDER_INSET}
