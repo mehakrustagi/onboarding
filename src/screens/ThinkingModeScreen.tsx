@@ -910,6 +910,14 @@ const CARD_H = 101;
  * so the row reads as a stack being worked through rather than a list, and
  * three of them fit in the clip with the front one fully visible. */
 const CARD_PITCH = CARD_W * 0.78;
+/* Room for the row: from its left edge to the screen edge, not Figma's
+ * 307-wide frame. That frame is sized for a static shot of two-and-a-bit
+ * cards; a conveyor needs all three on screen or the queue reads as
+ * chopped off rather than as waiting. Vertical slack keeps the cards'
+ * drop shadows off the clip edges. */
+const CARD_ROW_X = 62;
+const CARD_ROW_W = 393 - CARD_ROW_X;
+const CARD_ROW_SLACK = 26;
 /* How far a finished card travels as it leaves. Enough to clear the clip. */
 const CARD_EXIT_X = -(CARD_W + 60);
 /* The export box and where it has to sit so the card lands on the node box. */
@@ -993,12 +1001,17 @@ function ScanningPassportStage() {
           slack so the cards' drop shadows aren't sliced off. */}
       <div
         className="pointer-events-none absolute overflow-hidden"
-        style={{ left: 62, top: 272 - 16, width: 307, height: CARD_H + 32 }}
+        style={{
+          left: CARD_ROW_X,
+          top: 272 - CARD_ROW_SLACK,
+          width: CARD_ROW_W,
+          height: CARD_H + CARD_ROW_SLACK * 2,
+        }}
       >
         {Array.from({ length: PASSPORT_COUNT }, (_, i) => (
           <PassportCard
             key={i}
-            y={16}
+            y={CARD_ROW_SLACK}
             /* Slot 0 is the read position; cards queue to its right and a
                finished card drops to a negative slot and leaves. */
             slot={i - Math.max(0, reading)}
@@ -1252,7 +1265,10 @@ const PHOTO_H = 80;
 /* As with the passports: Figma's 89.962 spacing is card-plus-gap for a
  * static frame. On the conveyor they overlap, each tucking behind the one
  * in front. */
-const PHOTO_PITCH = PHOTO_W * 0.8;
+/* A gentler overlap than the passports': four photos have to fit between
+ * the row's left edge and the screen edge, and at a tight pitch the queued
+ * faces disappear behind the one in front. */
+const PHOTO_PITCH = PHOTO_W * 0.9;
 const PHOTO_EXIT_X = -(PHOTO_W + 70);
 const PHOTO_ROW_X = 57;
 const PHOTO_ROW_Y = 281;
@@ -1550,6 +1566,10 @@ const FETCH_ROW_Y = 292;
 const CHIP_X = 62;
 const CHIP_SIZE = 20;
 const CHIP_GAP = 8;
+const SOURCE_CHIPS = [
+  { src: "/assets/thinking/fetching/source-atlys-chip.png", whole: true },
+  { src: "/assets/thinking/fetching/source-gmail.svg", whole: false },
+] as const;
 const FOLDER_X = 102;
 const FOLDER_SIZE = 40;
 const FOLDER_Y = FETCH_ROW_Y + 4; // items-center in a 48-tall row
@@ -1578,6 +1598,19 @@ const LINKS = [
     from: "#ffffff",
     to: "#10b981",
   },
+] as const;
+
+/* The two documents in the folder. Figma expresses them as rotated rects
+ * inside bounding boxes (the hypot(...cqw, ...cqh) sizing), which works out
+ * to a pair of ~28.4×18.9 sheets kicked -34.78° and -23.95°, centred just
+ * above the middle of the folder artwork so their corners poke out over the
+ * top-left of it. Stated here as centres, since that is what the rotation
+ * is about. */
+const DOC_W = 28.37;
+const DOC_H = 18.86;
+const DOCS = [
+  { rotate: -34.78, cx: 16.03, cy: 9.84, delay: 0 },
+  { rotate: -23.95, cx: 17.04, cy: 10.84, delay: 0.12 },
 ] as const;
 
 /* Success green — the design's border-input-success / link gradient hue. */
@@ -1633,14 +1666,20 @@ function FetchingDocsStage() {
         </p>
       </motion.div>
 
-      {/* Source chips. */}
-      {[
-        { src: "/assets/thinking/fetching/source-drive.png", i: 0 },
-        { src: "/assets/thinking/fetching/source-gmail.svg", i: 1 },
-      ].map(({ src, i }) => (
+      {/* Source chips — the places the agent is pulling documents from.
+          The first one is Figma's render of the whole chip: its glyph is an
+          image fill that exports as an empty file, so the ring comes with
+          it. The second is the chip drawn in CSS around Figma's Gmail
+          glyph — same spec either way (#f7f7f7, 0.75px #e8e8e8). */}
+      {SOURCE_CHIPS.map((chip, i) => (
         <motion.div
-          key={src}
-          className="absolute flex items-center justify-center rounded-full border-[0.75px] border-[#e8e8e8] bg-[#f7f7f7]"
+          key={chip.src}
+          className={
+            "absolute flex items-center justify-center rounded-full " +
+            (chip.whole
+              ? ""
+              : "border-[0.75px] border-[#e8e8e8] bg-[#f7f7f7]")
+          }
           style={{
             left: CHIP_X,
             top: FETCH_ROW_Y + i * (CHIP_SIZE + CHIP_GAP),
@@ -1659,11 +1698,15 @@ function FetchingDocsStage() {
           }}
         >
           <Image
-            src={src}
+            src={chip.src}
             alt=""
-            width={10}
-            height={10}
-            style={{ width: 10, height: 10 }}
+            width={chip.whole ? CHIP_SIZE : 10}
+            height={chip.whole ? CHIP_SIZE : 10}
+            style={
+              chip.whole
+                ? { width: CHIP_SIZE, height: CHIP_SIZE }
+                : { width: 10, height: 10 }
+            }
           />
         </motion.div>
       ))}
@@ -1717,31 +1760,6 @@ function FetchingDocsStage() {
         <div
           className="absolute inset-0 overflow-hidden rounded-[10px] border-[0.6px] border-white bg-[#f9fafb]"
         >
-          {/* "Energy bounce inside the folder" — a soft bloom breathing
-              behind the artwork while the fetch is live. */}
-          <motion.div
-            className="absolute"
-            style={{
-              left: -6,
-              top: -6,
-              width: FOLDER_SIZE + 12,
-              height: FOLDER_SIZE + 12,
-              background:
-                "radial-gradient(circle at 50% 60%, rgba(16,185,129,0.55) 0%, rgba(80,87,234,0.25) 45%, rgba(255,255,255,0) 70%)",
-            }}
-            initial={{ opacity: 0, scale: 0.7 }}
-            animate={
-              loading
-                ? { opacity: [0.35, 0.9, 0.35], scale: [0.78, 1.08, 0.78] }
-                : { opacity: 0, scale: 0.7 }
-            }
-            transition={
-              loading
-                ? { duration: 1.1, ease: "easeInOut", repeat: Infinity }
-                : { duration: 0.4, ease: IN_EASE }
-            }
-          />
-
           {/* Folder artwork: back plate, the documents, then the front flap
               over them — so a document arriving slides in BEHIND the flap,
               which is what puts it inside the folder rather than on it. */}
@@ -1757,18 +1775,18 @@ function FetchingDocsStage() {
               style={{ position: "absolute", left: 2.37, top: 0, width: 27.38, height: 24.98 }}
             />
 
-            {[
-              { rotate: -34.78, left: 1.5, top: -4, delay: 0 },
-              { rotate: -23.95, left: 5.5, top: -2.4, delay: 0.12 },
-            ].map((doc) => (
+            {DOCS.map((doc) => (
               <motion.div
                 key={doc.rotate}
                 className="absolute overflow-hidden rounded-[4.854px] border-[0.187px] border-white"
                 style={{
-                  left: doc.left,
-                  top: doc.top,
-                  width: 22,
-                  height: 17,
+                  /* Figma gives these as rotated rects inside a bounding
+                     box, so they're placed by CENTRE — by corner they land
+                     in the wrong place and read oversized. */
+                  left: doc.cx - DOC_W / 2,
+                  top: doc.cy - DOC_H / 2,
+                  width: DOC_W,
+                  height: DOC_H,
                   transform: `rotate(${doc.rotate}deg)`,
                 }}
                 initial={{ opacity: 0, y: 10, scale: 0.7 }}
@@ -1786,8 +1804,8 @@ function FetchingDocsStage() {
                 <Image
                   src="/assets/thinking/fetching/doc.png"
                   alt=""
-                  width={22}
-                  height={17}
+                  width={DOC_W}
+                  height={DOC_H}
                   style={{
                     position: "absolute",
                     inset: 0,
