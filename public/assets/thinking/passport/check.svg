@@ -1,0 +1,19 @@
+<svg preserveAspectRatio="none" overflow="visible" style="display: block;" width="24.711" height="24.711" viewBox="0 0 24.711 24.711" fill="none" xmlns="http://www.w3.org/2000/svg">
+<g id="check_circle">
+<g clip-path="url(#clip0_0_930)">
+<rect width="24.711" height="24.711" rx="12.3555" fill="white" fill-opacity="0.8"/>
+<g id="Vector">
+</g>
+<path id="Vector_2" d="M12.3555 2.05925C6.67198 2.05925 2.05925 6.67198 2.05925 12.3555C2.05925 18.0391 6.67198 22.6518 12.3555 22.6518C18.0391 22.6518 22.6518 18.0391 22.6518 12.3555C22.6518 6.67198 18.0391 2.05925 12.3555 2.05925ZM10.2963 17.5037L5.14813 12.3555L6.59991 10.9037L10.2963 14.5898L18.1111 6.77494L19.5629 8.23701L10.2963 17.5037Z" fill="url(#paint0_linear_0_930)"/>
+</g>
+</g>
+<defs>
+<linearGradient id="paint0_linear_0_930" x1="2.05925" y1="12.3555" x2="22.6518" y2="12.3555" gradientUnits="userSpaceOnUse">
+<stop stop-color="#0B0B0B"/>
+<stop offset="1" stop-color="#10B981"/>
+</linearGradient>
+<clipPath id="clip0_0_930">
+<rect width="24.711" height="24.711" rx="12.3555" fill="white"/>
+</clipPath>
+</defs>
+</svg>

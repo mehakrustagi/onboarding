@@ -140,42 +140,95 @@ const SUB_AGENTS = [
   },
 ] as const;
 
+/* The stages of the flow, in the order the Figma board lays them out. Each
+ * one is a section on the "thinking mode animation" page; the sub-CTAs
+ * below the phone switch between them, and anything not built yet is
+ * listed but not selectable, so the row doubles as the build queue. */
+const STAGES = [
+  { id: "pre-thinking", label: "Pre-thinking", built: true },
+  { id: "scanning-passport", label: "Scanning passport", built: true },
+  { id: "fetching-docs", label: "Fetching docs", built: false },
+  { id: "scanning-photos", label: "Scanning photos", built: false },
+  { id: "visa-requirement", label: "Visa requirement", built: false },
+] as const;
+
+type StageId = (typeof STAGES)[number]["id"];
+
 export default function ThinkingModeScreen() {
+  const [stage, setStage] = useState<StageId>("pre-thinking");
   /* Bumping the run id remounts the stage, which replays the whole
      sequence — a one-shot build-up is otherwise only watchable once per
-     page load, which makes it useless to review. */
+     page load, which makes it useless to review. Switching stage counts
+     as a new run for the same reason. */
   const [run, setRun] = useState(0);
 
   return (
     <div className="flex flex-col items-center gap-3">
+      {/* Sub-CTAs — which state of the flow the phone is showing. */}
+      <nav className="mb-1 flex flex-wrap items-center justify-center gap-1.5">
+        {STAGES.map((s) => {
+          const isActive = s.id === stage;
+          return (
+            <button
+              key={s.id}
+              type="button"
+              disabled={!s.built}
+              aria-current={isActive ? "true" : undefined}
+              onClick={() => {
+                setStage(s.id);
+                setRun((r) => r + 1);
+              }}
+              className={
+                "rounded-full px-3.5 py-1.5 text-[13px] transition-colors " +
+                (isActive
+                  ? "bg-[#0b0b0b] text-white"
+                  : s.built
+                    ? "bg-black/5 text-[#4b4b53] hover:bg-black/10"
+                    : "cursor-not-allowed bg-black/[0.03] text-[#b4b4bb]")
+              }
+            >
+              {s.label}
+            </button>
+          );
+        })}
+      </nav>
+
       <div
         className="relative h-[852px] w-[393px] select-none overflow-hidden rounded-[40px] bg-white shadow-[0_40px_80px_-20px_rgba(0,0,0,0.5)]"
         onClick={() => setRun((r) => r + 1)}
       >
-        <ThinkingStage key={run} />
+        {/* Chrome is the same in every stage and never animates, so it
+            lives out here and only the stage content remounts. */}
+        <Background />
+        <TopBar />
+        <UserBubble />
+        <Composer />
+
+        {stage === "pre-thinking" ? (
+          <PreThinkingStage key={run} />
+        ) : (
+          <ScanningPassportStage key={run} />
+        )}
       </div>
       <p className="text-[12px] text-[#8b8b93]">tap the screen to replay</p>
     </div>
   );
 }
 
-function ThinkingStage() {
+/* ---------------------------------------------------------------------------
+ * Stage 1 — pre-thinking (section 852:8608). The agent tree assembling
+ * itself: orb, step title, rolling subline, two sub-agents on connectors.
+ * -------------------------------------------------------------------------*/
+function PreThinkingStage() {
   const step = useSequence();
 
   return (
     <>
-      <Background />
-      <TopBar />
-      <UserBubble />
-
-      {/* The agent tree. */}
       <AgentOrb visible={step >= S_ORB} />
       <StepText step={step} />
       {SUB_AGENTS.map((sub) => (
         <SubAgent key={sub.step} sub={sub} step={step} />
       ))}
-
-      <Composer />
     </>
   );
 }
@@ -469,11 +522,18 @@ function Composer() {
  * asset, and the same orb inhaling on a 2.4s cycle reads as something
  * running.
  * -------------------------------------------------------------------------*/
-function AgentOrb({ visible }: { visible: boolean }) {
+function AgentOrb({
+  visible,
+  /* Pre-thinking puts the orb at 224, the Scan frame at 225. */
+  top = 224,
+}: {
+  visible: boolean;
+  top?: number;
+}) {
   return (
     <motion.div
       className="pointer-events-none absolute"
-      style={{ left: 24, top: 224, width: 26, height: 26 }}
+      style={{ left: 24, top, width: 26, height: 26 }}
       initial={{ opacity: 0 }}
       animate={
         visible
@@ -785,4 +845,319 @@ function useDescriptionTicker(active: boolean, offset: number) {
   }, [active, i, offset]);
 
   return i;
+}
+
+/* ===========================================================================
+ * Stage 2 — Scanning passport (section 852:10995).
+ *
+ * The step line becomes "Scanning passport / Running 10 checks" and a row of
+ * passport cards runs underneath it: each card is scanned by a green line
+ * travelling across its face, then dims and takes a check, and the next one
+ * starts. The board draws it three times over — 1 card, 2 cards, 3+ — which
+ * is one sequence sampled at different depths, so it's built as three cards
+ * scanned in turn with the row sliding left when it runs out of room.
+ *
+ * Geometry off frame 852:11139 (the "Scan" frame, which sits at y 210):
+ *   agent orb        26×26 at (24, 225)
+ *   title / subline  left 62, y 224 / 244
+ *   card             128.491×101, first at (62, 272), pitch 137.491
+ *   row clip         307 wide — Figma's Frame 1991431083, so the third card
+ *                    is cut off until the row slides
+ *
+ * The card face is Figma's own export of passport-scan-w (852:11160): the
+ * printed passport, its white carrier, the shadow card kicked 3.85° behind
+ * it, and the black scan brackets are all one raster, because that artwork
+ * is 20-odd nested vectors and an image fill — nothing an animation needs
+ * to touch. The export carries ~15px of shadow bleed on each side, hence
+ * CARD_IMG being bigger than the node box and offset back into place.
+ * Everything that MOVES — the scan line, the dim, the check — is drawn over
+ * it here.
+ * -------------------------------------------------------------------------*/
+
+const PASSPORT_STEP_DELAYS = [
+  300, // 1  orb
+  600, // 2  "Scanning passport"
+  500, // 3  subline
+  350, // 4  card 1 arrives and starts scanning
+  1700, // 5  card 1 done
+  450, // 6  card 2 arrives, scanning
+  1700, // 7  card 2 done
+  450, // 8  card 3 arrives, row slides left
+  1700, // 9  card 3 done
+] as const;
+
+/* Each card's (arrive, done) step pair. */
+const PASSPORT_CARDS = [
+  { arrive: 4, done: 5 },
+  { arrive: 6, done: 7 },
+  { arrive: 8, done: 9 },
+] as const;
+
+/* Step at which the row has run out of room and slides one slot left. */
+const ROW_SLIDE_STEP = 8;
+
+const PASSPORT_CHECKS = [
+  "Running 10 checks",
+  "Glare detection",
+  "Sharpness level",
+  "Blur detection",
+  "Analysing data",
+] as const;
+
+/* Card geometry, all in the node's own coordinates. */
+const CARD_W = 128.491;
+const CARD_H = 101;
+const CARD_PITCH = 137.491;
+/* The export box and where it has to sit so the card lands on the node box. */
+const CARD_IMG_W = 159;
+const CARD_IMG_H = 130;
+const CARD_IMG_X = -(CARD_IMG_W - CARD_W) / 2;
+const CARD_IMG_Y = -(CARD_IMG_H - CARD_H) / 2;
+/* The printed face — what the scan line travels across. */
+const PRINT = { left: 11.12, top: 13.59, w: 104.245, h: 71.662 };
+/* Variant10's dim plate and its check, in node coordinates. */
+const DIM = { left: -1.23, top: 1.28, w: 128.497, h: 95.137, radius: 9.884 };
+const CHECK = { size: 24.711, cx: 63.63, cy: 49.42 };
+/* Figma's scan line colour (Line 234). */
+const SCAN_GREEN = "#08da0f";
+/* One pass of the line across a card. Two passes fit inside a card's scan
+ * step, which reads as a device working rather than one clean swipe. */
+const SWEEP_S = 0.85;
+
+function ScanningPassportStage() {
+  const step = useSequenceWith(PASSPORT_STEP_DELAYS);
+  const working = step < 9;
+  /* The subline ticks through the checks for as long as anything is being
+     scanned, then settles back on the count. */
+  const checkIndex = usePassportCheckTicker(step >= 4 && working);
+
+  return (
+    <>
+      <AgentOrb visible={step >= 1} top={225} />
+
+      <motion.div
+        className="absolute overflow-hidden"
+        style={{ left: 62, top: 224, width: 176, height: 16 }}
+        initial={{ opacity: 0, filter: "blur(8px)" }}
+        animate={{
+          opacity: step >= 2 ? 1 : 0,
+          filter: step >= 2 ? "blur(0px)" : "blur(8px)",
+        }}
+        transition={{ duration: 0.5, ease: IN_EASE }}
+      >
+        <p
+          className={
+            "text-[12px] font-medium " +
+            (working ? "agent-title-shine" : "agent-title-static")
+          }
+          style={{ lineHeight: "16px", letterSpacing: "-0.24px" }}
+        >
+          Scanning passport
+        </p>
+      </motion.div>
+
+      <motion.div
+        className="absolute"
+        style={{ left: 62, top: 244, width: 312.353 }}
+        initial={{ opacity: 0, filter: "blur(8px)" }}
+        animate={{
+          opacity: step >= 3 ? 1 : 0,
+          filter: step >= 3 ? "blur(0px)" : "blur(8px)",
+        }}
+        transition={{ duration: 0.5, ease: IN_EASE }}
+      >
+        <RollingLine
+          lines={PASSPORT_CHECKS}
+          index={checkIndex}
+          className="text-[11px] text-[#666]"
+        />
+      </motion.div>
+
+      {/* The card row. Clipped to Figma's 307, with vertical slack so the
+          cards' drop shadows aren't sliced off at the top and bottom. */}
+      <div
+        className="pointer-events-none absolute overflow-hidden"
+        style={{ left: 62, top: 272 - 16, width: 307, height: CARD_H + 32 }}
+      >
+        <motion.div
+          className="absolute left-0 top-0"
+          style={{ height: CARD_H + 32 }}
+          animate={{ x: step >= ROW_SLIDE_STEP ? -CARD_PITCH : 0 }}
+          transition={{ duration: 0.62, ease: IN_EASE }}
+        >
+          {PASSPORT_CARDS.map((card, i) => (
+            <PassportCard
+              key={i}
+              x={i * CARD_PITCH}
+              y={16}
+              visible={step >= card.arrive}
+              scanning={step >= card.arrive && step < card.done}
+              done={step >= card.done}
+            />
+          ))}
+        </motion.div>
+      </div>
+    </>
+  );
+}
+
+function PassportCard({
+  x,
+  y,
+  visible,
+  scanning,
+  done,
+}: {
+  x: number;
+  y: number;
+  visible: boolean;
+  scanning: boolean;
+  done: boolean;
+}) {
+  return (
+    <motion.div
+      className="absolute"
+      style={{ left: x, top: y, width: CARD_W, height: CARD_H }}
+      initial={{ opacity: 0, y: 10, scale: 0.96, filter: "blur(6px)" }}
+      animate={{
+        opacity: visible ? 1 : 0,
+        y: visible ? 0 : 10,
+        scale: visible ? 1 : 0.96,
+        filter: visible ? "blur(0px)" : "blur(6px)",
+      }}
+      transition={{ duration: 0.52, ease: IN_EASE }}
+    >
+      <Image
+        src="/assets/thinking/passport/card.png"
+        alt=""
+        width={CARD_IMG_W}
+        height={CARD_IMG_H}
+        style={{
+          position: "absolute",
+          left: CARD_IMG_X,
+          top: CARD_IMG_Y,
+          width: CARD_IMG_W,
+          height: CARD_IMG_H,
+        }}
+      />
+
+      {/* Scan pass — a hard green line with a soft trail behind it,
+          clipped to the printed face so nothing leaks over the carrier.
+          It loops while this card is the one being read. */}
+      <div
+        className="absolute overflow-hidden"
+        style={{
+          left: PRINT.left,
+          top: PRINT.top,
+          width: PRINT.w,
+          height: PRINT.h,
+        }}
+      >
+        <motion.div
+          className="absolute top-0"
+          style={{ width: 40, height: PRINT.h, left: -40 }}
+          animate={{ x: scanning ? [0, PRINT.w + 40] : 0 }}
+          transition={
+            scanning
+              ? { duration: SWEEP_S, ease: "linear", repeat: Infinity }
+              : { duration: 0 }
+          }
+          initial={false}
+        >
+          {/* Trail first, line on its leading edge. */}
+          <div
+            className="absolute inset-0"
+            style={{
+              background: `linear-gradient(90deg, rgba(8,218,15,0) 0%, rgba(8,218,15,0.22) 100%)`,
+              opacity: scanning ? 1 : 0,
+            }}
+          />
+          <div
+            className="absolute top-0"
+            style={{
+              right: 0,
+              width: 1.24,
+              height: PRINT.h,
+              background: SCAN_GREEN,
+              boxShadow: `0 0 6px 1px rgba(8,218,15,0.55)`,
+              opacity: scanning ? 1 : 0,
+            }}
+          />
+        </motion.div>
+      </div>
+
+      {/* Read — Variant10: the card dims under a black plate and takes a
+          check. The check lands with a small overshoot; a check that fades
+          in reads as a label, one that pops reads as a verdict. */}
+      <motion.div
+        className="absolute"
+        style={{
+          left: DIM.left,
+          top: DIM.top,
+          width: DIM.w,
+          height: DIM.h,
+          borderRadius: DIM.radius,
+          background: "rgba(0,0,0,0.6)",
+        }}
+        initial={{ opacity: 0 }}
+        animate={{ opacity: done ? 0.4 : 0 }}
+        transition={{ duration: 0.42, ease: IN_EASE }}
+      />
+      <motion.div
+        className="absolute"
+        style={{
+          left: CHECK.cx - CHECK.size / 2,
+          top: CHECK.cy - CHECK.size / 2,
+          width: CHECK.size,
+          height: CHECK.size,
+        }}
+        initial={{ opacity: 0, scale: 0.5 }}
+        animate={{ opacity: done ? 1 : 0, scale: done ? 1 : 0.5 }}
+        transition={
+          done
+            ? { type: "spring", stiffness: 520, damping: 24, delay: 0.14 }
+            : { duration: 0.2 }
+        }
+      >
+        <Image
+          src="/assets/thinking/passport/check.svg"
+          alt=""
+          width={CHECK.size}
+          height={CHECK.size}
+          style={{ width: CHECK.size, height: CHECK.size }}
+        />
+      </motion.div>
+    </motion.div>
+  );
+}
+
+/* Same walk as useSequence, over whichever delay table a stage passes in. */
+function useSequenceWith(delays: readonly number[]) {
+  const [step, setStep] = useState(0);
+
+  useEffect(() => {
+    if (step >= delays.length) return;
+    const t = window.setTimeout(() => setStep(step + 1), delays[step]);
+    return () => window.clearTimeout(t);
+  }, [step, delays]);
+
+  return step;
+}
+
+/* Rolls the subline through the check names while scanning is live, looping
+ * back to the count when it reaches the end — unlike the sub-agent ticker,
+ * these checks repeat for every card. */
+function usePassportCheckTicker(active: boolean) {
+  const [i, setI] = useState(0);
+
+  useEffect(() => {
+    if (!active) return;
+    const t = window.setTimeout(
+      () => setI((n) => (n + 1) % PASSPORT_CHECKS.length),
+      850,
+    );
+    return () => window.clearTimeout(t);
+  }, [active, i]);
+
+  return active ? i : 0;
 }
