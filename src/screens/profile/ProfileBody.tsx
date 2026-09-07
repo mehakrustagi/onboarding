@@ -3,6 +3,7 @@
 import Image from "next/image";
 import { motion } from "framer-motion";
 import PlanetCluster from "./PlanetCluster";
+import ActivatePill from "./ActivatePill";
 
 /* Everything below the pedestal — Figma node 853:16315.
  *
@@ -170,7 +171,16 @@ const AGENTS = [
   },
 ] as const;
 
-export default function ProfileBody({ show }: { show: boolean }) {
+export default function ProfileBody({
+  show,
+  onViewBenefits,
+}: {
+  show: boolean;
+  /* The benefits sheet has to cover the whole phone, and this block sits
+     in an offset container 614px down — so the sheet is owned by
+     ProfileScreen and this only asks for it. */
+  onViewBenefits: () => void;
+}) {
   /* Triggered rather than time-delayed: the body waits for the card's
      scan lap to close, so the sequence reads as cause and effect — the
      card finishes checking itself, and its contents are what appears.
@@ -250,10 +260,21 @@ export default function ProfileBody({ show }: { show: boolean }) {
         </div>
       </Reveal>
 
-      {/* Benefit card */}
+      {/* Benefit card — opens the same sheet as the CTA below it. The
+          card IS a benefit, so tapping it is the natural way in; making
+          only the CTA work would leave the more obvious target dead. */}
       <Reveal delay={t(2)} show={show}>
         <div
-          className="relative mx-auto mt-[24px] overflow-hidden"
+          role="button"
+          tabIndex={0}
+          onClick={onViewBenefits}
+          onKeyDown={(e) => {
+            if (e.key === "Enter" || e.key === " ") {
+              e.preventDefault();
+              onViewBenefits();
+            }
+          }}
+          className="relative mx-auto mt-[24px] cursor-pointer overflow-hidden"
           style={{ width: 380, height: 130, ...CARD_SHELL }}
         >
           <p
@@ -283,7 +304,11 @@ export default function ProfileBody({ show }: { show: boolean }) {
           >
             Book flights in the app and get a flat 5% back in Atlys credits.
           </p>
-          <ActivatePill left={26} top={90} />
+          {/* stopPropagation: activating a benefit is a different action
+              from browsing them, so the pill must not open the sheet. */}
+          <div onClick={(e) => e.stopPropagation()}>
+            <ActivatePill left={26} top={90} bolt={false} />
+          </div>
 
           {/* Plane, cropped by the card's right edge. */}
           <div
@@ -312,6 +337,7 @@ export default function ProfileBody({ show }: { show: boolean }) {
         <div className="mt-[22px] flex justify-center">
           <button
             type="button"
+            onClick={onViewBenefits}
             className="font-semibold"
             style={{
               padding: "11px 20px",
@@ -415,27 +441,6 @@ function Reveal({
   );
 }
 
-function ActivatePill({ left, top }: { left: number; top: number }) {
-  return (
-    <button
-      type="button"
-      className="absolute flex items-center gap-[4px] font-bold uppercase text-white"
-      style={{
-        left,
-        top,
-        padding: "7px 12px",
-        borderRadius: 999,
-        background: "#2b2b2e",
-        fontSize: 11,
-        lineHeight: "14px",
-        letterSpacing: "0.88px",
-      }}
-    >
-      Activate
-    </button>
-  );
-}
-
 function AgentCard({
   agent,
   index,
@@ -514,7 +519,7 @@ function AgentCard({
         {agent.desc}
       </p>
 
-      <ActivatePill left={18} top={128} />
+      <ActivatePill left={18} top={128} index={index} />
     </div>
   );
 }

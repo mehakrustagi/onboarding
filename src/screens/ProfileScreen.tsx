@@ -4,6 +4,7 @@ import Image from "next/image";
 import { motion, useMotionValue, useSpring, useTransform } from "framer-motion";
 import { useEffect, useRef, useState } from "react";
 import ProfileBody from "./profile/ProfileBody";
+import BenefitsSheet from "./profile/BenefitsSheet";
 
 /* Profile — Figma node 853:15690 (Dump_work).
  *
@@ -64,6 +65,11 @@ export default function ProfileScreen() {
      card looks like part of the card, not like something switching on. */
   const [lit, setLit] = useState(false);
   const [bodyIn, setBodyIn] = useState(false);
+  /* Benefits opens OVER this screen rather than replacing it — the design
+     keeps the WorldPass cards visible behind its scrim. So it's a sibling
+     of the stage, and closing it simply unmounts: the profile underneath
+     was never torn down, so it returns exactly as it was. */
+  const [benefitsOpen, setBenefitsOpen] = useState(false);
   useEffect(() => {
     const t = window.setTimeout(() => setLit(true), GREEN_DELAY_MS);
     return () => window.clearTimeout(t);
@@ -86,13 +92,20 @@ export default function ProfileScreen() {
   }, [lit]);
 
   return (
+    // The phone is a plain frame. Scrolling lives on an inner layer so the
+    // benefits sheet can sit OVER it as a sibling — a sheet inside the
+    // scroller gets carried by the scroll, which is why the sticky version
+    // of this didn't hold position.
     <div
-      // Scrolls: the design runs 1781px against a 965px viewport. The
-      // card stage stays put and the content below it moves, which is the
-      // behaviour the design implies rather than a shrunken full-page fit.
-      className="relative h-[965px] w-[440px] select-none overflow-y-auto overflow-x-hidden rounded-[44px] shadow-[0_40px_80px_-20px_rgba(0,0,0,0.5)] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
+      className="relative h-[965px] w-[440px] select-none overflow-hidden rounded-[44px] shadow-[0_40px_80px_-20px_rgba(0,0,0,0.5)]"
       style={{ background: "#ffffff" }}
     >
+      <div
+        // Scrolls: the design runs 1781px against a 965px viewport. The
+        // card stage stays put and the content below it moves, which is
+        // the behaviour the design implies rather than a shrunken fit.
+        className="absolute inset-0 overflow-y-auto overflow-x-hidden [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
+      >
       {/* Status bar — the design uses the iOS component; this is the
           9:41 / signal / wifi / battery row it renders as. */}
       <div
@@ -223,11 +236,23 @@ export default function ProfileScreen() {
       />
 
       {/* Everything below the pedestal (853:16315) — see ProfileBody. */}
-      <ProfileBody show={bodyIn} />
+      <ProfileBody
+        show={bodyIn}
+        onViewBenefits={() => setBenefitsOpen(true)}
+      />
 
       {/* Gives the scroll container the design's full height, so the
           absolutely-positioned body has room to scroll into. */}
-      <div style={{ height: 1781 }} />
+        <div style={{ height: 1781 }} />
+      </div>
+
+      {/* All benefits (853:22811). A sibling of the scroller, not a child,
+          so it covers the whole phone and holds still while its own list
+          scrolls inside it. */}
+      <BenefitsSheet
+        open={benefitsOpen}
+        onClose={() => setBenefitsOpen(false)}
+      />
     </div>
   );
 }
