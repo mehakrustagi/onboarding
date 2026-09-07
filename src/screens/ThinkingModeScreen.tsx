@@ -1579,18 +1579,26 @@ const ART = { left: 3.94, top: 7.5, w: 32.117, h: 25 };
  * stroke-dash instead of dropped in as flat images. */
 const LINKS = [
   {
-    /* chip 1 → folder */
+    /* Top chip → folder: leaves the chip level, bends DOWN, and runs into
+       the folder below. Figma stores the path rising left-to-right and
+       then mirrors the instance (-scale-y-100 + rotate-180, which composes
+       to a horizontal flip) — so the flip has to be applied here too, or
+       the line climbs to the top of the folder instead of dropping into
+       it. */
     top: 302.57,
     w: 20,
     h: 12.0927,
     d: "M0 11.7927H5.25366C8.42728 11.7927 11 9.21995 11 6.04634C11 2.87272 13.5727 0.3 16.7463 0.3H20",
+    flipX: true,
   },
   {
-    /* chip 2 → folder */
+    /* Bottom chip → folder: leaves level, bends UP into the folder above.
+       Drawn as stored, no transform on this one. */
     top: 319.29,
     w: 20,
     h: 13.2372,
     d: "M0 12.9372H2.6814C6.17106 12.9372 9 10.1083 9 6.6186C9 3.12894 11.8289 0.3 15.3186 0.3H20",
+    flipX: false,
   },
 ] as const;
 
@@ -1771,6 +1779,14 @@ function FetchingDocsStage() {
               ))}
             </linearGradient>
           </defs>
+          {/* The flip lives on a group, not on the <svg>, so the stroke
+              gradient stays in screen space and both links run their
+              colour the same way. */}
+          <g
+            transform={
+              link.flipX ? `translate(${link.w},0) scale(-1,1)` : undefined
+            }
+          >
           <motion.path
             d={link.d}
             stroke={done ? LINK_GREEN : `url(#link-grad-${i})`}
@@ -1797,6 +1813,7 @@ function FetchingDocsStage() {
               delay: step >= FETCH_LOADING_STEP ? i * 0.12 : 0,
             }}
           />
+          </g>
         </svg>
       ))}
 
