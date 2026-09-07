@@ -1,0 +1,10 @@
+<svg preserveAspectRatio="none" overflow="visible" style="display: block;" width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+<g id="eraser_size_1">
+<mask id="mask0_0_47" style="mask-type:alpha" maskUnits="userSpaceOnUse" x="0" y="0" width="24" height="24">
+<rect id="Bounding box" width="24" height="24" fill="#D9D9D9"/>
+</mask>
+<g mask="url(#mask0_0_47)">
+<path id="eraser_size_1_2" d="M7 19C6.45 19 5.97917 18.8042 5.5875 18.4125C5.19583 18.0208 5 17.55 5 17C5 16.75 5.05 16.5042 5.15 16.2625C5.25 16.0208 5.4 15.8 5.6 15.6L15.6 5.6C15.8 5.4 16.0208 5.25 16.2625 5.15C16.5042 5.05 16.75 5 17 5C17.55 5 18.0208 5.19583 18.4125 5.5875C18.8042 5.97917 19 6.45 19 7C19 7.25 18.9542 7.5 18.8625 7.75C18.7708 8 18.625 8.225 18.425 8.425L8.425 18.425C8.225 18.625 8.00417 18.7708 7.7625 18.8625C7.52083 18.9542 7.26667 19 7 19Z" fill="#1C1B1F"/>
+</g>
+</g>
+</svg>
