@@ -915,8 +915,13 @@ const CARD_IMG_X = -(CARD_IMG_W - CARD_W) / 2;
 const CARD_IMG_Y = -(CARD_IMG_H - CARD_H) / 2;
 /* The printed face — what the scan line travels across. */
 const PRINT = { left: 11.12, top: 13.59, w: 104.245, h: 71.662 };
-/* Variant10's dim plate and its check, in node coordinates. */
-const DIM = { left: -1.23, top: 1.28, w: 128.497, h: 95.137, radius: 9.884 };
+/* Variant10's dim plate, in node coordinates. Figma's own numbers for it
+ * are a 128.497×95.137 box hung at a negative offset — but it sits INSIDE
+ * the white card, which is overflow-clip, so what actually renders is that
+ * plate cut back to the card. Written here as the card's own rect, which
+ * is the clipped result: a plate that covers the passport and nothing
+ * else. Given as a free-floating box it bleeds out past the card edges. */
+const DIM = { left: 3.71, top: 4.94, w: 119.849, h: 88.96, radius: 12.356 };
 const CHECK = { size: 24.711, cx: 63.63, cy: 49.42 };
 /* Figma's scan line colour (Line 234). */
 const SCAN_GREEN = "#08da0f";
