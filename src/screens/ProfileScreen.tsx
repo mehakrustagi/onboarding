@@ -9,6 +9,7 @@ import CardBack from "./profile/CardBack";
 import VerifyGate from "./profile/VerifyGate";
 import ConnectScan from "./profile/ConnectScan";
 import ProgramsConnected from "./profile/ProgramsConnected";
+import SettingsSheet from "./profile/SettingsSheet";
 
 /* Profile — Figma node 853:15690 (Dump_work).
  *
@@ -81,6 +82,7 @@ export default function ProfileScreen() {
      handover — the scan recedes in z while the programs screen comes
      forward, so one has to still be on screen as the other arrives. */
   const [programsOpen, setProgramsOpen] = useState(false);
+  const [settingsOpen, setSettingsOpen] = useState(false);
   useEffect(() => {
     const t = window.setTimeout(() => setLit(true), GREEN_DELAY_MS);
     return () => window.clearTimeout(t);
@@ -139,6 +141,7 @@ export default function ProfileScreen() {
         x={360}
         icon="/assets/profile/settings.svg"
         label="Settings"
+        onClick={() => setSettingsOpen(true)}
       />
 
       {/* Card carousel. The second card is deliberately cut off by the
@@ -275,6 +278,12 @@ export default function ProfileScreen() {
           its glow stay ready to switch on. */}
       <VerifyGate open={false} onClose={() => {}} />
 
+      {/* Settings (853:18801) — a sheet over the profile, from the gear. */}
+      <SettingsSheet
+        open={settingsOpen}
+        onClose={() => setSettingsOpen(false)}
+      />
+
       {/* Connect scan (853:17974) — what the card's "+" opens. */}
       <ConnectScan
         open={scanOpen}
@@ -301,15 +310,18 @@ function IconButton({
   x,
   icon,
   label,
+  onClick,
 }: {
   x: number;
   icon: string;
   label: string;
+  onClick?: () => void;
 }) {
   return (
     <motion.button
       type="button"
       aria-label={label}
+      onClick={onClick}
       className="absolute flex items-center justify-center"
       style={{
         left: x,
