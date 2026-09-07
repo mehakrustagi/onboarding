@@ -1613,6 +1613,18 @@ const DOCS = [
   { rotate: -23.95, cx: 17.04, cy: 10.84, delay: 0.12 },
 ] as const;
 
+/* Border stroke maths. Half the stroke width in from the edge so the line
+ * sits fully inside the tile, and the perimeter of that rounded rect —
+ * straight runs plus one full circle of corner arc — is the dash cycle the
+ * travelling segment walks around. */
+const BORDER_INSET = 0.6;
+const BORDER_PERIMETER =
+  4 * (FOLDER_SIZE - BORDER_INSET * 2 - 2 * (10 - BORDER_INSET)) +
+  2 * Math.PI * (10 - BORDER_INSET);
+/* How much of the edge is lit at once — about a quarter, so it reads as a
+ * run of light rather than a dot doing laps. */
+const BORDER_ARC = BORDER_PERIMETER * 0.26;
+
 /* Success green — the design's border-input-success / link gradient hue. */
 const LINK_GREEN = "#10b981";
 
@@ -1833,18 +1845,83 @@ function FetchingDocsStage() {
           </div>
         </div>
 
-        {/* The border. While the fetch is live a lit arc travels around the
-            edge; when it lands the whole edge settles to green. */}
-        {loading ? (
-          <div className="travel-border absolute inset-0 rounded-[10px]" />
-        ) : null}
-        <motion.div
-          className="absolute inset-0 rounded-[10px]"
-          style={{ border: `1px solid ${LINK_GREEN}` }}
-          initial={{ opacity: 0 }}
-          animate={{ opacity: done ? 1 : 0 }}
-          transition={{ duration: 0.42, ease: IN_EASE }}
-        />
+        {/* The border, and ONLY the border. A lit arc runs around the edge
+            while the fetch is live, then the whole edge settles to green.
+            Drawn as a stroked rounded rect with a dash gap: one lit
+            segment, its offset walked around the perimeter. The earlier
+            attempt was a conic gradient with the middle masked out, which
+            is how the gradient ended up flooding the whole tile —
+            `mask-image` doesn't accept a `content-box` keyword (that
+            belongs to the `mask` shorthand), so the declaration was
+            dropped and the ring rendered as a filled box. A stroke can't
+            fail that way: there is no fill to leak. */}
+        <svg
+          className="absolute inset-0"
+          width={FOLDER_SIZE}
+          height={FOLDER_SIZE}
+          viewBox={`0 0 ${FOLDER_SIZE} ${FOLDER_SIZE}`}
+          fill="none"
+        >
+          <defs>
+            <linearGradient
+              id="folder-border-grad"
+              x1="0"
+              y1="0"
+              x2={FOLDER_SIZE}
+              y2={FOLDER_SIZE}
+              gradientUnits="userSpaceOnUse"
+            >
+              <stop stopColor="#5057ea" />
+              <stop offset="0.45" stopColor="#ef4646" />
+              <stop offset="1" stopColor="#edd758" />
+            </linearGradient>
+          </defs>
+
+          {/* Travelling arc while loading. */}
+          <motion.rect
+            x={BORDER_INSET}
+            y={BORDER_INSET}
+            width={FOLDER_SIZE - BORDER_INSET * 2}
+            height={FOLDER_SIZE - BORDER_INSET * 2}
+            rx={10 - BORDER_INSET}
+            stroke="url(#folder-border-grad)"
+            strokeWidth={1.2}
+            strokeLinecap="round"
+            strokeDasharray={`${BORDER_ARC} ${BORDER_PERIMETER - BORDER_ARC}`}
+            initial={{ strokeDashoffset: 0, opacity: 0 }}
+            animate={
+              loading
+                ? { strokeDashoffset: -BORDER_PERIMETER, opacity: 1 }
+                : { strokeDashoffset: 0, opacity: 0 }
+            }
+            transition={
+              loading
+                ? {
+                    strokeDashoffset: {
+                      duration: 1.4,
+                      ease: "linear",
+                      repeat: Infinity,
+                    },
+                    opacity: { duration: 0.3 },
+                  }
+                : { duration: 0.3 }
+            }
+          />
+
+          {/* Settled green edge once it lands. */}
+          <motion.rect
+            x={BORDER_INSET}
+            y={BORDER_INSET}
+            width={FOLDER_SIZE - BORDER_INSET * 2}
+            height={FOLDER_SIZE - BORDER_INSET * 2}
+            rx={10 - BORDER_INSET}
+            stroke={LINK_GREEN}
+            strokeWidth={1.2}
+            initial={{ opacity: 0 }}
+            animate={{ opacity: done ? 1 : 0 }}
+            transition={{ duration: 0.42, ease: IN_EASE }}
+          />
+        </svg>
       </motion.div>
     </>
   );
