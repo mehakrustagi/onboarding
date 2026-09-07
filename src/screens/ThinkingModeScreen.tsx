@@ -880,23 +880,16 @@ const PASSPORT_STEP_DELAYS = [
   300, // 1  orb
   600, // 2  "Scanning passport"
   500, // 3  subline
-  350, // 4  card 1 arrives and starts scanning
-  1700, // 5  card 1 done
-  450, // 6  card 2 arrives, scanning
-  1700, // 7  card 2 done
-  450, // 8  card 3 arrives, row slides left
-  1700, // 9  card 3 done
+  400, // 4  the whole row lands; the front card is being read
+  1600, // 5  front card leaves, the next slides up
+  1600, // 6  and the next
+  1600, // 7  last one read
 ] as const;
 
-/* Each card's (arrive, done) step pair. */
-const PASSPORT_CARDS = [
-  { arrive: 4, done: 5 },
-  { arrive: 6, done: 7 },
-  { arrive: 8, done: 9 },
-] as const;
-
-/* Step at which the row has run out of room and slides one slot left. */
-const ROW_SLIDE_STEP = 8;
+/* Step at which the row is on screen. Card i is the one being read at
+ * step ROW_STEP + i, so the step counter doubles as the read head. */
+const PASSPORT_ROW_STEP = 4;
+const PASSPORT_COUNT = 3;
 
 const PASSPORT_CHECKS = [
   "Running 10 checks",
@@ -909,7 +902,14 @@ const PASSPORT_CHECKS = [
 /* Card geometry, all in the node's own coordinates. */
 const CARD_W = 128.491;
 const CARD_H = 101;
-const CARD_PITCH = 137.491;
+/* Figma parks the cards 137.491 apart, which is the card plus a gap — that
+ * spacing is for a static frame showing the whole queue. Running it as a
+ * conveyor they overlap instead: each card tucks behind the one in front,
+ * so the row reads as a stack being worked through rather than a list, and
+ * three of them fit in the clip with the front one fully visible. */
+const CARD_PITCH = CARD_W * 0.78;
+/* How far a finished card travels as it leaves. Enough to clear the clip. */
+const CARD_EXIT_X = -(CARD_W + 60);
 /* The export box and where it has to sit so the card lands on the node box. */
 const CARD_IMG_W = 159;
 const CARD_IMG_H = 130;
@@ -933,10 +933,14 @@ const SWEEP_S = 0.85;
 
 function ScanningPassportStage() {
   const step = useSequenceWith(PASSPORT_STEP_DELAYS);
-  const working = step < 9;
+  const rowIn = step >= PASSPORT_ROW_STEP;
+  /* Which card the read head is on. Runs off the end once the last one is
+     done, which is what stops the sweep and settles the title. */
+  const reading = rowIn ? step - PASSPORT_ROW_STEP : -1;
+  const working = reading >= 0 && reading < PASSPORT_COUNT;
   /* The subline ticks through the checks for as long as anything is being
      scanned, then settles back on the count. */
-  const checkIndex = usePassportCheckTicker(step >= 4 && working);
+  const checkIndex = usePassportCheckTicker(working);
 
   return (
     <>
@@ -980,59 +984,79 @@ function ScanningPassportStage() {
         />
       </motion.div>
 
-      {/* The card row. Clipped to Figma's 307, with vertical slack so the
-          cards' drop shadows aren't sliced off at the top and bottom. */}
+      {/* The card row — a conveyor. Every card lands together and then the
+          read head works along them: the one being read sits at the front
+          slot, and once it's done it slides off the left edge while the
+          rest shift up one slot. Clipped to Figma's 307, with vertical
+          slack so the cards' drop shadows aren't sliced off. */}
       <div
         className="pointer-events-none absolute overflow-hidden"
         style={{ left: 62, top: 272 - 16, width: 307, height: CARD_H + 32 }}
       >
-        <motion.div
-          className="absolute left-0 top-0"
-          style={{ height: CARD_H + 32 }}
-          animate={{ x: step >= ROW_SLIDE_STEP ? -CARD_PITCH : 0 }}
-          transition={{ duration: 0.62, ease: IN_EASE }}
-        >
-          {PASSPORT_CARDS.map((card, i) => (
-            <PassportCard
-              key={i}
-              x={i * CARD_PITCH}
-              y={16}
-              visible={step >= card.arrive}
-              scanning={step >= card.arrive && step < card.done}
-              done={step >= card.done}
-            />
-          ))}
-        </motion.div>
+        {Array.from({ length: PASSPORT_COUNT }, (_, i) => (
+          <PassportCard
+            key={i}
+            y={16}
+            /* Slot 0 is the read position; cards queue to its right and a
+               finished card drops to a negative slot and leaves. */
+            slot={i - Math.max(0, reading)}
+            visible={rowIn}
+            delay={i * 0.08}
+            scanning={reading === i}
+            done={reading > i}
+          />
+        ))}
       </div>
     </>
   );
 }
 
 function PassportCard({
-  x,
+  slot,
   y,
   visible,
+  delay,
   scanning,
   done,
 }: {
-  x: number;
+  /* 0 is the read position, 1+ queue to the right, negative = gone. */
+  slot: number;
   y: number;
   visible: boolean;
+  delay: number;
   scanning: boolean;
   done: boolean;
 }) {
+  const gone = slot < 0;
   return (
     <motion.div
       className="absolute"
-      style={{ left: x, top: y, width: CARD_W, height: CARD_H }}
-      initial={{ opacity: 0, y: 10, scale: 0.96, filter: "blur(6px)" }}
+      style={{
+        top: y,
+        width: CARD_W,
+        height: CARD_H,
+        /* Front card on top, the queue stacking behind it to the right. */
+        zIndex: 50 - Math.max(0, slot),
+      }}
+      initial={{
+        x: Math.max(0, slot) * CARD_PITCH,
+        opacity: 0,
+        y: 10,
+        scale: 0.96,
+        filter: "blur(6px)",
+      }}
       animate={{
-        opacity: visible ? 1 : 0,
+        x: gone ? CARD_EXIT_X : slot * CARD_PITCH,
+        opacity: !visible ? 0 : gone ? 0 : 1,
         y: visible ? 0 : 10,
         scale: visible ? 1 : 0.96,
-        filter: visible ? "blur(0px)" : "blur(6px)",
+        filter: visible && !gone ? "blur(0px)" : "blur(6px)",
       }}
-      transition={{ duration: 0.52, ease: IN_EASE }}
+      transition={{
+        duration: gone ? 0.66 : 0.52,
+        ease: IN_EASE,
+        delay: visible && !gone ? delay : 0,
+      }}
     >
       <Image
         src="/assets/thinking/passport/card.png"
@@ -1223,7 +1247,11 @@ const PHOTO_CHECKS = [
 
 const PHOTO_W = 77.962;
 const PHOTO_H = 80;
-const PHOTO_PITCH = 89.962;
+/* As with the passports: Figma's 89.962 spacing is card-plus-gap for a
+ * static frame. On the conveyor they overlap, each tucking behind the one
+ * in front. */
+const PHOTO_PITCH = PHOTO_W * 0.8;
+const PHOTO_EXIT_X = -(PHOTO_W + 70);
 const PHOTO_ROW_X = 57;
 const PHOTO_ROW_Y = 281;
 
@@ -1300,14 +1328,17 @@ function ScanningPhotosStage() {
         />
       </motion.div>
 
+      {/* Conveyor, same as the passports: the row lands together, the read
+          head works along it, and a finished photo slides off the left
+          edge while the rest shift up one slot. */}
       {PORTRAITS.map((src, i) => (
         <PhotoCard
           key={src}
           src={src}
-          x={PHOTO_ROW_X + i * PHOTO_PITCH}
+          slot={i - Math.max(0, reading)}
           visible={rowIn}
-          /* The cards land left to right rather than together — a row that
-             appears all at once reads as a static image. */
+          /* The cards land left to right rather than all at once — a row
+             that arrives together reads as a static image. */
           delay={i * 0.09}
           scanning={reading === i}
         />
@@ -1318,29 +1349,48 @@ function ScanningPhotosStage() {
 
 function PhotoCard({
   src,
-  x,
+  slot,
   visible,
   delay,
   scanning,
 }: {
   src: string;
-  x: number;
+  /* 0 is the read position, 1+ queue to the right, negative = gone. */
+  slot: number;
   visible: boolean;
   delay: number;
   scanning: boolean;
 }) {
+  const gone = slot < 0;
   return (
     <motion.div
       className="pointer-events-none absolute"
-      style={{ left: x, top: PHOTO_ROW_Y, width: PHOTO_W, height: PHOTO_H }}
-      initial={{ opacity: 0, y: 10, scale: 0.94, filter: "blur(6px)" }}
+      style={{
+        left: PHOTO_ROW_X,
+        top: PHOTO_ROW_Y,
+        width: PHOTO_W,
+        height: PHOTO_H,
+        zIndex: 50 - Math.max(0, slot),
+      }}
+      initial={{
+        x: Math.max(0, slot) * PHOTO_PITCH,
+        opacity: 0,
+        y: 10,
+        scale: 0.94,
+        filter: "blur(6px)",
+      }}
       animate={{
-        opacity: visible ? 1 : 0,
+        x: gone ? PHOTO_EXIT_X : slot * PHOTO_PITCH,
+        opacity: !visible ? 0 : gone ? 0 : 1,
         y: visible ? 0 : 10,
         scale: visible ? 1 : 0.94,
-        filter: visible ? "blur(0px)" : "blur(6px)",
+        filter: visible && !gone ? "blur(0px)" : "blur(6px)",
       }}
-      transition={{ duration: 0.5, ease: IN_EASE, delay: visible ? delay : 0 }}
+      transition={{
+        duration: gone ? 0.6 : 0.5,
+        ease: IN_EASE,
+        delay: visible && !gone ? delay : 0,
+      }}
     >
       {/* The kicked shadow card behind the carrier. */}
       <div
