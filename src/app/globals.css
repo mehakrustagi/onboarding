@@ -349,3 +349,65 @@ body {
     background-position: -50% 0, -28% 0, 0 0;
   }
 }
+
+/* Screen-edge rim light — the BORDER GLOW idea from Figma 852:8807, where
+ * the colour lives in four blurred bands along the frame's edges rather
+ * than as a wash across the middle.
+ *
+ * Built as a rounded gradient ring: the brand hues are painted as a conic
+ * gradient and everything but a band along the edge is masked out, then
+ * blurred so the band blooms inward. The ring itself never moves — only
+ * the conic gradient's start angle does, which walks the colour around the
+ * perimeter. That's what makes it read as light travelling along the edge
+ * instead of a shape sliding around behind the screen.
+ *
+ * --rim-angle has to be @property-registered: a plain custom property is
+ * an untyped string and animating it would snap between values instead of
+ * interpolating. */
+@property --rim-angle {
+  syntax: "<angle>";
+  inherits: false;
+  initial-value: 0deg;
+}
+
+.screen-rim {
+  /* Band thickness — Figma's glow vectors are 42px-wide bands. */
+  padding: 42px;
+  background: conic-gradient(
+    from var(--rim-angle),
+    #ffffff 0%,
+    var(--color-blue-500) 25%,
+    #ef4646 46%,
+    var(--color-soft-gold-500) 68%,
+    #ffffff 100%
+  );
+  /* Keep the fill only where the padding is — i.e. a ring hugging the
+     rounded edge — by masking the content box out of the border box. */
+  -webkit-mask-image:
+    linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
+  mask-image: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
+  -webkit-mask-composite: xor;
+  mask-composite: exclude;
+  filter: blur(26px);
+  animation:
+    rim-travel 14s linear infinite,
+    rim-breathe 6s ease-in-out infinite;
+}
+
+@keyframes rim-travel {
+  to {
+    --rim-angle: 360deg;
+  }
+}
+
+/* Figma flickers the glow bands between 0.1 and 0.2 opacity. Same idea,
+   slower and wider, so the edge reads as breathing rather than buzzing. */
+@keyframes rim-breathe {
+  0%,
+  100% {
+    opacity: 0.5;
+  }
+  50% {
+    opacity: 0.72;
+  }
+}

@@ -32,11 +32,11 @@ import { useEffect, useState } from "react";
  *   composer          bottom bar 108 tall, input 56 r30
  *
  * Figma's own motion data (get_motion_context on 852:8749) covers exactly
- * one thing — the background aura: a 10s linear loop that shrinks the
- * 1200px blurred gradient ring to 679px while drifting it, plus a flicker
- * track on the BORDER GLOW vectors. That glow group sits at opacity 0 in
- * this frame, so only the drift is implemented. Everything else — how the
- * orb, the lines and the sub-agents arrive — is sequenced here.
+ * one thing — the background: a 10s loop drifting the blurred gradient
+ * ring, plus a flicker track on the BORDER GLOW bands. The colour here is
+ * the edge glow only, held stationary with the gradient travelling through
+ * it; see Background below. Everything else — how the orb, the lines and
+ * the sub-agents arrive — is sequenced in this file.
  */
 
 const IN_EASE = [0.22, 1, 0.36, 1] as const;
@@ -196,48 +196,27 @@ function useSequence() {
 }
 
 /* ---------------------------------------------------------------------------
- * Background — Backgrounds/Default (852:7671). A white frame with a single
- * 1200px circle behind it, stroked 150px wide on the brand gradient
- * (white → #5057EA → #EF4646 → #EDD758 → white) and blurred hard. None of
- * the ring reads as a ring; what lands on screen is the peach corner and
- * the lilac bottom edge. Figma animates it on a 10s linear loop, shrinking
- * 1200 → 1069 → 679 while drifting x/y — kept verbatim, because at this
- * blur radius the size change is the only thing that reads, and it reads as
- * the light breathing.
+ * Background — the colour lives on the screen's EDGES, not across it.
+ *
+ * Figma builds this twice over: a 1200px circle stroked 150px wide on the
+ * brand gradient and blurred into a corner wash (852:7673), and on top of
+ * it a BORDER GLOW group (852:8807) of four blurred bands running along
+ * the frame's edges. This takes the second idea and drops the wash: the
+ * middle of the screen stays white, and the brand hues sit as a rim light
+ * hugging the rounded edge.
+ *
+ * The rim is a rounded gradient ring — brand hues painted as a conic
+ * gradient, everything but a 42px band along the edge masked away, then
+ * blurred so the band blooms inward (.screen-rim). It's stationary: only
+ * the conic gradient's start angle animates, which walks the colour around
+ * the perimeter without the shape itself moving anywhere. Figma's own
+ * flicker track on those bands (opacity 0.1 ↔ 0.2 across a 10s loop)
+ * becomes the slower, wider breathe on the same class.
  * -------------------------------------------------------------------------*/
 function Background() {
   return (
     <div className="pointer-events-none absolute inset-0 overflow-hidden rounded-[40px]">
-      <motion.div
-        className="absolute"
-        style={{ left: -404, top: -174, opacity: 0.4 }}
-        initial={{ width: 1200, height: 1200, x: 0, y: 0 }}
-        animate={{
-          width: [1200, 1069, 679],
-          height: [1200, 1069, 679],
-          x: [0, 109, -69],
-          y: [0, 115, -61],
-        }}
-        transition={{
-          duration: 10,
-          times: [0, 0.4978, 1],
-          ease: "linear",
-          repeat: Infinity,
-        }}
-      >
-        {/* The svg carries its own blur filter, which needs the extra
-            16.67% of bleed on every side to render uncropped. */}
-        <div className="absolute inset-[-16.67%]">
-          <Image
-            src="/assets/thinking/bg-ellipse.svg"
-            alt=""
-            fill
-            sizes="1600px"
-            style={{ objectFit: "fill" }}
-            priority
-          />
-        </div>
-      </motion.div>
+      <div className="screen-rim absolute inset-0 rounded-[40px]" />
     </div>
   );
 }
