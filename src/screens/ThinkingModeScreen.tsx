@@ -1584,10 +1584,6 @@ const LINKS = [
     w: 20,
     h: 12.0927,
     d: "M0 11.7927H5.25366C8.42728 11.7927 11 9.21995 11 6.04634C11 2.87272 13.5727 0.3 16.7463 0.3H20",
-    /* the design fades the stroke out toward the folder on the top link
-       and toward the chip on the bottom one */
-    from: "#10b981",
-    to: "#ffffff",
   },
   {
     /* chip 2 → folder */
@@ -1595,8 +1591,6 @@ const LINKS = [
     w: 20,
     h: 13.2372,
     d: "M0 12.9372H2.6814C6.17106 12.9372 9 10.1083 9 6.6186C9 3.12894 11.8289 0.3 15.3186 0.3H20",
-    from: "#ffffff",
-    to: "#10b981",
   },
 ] as const;
 
@@ -1624,6 +1618,17 @@ const BORDER_PERIMETER =
 /* How much of the edge is lit at once — about a quarter, so it reads as a
  * run of light rather than a dot doing laps. */
 const BORDER_ARC = BORDER_PERIMETER * 0.26;
+
+/* The connection's colour, used by the links and the folder's edge alike.
+ * Figma strokes the links #10B981→white, which next to a brand-gradient
+ * border reads as two unrelated things; the connection is one thing, so
+ * both carry these stops while it is live and both go green when it
+ * lands. */
+const BRAND_STOPS = [
+  { offset: 0, color: "#5057ea" },
+  { offset: 0.45, color: "#ef4646" },
+  { offset: 1, color: "#edd758" },
+] as const;
 
 /* Success green — the design's border-input-success / link gradient hue. */
 const LINK_GREEN = "#10b981";
@@ -1734,15 +1739,29 @@ function FetchingDocsStage() {
           fill="none"
         >
           <defs>
-            <linearGradient id={`link-grad-${i}`} x1="0" x2={link.w} y1="0" y2="0" gradientUnits="userSpaceOnUse">
-              <stop stopColor={link.from} />
-              <stop offset="1" stopColor={link.to} />
+            <linearGradient
+              id={`link-grad-${i}`}
+              x1="0"
+              y1="0"
+              x2={link.w}
+              y2={link.h}
+              gradientUnits="userSpaceOnUse"
+            >
+              {BRAND_STOPS.map((stop) => (
+                <stop
+                  key={stop.offset}
+                  offset={stop.offset}
+                  stopColor={stop.color}
+                />
+              ))}
             </linearGradient>
           </defs>
           <motion.path
             d={link.d}
             stroke={done ? LINK_GREEN : `url(#link-grad-${i})`}
-            strokeWidth={0.6}
+            /* Figma's 0.6 hairline all but disappears once it is carrying
+               colour rather than a flat green, so it goes to 0.9. */
+            strokeWidth={0.9}
             /* One path length's worth of dash, offset a whole length, is a
                line that hasn't been drawn yet; walking the offset to zero
                draws it from the chip toward the folder. */
@@ -1871,9 +1890,13 @@ function FetchingDocsStage() {
               y2={FOLDER_SIZE}
               gradientUnits="userSpaceOnUse"
             >
-              <stop stopColor="#5057ea" />
-              <stop offset="0.45" stopColor="#ef4646" />
-              <stop offset="1" stopColor="#edd758" />
+              {BRAND_STOPS.map((stop) => (
+                <stop
+                  key={stop.offset}
+                  offset={stop.offset}
+                  stopColor={stop.color}
+                />
+              ))}
             </linearGradient>
           </defs>
 
