@@ -148,7 +148,7 @@ const STAGES = [
   { id: "pre-thinking", label: "Pre-thinking", built: true },
   { id: "scanning-passport", label: "Scanning passport", built: true },
   { id: "fetching-docs", label: "Fetching docs", built: false },
-  { id: "scanning-photos", label: "Scanning photos", built: false },
+  { id: "scanning-photos", label: "Scanning photos", built: true },
   { id: "visa-requirement", label: "Visa requirement", built: false },
 ] as const;
 
@@ -206,8 +206,10 @@ export default function ThinkingModeScreen() {
 
         {stage === "pre-thinking" ? (
           <PreThinkingStage key={run} />
-        ) : (
+        ) : stage === "scanning-passport" ? (
           <ScanningPassportStage key={run} />
+        ) : (
+          <ScanningPhotosStage key={run} />
         )}
       </div>
       <p className="text-[12px] text-[#8b8b93]">tap the screen to replay</p>
@@ -1165,4 +1167,289 @@ function usePassportCheckTicker(active: boolean) {
   }, [active, i]);
 
   return active ? i : 0;
+}
+
+/* ===========================================================================
+ * Stage 3 — Scanning photos (section 852:13192).
+ *
+ * Same shape as the passport stage, different subject: the step line reads
+ * "Scanning your photos / Running 10 checks" and a row of passport-photo
+ * cards is read one after another. The board's 1 / 2 / 3+ frames show the
+ * row arriving and then all four cards sitting there with the scan line on
+ * one of them, so here all four arrive on a stagger and the line walks
+ * along them.
+ *
+ * Two things differ from the passport cards, both from the design:
+ *   · the scan line is HORIZONTAL and travels down the face (Line 234 sits
+ *     at 41.18% of the card's height, mid-face), where the passport's line
+ *     is vertical and travels across
+ *   · there is no dim-and-check finish — the design leaves the brackets on
+ *     and moves the line to the next card, so completion is carried by the
+ *     line having moved on rather than by a badge
+ *
+ * Geometry off photo-scan-w (852:13271), node box 77.962×80:
+ *   row              starts (57, 281), pitch 89.962 — the fourth card runs
+ *                    past the screen edge and is clipped by the shell, as
+ *                    Figma's 347.848-wide row is
+ *   shadow card      the carrier's rect again, kicked 6.16°
+ *   carrier          72.46×72.47 at (1.82, 3.86), r9.11, white
+ *   photo            63.771 square at (6.08, 12.14), 0.569 #d6d9dc border
+ *   brackets         6.66 square, one glyph rotated into each corner
+ * -------------------------------------------------------------------------*/
+
+const PHOTO_STEP_DELAYS = [
+  300, // 1  orb
+  600, // 2  "Scanning your photos"
+  500, // 3  subline
+  400, // 4  the row arrives, first card starts being read
+  1250, // 5  card 2
+  1250, // 6  card 3
+  1250, // 7  card 4
+  1250, // 8  done
+] as const;
+
+/* Step at which the row is on screen; each later step moves the line one
+ * card along, so card i is being read at step 4 + i. */
+const PHOTO_ROW_STEP = 4;
+const PHOTO_COUNT = 4;
+
+const PHOTO_CHECKS = [
+  "Running 10 checks",
+  "Face detection",
+  "Background check",
+  "Glare detection",
+  "Analysing data",
+] as const;
+
+const PHOTO_W = 77.962;
+const PHOTO_H = 80;
+const PHOTO_PITCH = 89.962;
+const PHOTO_ROW_X = 57;
+const PHOTO_ROW_Y = 281;
+
+/* Card internals, in the node's own coordinates. */
+const CARRIER = { left: 1.82, top: 3.86, w: 72.46, h: 72.47, radius: 9.11 };
+const FACE = { left: 6.08, top: 12.14, size: 63.771 };
+const BRACKET = 6.66;
+/* Carrier-relative bracket corners, from the design; +CARRIER to place. */
+const BRACKET_CORNERS = [
+  { left: 7.53, top: 8.29, rotate: -90 }, // top-left
+  { left: 59.46, top: 8.28, rotate: 0 }, // top-right
+  { left: 7.53, top: 60.18, rotate: 180 }, // bottom-left
+  { left: 59.46, top: 60.18, rotate: 90 }, // bottom-right
+] as const;
+
+const PORTRAITS = [
+  "/assets/thinking/photos/portrait-1.png",
+  "/assets/thinking/photos/portrait-2.png",
+  "/assets/thinking/photos/portrait-3.png",
+  "/assets/thinking/photos/portrait-4.png",
+] as const;
+
+/* One pass of the line down a face. */
+const PHOTO_SWEEP_S = 0.62;
+
+function ScanningPhotosStage() {
+  const step = useSequenceWith(PHOTO_STEP_DELAYS);
+  const rowIn = step >= PHOTO_ROW_STEP;
+  /* Which card the line is on. Runs off the end when the last one is read,
+     which is what stops the sweep everywhere. */
+  const reading = rowIn ? step - PHOTO_ROW_STEP : -1;
+  const working = reading >= 0 && reading < PHOTO_COUNT;
+  const checkIndex = usePassportCheckTicker(working);
+
+  return (
+    <>
+      <AgentOrb visible={step >= 1} top={225} />
+
+      <motion.div
+        className="absolute overflow-hidden"
+        style={{ left: 62, top: 224, width: 176, height: 16 }}
+        initial={{ opacity: 0, filter: "blur(8px)" }}
+        animate={{
+          opacity: step >= 2 ? 1 : 0,
+          filter: step >= 2 ? "blur(0px)" : "blur(8px)",
+        }}
+        transition={{ duration: 0.5, ease: IN_EASE }}
+      >
+        <p
+          className={
+            "whitespace-nowrap text-[12px] font-medium " +
+            (working ? "agent-title-shine" : "agent-title-static")
+          }
+          style={{ lineHeight: "16px", letterSpacing: "-0.24px" }}
+        >
+          Scanning your photos
+        </p>
+      </motion.div>
+
+      <motion.div
+        className="absolute"
+        style={{ left: 62, top: 244, width: 312.353 }}
+        initial={{ opacity: 0, filter: "blur(8px)" }}
+        animate={{
+          opacity: step >= 3 ? 1 : 0,
+          filter: step >= 3 ? "blur(0px)" : "blur(8px)",
+        }}
+        transition={{ duration: 0.5, ease: IN_EASE }}
+      >
+        <RollingLine
+          lines={PHOTO_CHECKS}
+          index={checkIndex}
+          className="text-[11px] text-[#666]"
+        />
+      </motion.div>
+
+      {PORTRAITS.map((src, i) => (
+        <PhotoCard
+          key={src}
+          src={src}
+          x={PHOTO_ROW_X + i * PHOTO_PITCH}
+          visible={rowIn}
+          /* The cards land left to right rather than together — a row that
+             appears all at once reads as a static image. */
+          delay={i * 0.09}
+          scanning={reading === i}
+        />
+      ))}
+    </>
+  );
+}
+
+function PhotoCard({
+  src,
+  x,
+  visible,
+  delay,
+  scanning,
+}: {
+  src: string;
+  x: number;
+  visible: boolean;
+  delay: number;
+  scanning: boolean;
+}) {
+  return (
+    <motion.div
+      className="pointer-events-none absolute"
+      style={{ left: x, top: PHOTO_ROW_Y, width: PHOTO_W, height: PHOTO_H }}
+      initial={{ opacity: 0, y: 10, scale: 0.94, filter: "blur(6px)" }}
+      animate={{
+        opacity: visible ? 1 : 0,
+        y: visible ? 0 : 10,
+        scale: visible ? 1 : 0.94,
+        filter: visible ? "blur(0px)" : "blur(6px)",
+      }}
+      transition={{ duration: 0.5, ease: IN_EASE, delay: visible ? delay : 0 }}
+    >
+      {/* The kicked shadow card behind the carrier. */}
+      <div
+        style={{
+          position: "absolute",
+          left: CARRIER.left,
+          top: CARRIER.top,
+          width: CARRIER.w,
+          height: CARRIER.h,
+          borderRadius: CARRIER.radius,
+          background: "#d8d8d8",
+          opacity: 0.77,
+          transform: "rotate(6.16deg)",
+          boxShadow:
+            "0 0 4.555px rgba(0,0,0,0.04), 0 9.11px 18.22px rgba(0,0,0,0.08)",
+        }}
+      />
+
+      {/* White carrier. */}
+      <div
+        style={{
+          position: "absolute",
+          left: CARRIER.left,
+          top: CARRIER.top,
+          width: CARRIER.w,
+          height: CARRIER.h,
+          borderRadius: CARRIER.radius,
+          background: "#ffffff",
+          boxShadow:
+            "0 0 2.278px rgba(0,0,0,0.04), 0 9.11px 9.11px rgba(0,0,0,0.08)",
+        }}
+      />
+
+      {/* The photo, and the scan pass over it. */}
+      <div
+        className="absolute overflow-hidden"
+        style={{
+          left: FACE.left,
+          top: FACE.top,
+          width: FACE.size,
+          height: FACE.size,
+          border: "0.569px solid #d6d9dc",
+        }}
+      >
+        <Image
+          src={src}
+          alt=""
+          width={FACE.size}
+          height={FACE.size}
+          style={{
+            position: "absolute",
+            inset: 0,
+            width: "100%",
+            height: "100%",
+            objectFit: "cover",
+          }}
+        />
+
+        {/* Horizontal line travelling down the face, trail above it. */}
+        <motion.div
+          className="absolute left-0"
+          style={{ width: "100%", height: 26, top: -26 }}
+          animate={{ y: scanning ? [0, FACE.size + 26] : 0 }}
+          transition={
+            scanning
+              ? { duration: PHOTO_SWEEP_S, ease: "linear", repeat: Infinity }
+              : { duration: 0 }
+          }
+          initial={false}
+        >
+          <div
+            className="absolute inset-0"
+            style={{
+              background:
+                "linear-gradient(180deg, rgba(8,218,15,0) 0%, rgba(8,218,15,0.28) 100%)",
+              opacity: scanning ? 1 : 0,
+            }}
+          />
+          <div
+            className="absolute left-0 w-full"
+            style={{
+              bottom: 0,
+              height: 1.24,
+              background: SCAN_GREEN,
+              boxShadow: "0 0 6px 1px rgba(8,218,15,0.55)",
+              opacity: scanning ? 1 : 0,
+            }}
+          />
+        </motion.div>
+      </div>
+
+      {/* Scan brackets — one glyph rotated into each corner, as drawn. */}
+      {BRACKET_CORNERS.map((c) => (
+        <Image
+          key={`${c.left}-${c.top}`}
+          src="/assets/thinking/photos/bracket.svg"
+          alt=""
+          width={BRACKET}
+          height={BRACKET}
+          style={{
+            position: "absolute",
+            left: CARRIER.left + c.left,
+            top: CARRIER.top + c.top,
+            width: BRACKET,
+            height: BRACKET,
+            transform: `rotate(${c.rotate}deg)`,
+          }}
+        />
+      ))}
+    </motion.div>
+  );
 }
