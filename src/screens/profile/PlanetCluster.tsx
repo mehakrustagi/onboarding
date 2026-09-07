@@ -93,9 +93,20 @@ export default function PlanetCluster() {
             width={o.size}
             height={o.size}
             unoptimized
-            // Rendered as-is: these are finished orb artworks, so
-            // clipping them to a circle would cut into the art.
-            style={{ width: o.size, height: o.size, display: "block" }}
+            // p-avatar is an opaque photo, not orb artwork, so it needs
+            // rounding to read as a planet. Everything else is already
+            // round with transparent corners and renders as-is.
+            style={
+              o.src.includes("p-avatar")
+                ? {
+                    width: o.size,
+                    height: o.size,
+                    display: "block",
+                    borderRadius: "50%",
+                    objectFit: "cover",
+                  }
+                : { width: o.size, height: o.size, display: "block" }
+            }
           />
         </motion.div>
       ))}

@@ -25,17 +25,20 @@ const IN_EASE = [0.22, 1, 0.36, 1] as const;
 /* Green sampled from the Figma render — rgb(27,158,114). */
 const GREEN = "#1b9e72";
 
-/* Ring around each agent orb — Figma: 40×40, fill #FFFFFF at 10%, stroke
- * 1px OUTSIDE on a linear gradient, plus a glass effect.
+/* Agent orb — Figma node 853:16548.
  *
- * Drawn as an SVG circle rather than a CSS border, because CSS can't put a
- * gradient on a border — the usual workarounds (padding + background-clip,
- * or a masked pseudo-element) all fight the transparent 10% fill, which has
- * to let the card through. An SVG stroke does both cleanly.
+ * A composite, not a single image: a planet sitting inside an open
+ * gradient arc. I'd been drawing only the planet, which is why these
+ * looked plain next to the design.
  *
- * Stroke sits OUTSIDE the 40px box as Figma specifies, so the circle is
- * drawn at r 20 in a 42 viewBox — half the stroke width of headroom on
- * each side, otherwise it clips. */
+ *   frame   40×40, r43.2 (fully round), fill #FFFFFF at 10%
+ *   stroke  1px OUTSIDE, gradient #14163A → #4E55E5 → #AB4D8C → #EE874E
+ *   planet  24×24, centred
+ *
+ * The arc is drawn with a dash gap rather than as a closed ring, which is
+ * what the design shows — an orbit caught mid-sweep rather than a border
+ * around an avatar.
+ */
 const RING_STOPS = [
   { offset: "0%", color: "#14163A" },
   { offset: "50%", color: "#4E55E5" },
@@ -43,67 +46,77 @@ const RING_STOPS = [
   { offset: "100%", color: "#EE874E" },
 ] as const;
 
-function OrbRing({
-  id,
-  size = 40,
-  children,
-}: {
-  /** Gradient ids must be unique per instance — a repeated id makes every
-   *  later ring silently reuse the first one's gradient. */
-  id: string;
-  size?: number;
-  children: React.ReactNode;
-}) {
-  const box = size + 2;
+const RING_SIZE = 40;
+/* Stroke sits OUTSIDE the frame, so the box carries a pixel of headroom
+ * each side or the ring clips against its own bounds. */
+const RING_BOX = RING_SIZE + 2;
+const RING_R = RING_SIZE / 2;
+const RING_C = 2 * Math.PI * RING_R;
+/* Roughly five-sixths drawn, one-sixth open — enough gap to read as an
+ * orbit with ends rather than a circle with a nick in it. */
+const RING_ARC = RING_C * 0.84;
+
+function AgentOrbMark({ id, index }: { id: string; index: number }) {
   return (
+    // flexShrink guard: this sits inside a flex row, and without it the
+    // ring gets squeezed horizontally into an oval — which is exactly
+    // what was happening once the float wrapper became the flex child.
     <div
       className="relative"
-      style={{ width: box, height: box, flexShrink: 0 }}
+      style={{ width: RING_BOX, height: RING_BOX, flexShrink: 0 }}
     >
-      <svg
+      {/* Planet, centred. */}
+      <Image
+        src="/assets/profile/a-planet.png"
+        alt=""
+        width={24}
+        height={24}
+        unoptimized
+        className="absolute"
+        style={{
+          width: 24,
+          height: 24,
+          left: "50%",
+          top: "50%",
+          transform: "translate(-50%, -50%)",
+          display: "block",
+        }}
+      />
+
+      {/* Orbit. Rotates slowly — each at its own speed and starting angle,
+          so the grid never reads as six copies of one animation. */}
+      <motion.svg
         className="absolute inset-0"
-        width={box}
-        height={box}
-        viewBox={`0 0 ${box} ${box}`}
+        width={RING_BOX}
+        height={RING_BOX}
+        viewBox={`0 0 ${RING_BOX} ${RING_BOX}`}
         fill="none"
+        animate={{ rotate: 360 }}
+        transition={{
+          duration: 26 + index * 4,
+          repeat: Infinity,
+          ease: "linear",
+        }}
+        style={{ rotate: index * 47 }}
       >
         <defs>
-          <linearGradient
-            id={`ring-${id}`}
-            x1="0"
-            y1="0"
-            x2="1"
-            y2="1"
-          >
+          <linearGradient id={`ring-${id}`} x1="0" y1="0" x2="1" y2="1">
             {RING_STOPS.map((st) => (
-              <stop
-                key={st.offset}
-                offset={st.offset}
-                stopColor={st.color}
-              />
+              <stop key={st.offset} offset={st.offset} stopColor={st.color} />
             ))}
           </linearGradient>
         </defs>
         <circle
-          cx={box / 2}
-          cy={box / 2}
-          r={size / 2}
+          cx={RING_BOX / 2}
+          cy={RING_BOX / 2}
+          r={RING_R}
           fill="rgba(255,255,255,0.1)"
           stroke={`url(#ring-${id})`}
           strokeWidth={1}
+          strokeLinecap="round"
+          strokeDasharray={`${RING_ARC} ${RING_C - RING_ARC}`}
         />
-      </svg>
-      {/* Orb, pinned to the ring's exact centre. Positioned from 50/50 and
-          pulled back by half its own size rather than laid out with
-          inset+flex — the box is 42px against a 30px orb, so any
-          inset-based centring leaves a fractional offset that shows up as
-          the orb sitting slightly off in the ring. */}
-      <div
-        className="absolute"
-        style={{ left: "50%", top: "50%", transform: "translate(-50%, -50%)" }}
-      >
-        {children}
-      </div>
+      </motion.svg>
     </div>
   );
 }
@@ -123,42 +136,36 @@ const AGENTS = [
     key: "flight",
     title: "flight",
     desc: "Updated 2 preferences basis 2 recent trips…",
-    orb: "/assets/profile/p-orb1.png",
     tint: "rgba(214,214,222,0.45)",
   },
   {
     key: "stay",
     title: "Stay",
     desc: "Stays that match your style and benefits.",
-    orb: "/assets/profile/p-orb8.png",
     tint: "rgba(206,232,214,0.5)",
   },
   {
     key: "airport",
     title: "airport\nlogistics",
     desc: "Every airport detail, already sorted.",
-    orb: "/assets/profile/p-avatar.png",
     tint: "rgba(244,214,206,0.5)",
   },
   {
     key: "food",
     title: "food",
     desc: "added 2 cuisines for upcoming trip",
-    orb: "/assets/profile/p-orb4.png",
     tint: "rgba(226,226,230,0.45)",
   },
   {
     key: "medical",
     title: "medical",
     desc: "Travel with important information ready.",
-    orb: "/assets/profile/p-orb5.png",
     tint: "rgba(240,214,224,0.45)",
   },
   {
     key: "itinerary",
     title: "itinerary",
     desc: "Plans built around how you travel.",
-    orb: "/assets/profile/p-orb6.png",
     tint: "rgba(214,222,240,0.45)",
   },
 ] as const;
@@ -476,11 +483,11 @@ function AgentCard({
         style={{ right: 14, top: 14 }}
       >
         <span className="text-[13px] font-light text-[#b4b4ba]">+</span>
-        {/* The float is on the whole unit, so the ring and its orb move
-            together. Floating the orb INSIDE the ring is what had them
-            sitting at different heights — each was at its own point in
-            the cycle, so none of them lined up. */}
+        {/* Float on the whole unit so ring and planet move together —
+            floating the planet inside the ring had them at different
+            heights, since each was at its own point in the cycle. */}
         <motion.div
+          style={{ flexShrink: 0 }}
           animate={{ y: [0, -2.5, 0] }}
           transition={{
             duration: 3.2 + index * 0.5,
@@ -488,18 +495,7 @@ function AgentCard({
             ease: "easeInOut",
           }}
         >
-          <OrbRing id={agent.key}>
-            <Image
-              src={agent.orb}
-              alt=""
-              width={30}
-              height={30}
-              unoptimized
-              // No border-radius or object-fit crop — the orb art is its
-              // own shape and clipping it to a circle changes the artwork.
-              style={{ width: 30, height: 30, display: "block" }}
-            />
-          </OrbRing>
+          <AgentOrbMark id={agent.key} index={index} />
         </motion.div>
       </div>
 
