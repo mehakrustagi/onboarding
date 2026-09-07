@@ -147,7 +147,7 @@ const SUB_AGENTS = [
 const STAGES = [
   { id: "pre-thinking", label: "Pre-thinking", built: true },
   { id: "scanning-passport", label: "Scanning passport", built: true },
-  { id: "fetching-docs", label: "Fetching docs", built: false },
+  { id: "fetching-docs", label: "Fetching docs", built: true },
   { id: "scanning-photos", label: "Scanning photos", built: true },
   { id: "visa-requirement", label: "Visa requirement", built: false },
 ] as const;
@@ -208,8 +208,10 @@ export default function ThinkingModeScreen() {
           <PreThinkingStage key={run} />
         ) : stage === "scanning-passport" ? (
           <ScanningPassportStage key={run} />
-        ) : (
+        ) : stage === "scanning-photos" ? (
           <ScanningPhotosStage key={run} />
+        ) : (
+          <FetchingDocsStage key={run} />
         )}
       </div>
       <p className="text-[12px] text-[#8b8b93]">tap the screen to replay</p>
@@ -1501,5 +1503,331 @@ function PhotoCard({
         />
       ))}
     </motion.div>
+  );
+}
+
+/* ===========================================================================
+ * Stage 4 — Fetching documents from your profile (section 852:12711).
+ *
+ * The board calls this one out as three beats rather than a queue:
+ *   step 01.a  loop — the sources and the folder, connectors between them
+ *   step 01.b  loop — "energy bounce inside the folder"
+ *   step 02    finishing — "docs appear inside the folder → success state"
+ *
+ * So it is built as a connection being made rather than a row being worked
+ * through: two source chips on the left, a folder on the right, and the two
+ * curved links bridging the 20px between them. The links draw themselves in
+ * (stroke-dash, using Figma's own path data and its #10B981→white gradient),
+ * then the folder's border carries a lit arc travelling around its edge for
+ * three seconds while energy pulses inside it, and when it lands the border
+ * settles to a solid green and the documents appear inside the folder.
+ *
+ * Geometry off frame 852:12830 — content block at (0, 210), px24 py14:
+ *   agent orb     26×26 at (24, 224)
+ *   title         left 62, y 224
+ *   description   left 62, y 248, 12/16 #666, wraps over 312
+ *   row           y 292: chips column at 62, folder 40×40 at 102
+ *   links         20 wide, bridging (82, 302.57) and (82, 319.29)
+ *   folder art    32.117×25 centred in the 40 box; back plate, the two
+ *                 kicked documents, then the front flap over them
+ * -------------------------------------------------------------------------*/
+
+const FETCH_STEP_DELAYS = [
+  300, // 1  orb
+  600, // 2  title
+  400, // 3  description
+  400, // 4  source chips
+  400, // 5  folder
+  300, // 6  links draw, folder border starts travelling
+  3000, // 7  ...for three seconds, then success
+] as const;
+
+const FETCH_LOADING_STEP = 6;
+const FETCH_DONE_STEP = 7;
+
+/* Row geometry, in screen coordinates. */
+const FETCH_ROW_Y = 292;
+const CHIP_X = 62;
+const CHIP_SIZE = 20;
+const CHIP_GAP = 8;
+const FOLDER_X = 102;
+const FOLDER_SIZE = 40;
+const FOLDER_Y = FETCH_ROW_Y + 4; // items-center in a 48-tall row
+/* Folder artwork inside the 40 box. */
+const ART = { left: 3.94, top: 7.5, w: 32.117, h: 25 };
+/* Figma's link paths, kept as path data so they can be drawn on with
+ * stroke-dash instead of dropped in as flat images. */
+const LINKS = [
+  {
+    /* chip 1 → folder */
+    top: 302.57,
+    w: 20,
+    h: 12.0927,
+    d: "M0 11.7927H5.25366C8.42728 11.7927 11 9.21995 11 6.04634C11 2.87272 13.5727 0.3 16.7463 0.3H20",
+    /* the design fades the stroke out toward the folder on the top link
+       and toward the chip on the bottom one */
+    from: "#10b981",
+    to: "#ffffff",
+  },
+  {
+    /* chip 2 → folder */
+    top: 319.29,
+    w: 20,
+    h: 13.2372,
+    d: "M0 12.9372H2.6814C6.17106 12.9372 9 10.1083 9 6.6186C9 3.12894 11.8289 0.3 15.3186 0.3H20",
+    from: "#ffffff",
+    to: "#10b981",
+  },
+] as const;
+
+/* Success green — the design's border-input-success / link gradient hue. */
+const LINK_GREEN = "#10b981";
+
+function FetchingDocsStage() {
+  const step = useSequenceWith(FETCH_STEP_DELAYS);
+  const loading = step >= FETCH_LOADING_STEP && step < FETCH_DONE_STEP;
+  const done = step >= FETCH_DONE_STEP;
+
+  return (
+    <>
+      <AgentOrb visible={step >= 1} />
+
+      <motion.div
+        className="absolute"
+        style={{ left: 62, top: 224, width: 312 }}
+        initial={{ opacity: 0, filter: "blur(8px)" }}
+        animate={{
+          opacity: step >= 2 ? 1 : 0,
+          filter: step >= 2 ? "blur(0px)" : "blur(8px)",
+        }}
+        transition={{ duration: 0.5, ease: IN_EASE }}
+      >
+        <p
+          className={
+            "whitespace-nowrap text-[12px] font-medium " +
+            (done ? "agent-title-static" : "agent-title-shine")
+          }
+          style={{ lineHeight: "16px", letterSpacing: "-0.24px" }}
+        >
+          Fetching document from your profile
+        </p>
+      </motion.div>
+
+      <motion.div
+        className="absolute"
+        style={{ left: 62, top: 248, width: 312 }}
+        initial={{ opacity: 0, filter: "blur(8px)", y: 4 }}
+        animate={{
+          opacity: step >= 3 ? 1 : 0,
+          filter: step >= 3 ? "blur(0px)" : "blur(8px)",
+          y: step >= 3 ? 0 : 4,
+        }}
+        transition={{ duration: 0.5, ease: IN_EASE }}
+      >
+        <p
+          className="text-[12px] text-[#666]"
+          style={{ lineHeight: "16px", letterSpacing: "-0.12px" }}
+        >
+          The agent is reviewing your profile to identify the documents we
+          currently possess.
+        </p>
+      </motion.div>
+
+      {/* Source chips. */}
+      {[
+        { src: "/assets/thinking/fetching/source-drive.png", i: 0 },
+        { src: "/assets/thinking/fetching/source-gmail.svg", i: 1 },
+      ].map(({ src, i }) => (
+        <motion.div
+          key={src}
+          className="absolute flex items-center justify-center rounded-full border-[0.75px] border-[#e8e8e8] bg-[#f7f7f7]"
+          style={{
+            left: CHIP_X,
+            top: FETCH_ROW_Y + i * (CHIP_SIZE + CHIP_GAP),
+            width: CHIP_SIZE,
+            height: CHIP_SIZE,
+          }}
+          initial={{ opacity: 0, scale: 0.7 }}
+          animate={{
+            opacity: step >= 4 ? 1 : 0,
+            scale: step >= 4 ? 1 : 0.7,
+          }}
+          transition={{
+            duration: 0.42,
+            ease: IN_EASE,
+            delay: step >= 4 ? i * 0.1 : 0,
+          }}
+        >
+          <Image
+            src={src}
+            alt=""
+            width={10}
+            height={10}
+            style={{ width: 10, height: 10 }}
+          />
+        </motion.div>
+      ))}
+
+      {/* The links. Drawn on with stroke-dash so the connection reads as
+          being made rather than as having always been there. */}
+      {LINKS.map((link, i) => (
+        <svg
+          key={link.top}
+          className="absolute"
+          style={{ left: 82, top: link.top, width: link.w, height: link.h }}
+          viewBox={`0 0 ${link.w} ${link.h}`}
+          fill="none"
+        >
+          <defs>
+            <linearGradient id={`link-grad-${i}`} x1="0" x2={link.w} y1="0" y2="0" gradientUnits="userSpaceOnUse">
+              <stop stopColor={link.from} />
+              <stop offset="1" stopColor={link.to} />
+            </linearGradient>
+          </defs>
+          <motion.path
+            d={link.d}
+            stroke={done ? LINK_GREEN : `url(#link-grad-${i})`}
+            strokeWidth={0.6}
+            /* One path length's worth of dash, offset a whole length, is a
+               line that hasn't been drawn yet; walking the offset to zero
+               draws it from the chip toward the folder. */
+            strokeDasharray={34}
+            initial={{ strokeDashoffset: 34, opacity: 0 }}
+            animate={{
+              strokeDashoffset: step >= FETCH_LOADING_STEP ? 0 : 34,
+              opacity: step >= FETCH_LOADING_STEP ? 1 : 0,
+            }}
+            transition={{
+              duration: 0.6,
+              ease: IN_EASE,
+              delay: step >= FETCH_LOADING_STEP ? i * 0.12 : 0,
+            }}
+          />
+        </svg>
+      ))}
+
+      {/* The folder. */}
+      <motion.div
+        className="absolute"
+        style={{ left: FOLDER_X, top: FOLDER_Y, width: FOLDER_SIZE, height: FOLDER_SIZE }}
+        initial={{ opacity: 0, scale: 0.8 }}
+        animate={{ opacity: step >= 5 ? 1 : 0, scale: step >= 5 ? 1 : 0.8 }}
+        transition={{ duration: 0.46, ease: IN_EASE }}
+      >
+        <div
+          className="absolute inset-0 overflow-hidden rounded-[10px] border-[0.6px] border-white bg-[#f9fafb]"
+        >
+          {/* "Energy bounce inside the folder" — a soft bloom breathing
+              behind the artwork while the fetch is live. */}
+          <motion.div
+            className="absolute"
+            style={{
+              left: -6,
+              top: -6,
+              width: FOLDER_SIZE + 12,
+              height: FOLDER_SIZE + 12,
+              background:
+                "radial-gradient(circle at 50% 60%, rgba(16,185,129,0.55) 0%, rgba(80,87,234,0.25) 45%, rgba(255,255,255,0) 70%)",
+            }}
+            initial={{ opacity: 0, scale: 0.7 }}
+            animate={
+              loading
+                ? { opacity: [0.35, 0.9, 0.35], scale: [0.78, 1.08, 0.78] }
+                : { opacity: 0, scale: 0.7 }
+            }
+            transition={
+              loading
+                ? { duration: 1.1, ease: "easeInOut", repeat: Infinity }
+                : { duration: 0.4, ease: IN_EASE }
+            }
+          />
+
+          {/* Folder artwork: back plate, the documents, then the front flap
+              over them — so a document arriving slides in BEHIND the flap,
+              which is what puts it inside the folder rather than on it. */}
+          <div
+            className="absolute"
+            style={{ left: ART.left, top: ART.top, width: ART.w, height: ART.h }}
+          >
+            <Image
+              src="/assets/thinking/fetching/folder-back.svg"
+              alt=""
+              width={27.38}
+              height={24.98}
+              style={{ position: "absolute", left: 2.37, top: 0, width: 27.38, height: 24.98 }}
+            />
+
+            {[
+              { rotate: -34.78, left: 1.5, top: -4, delay: 0 },
+              { rotate: -23.95, left: 5.5, top: -2.4, delay: 0.12 },
+            ].map((doc) => (
+              <motion.div
+                key={doc.rotate}
+                className="absolute overflow-hidden rounded-[4.854px] border-[0.187px] border-white"
+                style={{
+                  left: doc.left,
+                  top: doc.top,
+                  width: 22,
+                  height: 17,
+                  transform: `rotate(${doc.rotate}deg)`,
+                }}
+                initial={{ opacity: 0, y: 10, scale: 0.7 }}
+                animate={{
+                  opacity: done ? 1 : 0,
+                  y: done ? 0 : 10,
+                  scale: done ? 1 : 0.7,
+                }}
+                transition={{
+                  duration: 0.5,
+                  ease: IN_EASE,
+                  delay: done ? doc.delay : 0,
+                }}
+              >
+                <Image
+                  src="/assets/thinking/fetching/doc.png"
+                  alt=""
+                  width={22}
+                  height={17}
+                  style={{
+                    position: "absolute",
+                    inset: 0,
+                    width: "100%",
+                    height: "100%",
+                    objectFit: "cover",
+                  }}
+                />
+              </motion.div>
+            ))}
+
+            <Image
+              src="/assets/thinking/fetching/folder-front.svg"
+              alt=""
+              width={ART.w}
+              height={9.67}
+              style={{
+                position: "absolute",
+                left: 0,
+                top: 15.33,
+                width: ART.w,
+                height: 9.67,
+              }}
+            />
+          </div>
+        </div>
+
+        {/* The border. While the fetch is live a lit arc travels around the
+            edge; when it lands the whole edge settles to green. */}
+        {loading ? (
+          <div className="travel-border absolute inset-0 rounded-[10px]" />
+        ) : null}
+        <motion.div
+          className="absolute inset-0 rounded-[10px]"
+          style={{ border: `1px solid ${LINK_GREEN}` }}
+          initial={{ opacity: 0 }}
+          animate={{ opacity: done ? 1 : 0 }}
+          transition={{ duration: 0.42, ease: IN_EASE }}
+        />
+      </motion.div>
+    </>
   );
 }
