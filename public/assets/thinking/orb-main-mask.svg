@@ -1,0 +1,23 @@
+<svg preserveAspectRatio="none" overflow="visible" style="display: block;" width="21.4593" height="21.4593" viewBox="0 0 21.4593 21.4593" fill="none" xmlns="http://www.w3.org/2000/svg">
+<g id="Mask group">
+<mask id="mask0_0_643" style="mask-type:alpha" maskUnits="userSpaceOnUse" x="0" y="0" width="22" height="22">
+<circle id="Ellipse 6931" cx="10.7296" cy="10.7297" r="10.7296" fill="white" fill-opacity="0.1"/>
+</mask>
+<g mask="url(#mask0_0_643)">
+<g id="Ellipse 6929" filter="url(#filter0_f_0_643)">
+<ellipse cx="8.90607" cy="8.0821" rx="7.00335" ry="6.14054" transform="rotate(-32.9671 8.90607 8.0821)" fill="url(#paint0_linear_0_643)"/>
+</g>
+</g>
+</g>
+<defs>
+<filter id="filter0_f_0_643" x="1.62555" y="1.15355" width="14.561" height="13.8571" filterUnits="userSpaceOnUse" color-interpolation-filters="sRGB">
+<feFlood flood-opacity="0" result="BackgroundImageFix"/>
+<feBlend mode="normal" in="SourceGraphic" in2="BackgroundImageFix" result="shape"/>
+<feGaussianBlur stdDeviation="0.26" result="effect1_foregroundBlur_0_643"/>
+</filter>
+<linearGradient id="paint0_linear_0_643" x1="8.42461" y1="2.1285" x2="7.87901" y2="6.26641" gradientUnits="userSpaceOnUse">
+<stop stop-color="white"/>
+<stop offset="1" stop-color="white" stop-opacity="0"/>
+</linearGradient>
+</defs>
+</svg>

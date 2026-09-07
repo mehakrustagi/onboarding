@@ -291,3 +291,61 @@ body {
   -moz-osx-font-smoothing: grayscale;
   overscroll-behavior: none;
 }
+
+/* Agent step title ("Preparing our agents", "Sub agent task") — Figma
+ * component 747:9284. Inter Medium 12/16, tracking -0.24, painted with a
+ * grey gradient (#2e2e2e → #adadad at 20% → #2e2e2e) and lit by two
+ * blurred light streaks that travel across it while the step is running —
+ * the white one leading, a lavender (#c6c8fd) one trailing it. Same
+ * shine-on-loop language as .grey-shine-text and .gradient-text-shine,
+ * so a step that is still working reads as alive. */
+.agent-title-shine {
+  background-image:
+    linear-gradient(
+      115deg,
+      rgba(255, 255, 255, 0) 42%,
+      rgba(255, 255, 255, 0.95) 50%,
+      rgba(255, 255, 255, 0) 58%
+    ),
+    linear-gradient(
+      115deg,
+      rgba(198, 200, 253, 0) 40%,
+      rgba(198, 200, 253, 0.9) 50%,
+      rgba(198, 200, 253, 0) 60%
+    ),
+    linear-gradient(90deg, #2e2e2e 0%, #adadad 20%, #2e2e2e 100%);
+  background-size: 220% 100%, 220% 100%, 100% 100%;
+  background-position: 150% 0, 172% 0, 0 0;
+  background-repeat: no-repeat, no-repeat, no-repeat;
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+  -webkit-text-fill-color: transparent;
+  animation: agent-title-sweep 2.8s cubic-bezier(0.4, 0, 0.2, 1) infinite;
+}
+
+/* Same paint, no sweep — for a step that has finished working. */
+.agent-title-static {
+  background-image: linear-gradient(
+    90deg,
+    #2e2e2e 0%,
+    #adadad 20%,
+    #2e2e2e 100%
+  );
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+  -webkit-text-fill-color: transparent;
+}
+
+@keyframes agent-title-sweep {
+  0% {
+    background-position: 150% 0, 172% 0, 0 0;
+  }
+  60% {
+    background-position: -50% 0, -28% 0, 0 0;
+  }
+  100% {
+    background-position: -50% 0, -28% 0, 0 0;
+  }
+}
