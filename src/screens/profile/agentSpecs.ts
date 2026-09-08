@@ -177,8 +177,10 @@ export const MEDICAL_AGENT: AgentSpec = {
       /* No heading in the design — the card names itself. */
       label: "MEDICAL CARD",
       toggle: "Open medical card when phone is locked",
+      /* No NAME row — the card already carries the name as its heading
+         (853:65156), so listing it again just repeated it. Figma's rows
+         start at D.O.B. */
       fields: [
-        { label: "NAME", value: "mohak n." },
         { label: "D.O.B", value: "29.09.1993" },
         { label: "BLOOD GROUP", value: "O+" },
         { label: "EMERGENCY CONTACT", value: "+91 9834512458" },
