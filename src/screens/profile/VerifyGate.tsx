@@ -1,7 +1,7 @@
 "use client";
 
-import Image from "next/image";
 import { motion, AnimatePresence } from "framer-motion";
+import { BenefitCardFace } from "./BenefitDeck";
 
 /* Verification gate — Figma node 853:22081.
  *
@@ -114,46 +114,17 @@ export default function VerifyGate({
             ))}
           </div>
 
-          {/* Ring + orb */}
+          {/* The benefit card itself, lifted onto the scrim (853:21578) —
+              380×154 centred at top 334. The gate is about THIS benefit,
+              so the card has to come with it. */}
           <motion.div
-            className="pointer-events-none absolute"
-            style={{ left: ORB_CX - 55, top: ORB_CY - 55, width: 110, height: 110 }}
-            initial={{ opacity: 0, scale: 0.9 }}
-            animate={{ opacity: 1, scale: 1 }}
-            transition={{ delay: 0.1, duration: 0.6, ease: IN_EASE }}
+            className="absolute left-1/2"
+            style={{ top: 334, x: "-50%" }}
+            initial={{ opacity: 0, y: 18, scale: 0.97 }}
+            animate={{ opacity: 1, y: 0, scale: 1 }}
+            transition={{ delay: 0.08, duration: 0.55, ease: IN_EASE }}
           >
-            {/* The ring breathes outward — a containment that pulses reads
-                as something being held, which is the point of a gate. */}
-            <motion.div
-              className="absolute inset-0"
-              animate={{ scale: [1, 1.06, 1], opacity: [0.9, 0.55, 0.9] }}
-              transition={{ duration: 3.4, repeat: Infinity, ease: "easeInOut" }}
-            >
-              <Image
-                src="/assets/profile/verify-orb.png"
-                alt=""
-                width={110}
-                height={110}
-                unoptimized
-                style={{ width: 110, height: 110, display: "block" }}
-              />
-            </motion.div>
-
-            <motion.div
-              className="absolute"
-              style={{ left: 31, top: 31, width: 48, height: 48 }}
-              animate={{ y: [0, -3, 0] }}
-              transition={{ duration: 5.2, repeat: Infinity, ease: "easeInOut" }}
-            >
-              <Image
-                src="/assets/profile/verify-planet.png"
-                alt=""
-                width={48}
-                height={48}
-                unoptimized
-                style={{ width: 48, height: 48, display: "block" }}
-              />
-            </motion.div>
+            <BenefitCardFace />
           </motion.div>
 
           <motion.p

@@ -86,10 +86,17 @@ const mod = (n: number, m: number) => ((n % m) + m) % m;
 
 export default function Screen7({
   onComplete,
+  variant = "onboarding",
 }: {
   initialPhase?: Screen7Phase;
   onComplete?: () => void;
+  /** "airport" is the same screen reused inside the Travel preferences
+   *  sheet: different copy, an extra eligibility line, the car washed out
+   *  under white, and no agent orbs in the staged state — that handoff
+   *  only means something when Screen 5 is next. */
+  variant?: "onboarding" | "airport";
 } = {}) {
+  const airport = variant === "airport";
   // `x` = drag offset (unbounded). Negative x = swiped left = next car.
   const x = useMotionValue(0);
   const [activeIdx, setActiveIdx] = useState(0);
@@ -202,9 +209,21 @@ export default function Screen7({
         animate={{ opacity: 1, y: 0 }}
         transition={{ duration: 0.6, ease: IN_EASE }}
       >
-        <SeatIcon />
+        {/* The agent orb, as every other Travel preferences sheet has in
+            this slot — the seat glyph belongs to the onboarding run, where
+            the screen is about the transfer rather than about an agent. */}
+        {airport ? (
+          <motion.div
+            animate={{ y: [0, -5, 0] }}
+            transition={{ duration: 5.4, repeat: Infinity, ease: "easeInOut" }}
+          >
+            <AgentOrb size={72} />
+          </motion.div>
+        ) : (
+          <SeatIcon />
+        )}
         <p className="mt-[20px] whitespace-nowrap text-[20px] font-medium leading-[25px] tracking-[-0.04em] text-[#0b0b0b] text-center">
-          Select your arrival supercar
+          {airport ? "Select your airport pickup" : "Select your arrival supercar"}
         </p>
         <p
           className="mt-[10px] text-center text-[12px] font-semibold leading-[16px] tracking-[-0.01em] text-[#999]"
@@ -214,6 +233,14 @@ export default function Screen7({
           <br />
           exotic transfer waiting at arrival
         </p>
+        {airport && (
+          <p
+            className="mt-[18px] text-center text-[12px] font-semibold leading-[16px] tracking-[-0.01em] text-[#999]"
+            style={{ width: 360 }}
+          >
+            Available only in eligible regions
+          </p>
+        )}
       </motion.div>
 
       {/* Ripple halo behind hero car — 5 concentric rings expand and fade.
@@ -325,7 +352,7 @@ export default function Screen7({
         animate={{ opacity: 1, y: 0 }}
         transition={{ delay: 0.4, duration: 0.7, ease: IN_EASE }}
       >
-        Reserve my car
+        {airport ? "Select my car" : "Reserve my car"}
       </motion.button>
 
       {/* Footer note — Inter Semibold 12/16 #999, centered, at y 903. */}
@@ -346,7 +373,7 @@ export default function Screen7({
       {/* STAGED phase — the reserved car drives forward off-screen, tire
           tracks trail behind, agent orbs + confirmation text fade in, and
           exhaust cloud billows up from the bottom. */}
-      {phase === "staged" && <StagedView car={CARS[activeIdx]} />}
+      {phase === "staged" && <StagedView car={CARS[activeIdx]} airport={airport} />}
     </div>
   );
 }
@@ -354,7 +381,7 @@ export default function Screen7({
 /* ---------------------------------------------------------------------------
  * Staged phase — "Your ride is staged" locked-in state.
  * -------------------------------------------------------------------------*/
-function StagedView({ car }: { car: Car }) {
+function StagedView({ car, airport = false }: { car: Car; airport?: boolean }) {
   // Fade the Staged decor (car trail, tracks, smoke, text) out in the last
   // ~1s before Screen 5 mounts, so the orbs are the only element still on
   // screen when the swap happens — clean, seamless handoff.
@@ -415,6 +442,23 @@ function StagedView({ car }: { car: Car }) {
         />
       </motion.div>
 
+      {/* White wash over the departing car — the airport sheet's staged
+          state (right frame of the reference). Transparent at the roof and
+          solid by the tail, so the car reads as dissolving forward into
+          the page rather than being covered by a panel. Only here: on the
+          selector the car is the thing you are choosing. */}
+      {airport && (
+        <div
+          className="pointer-events-none absolute left-0 z-[6] w-full"
+          style={{
+            top: CAR_TOP + 40,
+            height: 420,
+            background:
+              "linear-gradient(180deg, rgba(255,255,255,0) 0%, rgba(255,255,255,0.55) 34%, rgba(255,255,255,0.92) 64%, #ffffff 100%)",
+          }}
+        />
+      )}
+
       {/* "Your ride is staged" — grey caption below the orb row. Figma
           spec: (137.82, 589.6), 164×25. */}
       <div
@@ -460,9 +504,14 @@ function StagedView({ car }: { car: Car }) {
           card-rise entrance — so the transition is one continuous motion
           across the screen boundary. Orbs sit OUTSIDE the decor fade
           wrapper so they persist through the handoff. */}
-      {STAGED_ORBS.map((orb, i) => (
-        <FloatingOrb key={orb.blob} orb={orb} orbIndex={i} />
-      ))}
+      {/* The orb row is a HANDOFF: these four mount at Screen 4's team-perks
+          positions and Screen 5 picks them up from here. Inside the airport
+          sheet there is no Screen 5 to hand off to, so they would just be
+          four orbs appearing for no reason — text only. */}
+      {!airport &&
+        STAGED_ORBS.map((orb, i) => (
+          <FloatingOrb key={orb.blob} orb={orb} orbIndex={i} />
+        ))}
     </>
   );
 }

@@ -28,10 +28,24 @@ type Trigger =
   | "agentComplete"    // Screen 4: agent finishes and green check lands
   | "textReveal"       // Screens 1–3: word / line reveal beats
   | "splashLand"       // Screen 1: visa logo lands into place
-  | "orbTravel";       // Screen 5: orb traveling row → card
+  | "orbTravel"        // Screen 5: orb traveling row → card
+  | "dragGrab"         // Control panel: icon picked up
+  | "dragResist"       // Control panel: repeating tick while the magnet fights you
+  | "dragBreak"        // Control panel: past the threshold, the magnet lets go
+  | "tunnelEnter"      // Control panel: icon committed, descent begins
+  | "tunnelExit";      // Control panel: icon lands on the far platform
 
 const PATTERNS: Record<Trigger, number | number[]> = {
   orbLand: 12,
+  /* The drag ladder. Resist is deliberately tiny and fires repeatedly as
+     the icon is pulled — many small ticks read as friction, where one
+     long buzz reads as an error. Break is the release: a sharp double
+     that says the hold has given way. */
+  dragGrab: 8,
+  dragResist: 4,
+  dragBreak: [18, 30, 24],
+  tunnelEnter: [30, 40, 60],
+  tunnelExit: [40, 60, 30],
   carouselSnap: 8,
   stagedLock: [20, 40, 20],
   cardRise: 15,
