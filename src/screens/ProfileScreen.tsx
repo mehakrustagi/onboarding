@@ -968,21 +968,40 @@ function WorldPassCard({
             <CardBack onConnect={onConnect} />
           </div>
 
-          {/* The turn tab — 853:77298, an 11×93 Union sitting flush on the
-              card's left edge at card-relative (0, 64).
+          {/* The turn tab — 853:77298, an 11×93 Union flush on the card's
+              left edge at card-relative (0, 64).
 
-              Its own asset rather than a crop of 899:13965: that one bakes
-              the arrow in, and cropping it inside a preserve-3d context
-              needed clip-path because overflow is ignored there.
+              TWO copies, one per face, exactly as the faces themselves are
+              done. A single tab inherits the card's 180° flip and lands on
+              the RIGHT once turned; the cue has to stay on the left
+              whichever way the card is facing. Each carries
+              backfaceVisibility hidden, so the swap happens at 90° for
+              free rather than needing the rotation watched.
 
-              Last child of the tilt element, so it paints over whichever
-              face is showing and inherits every transform the card has —
-              tilt, drag and flip. No backfaceVisibility, so turning the
-              card carries it to the opposite edge, where a tab on a card's
-              side would actually end up. */}
-          <div
+              The back copy sits at the card's local RIGHT edge and is
+              pre-rotated 180° — which, after the card's own 180°, puts it
+              back on the viewer's left, facing out. */}
+          <motion.div
             className="pointer-events-none absolute"
-            style={{ left: 0, top: 64, width: 11, height: 93 }}
+            style={{
+              left: 0,
+              top: 64,
+              width: 11,
+              height: 93,
+              // Anchored at its INNER edge, so it grows outward past the
+              // card rather than sliding across it — it stays fixed to the
+              // card and peeks, which is the cue.
+              transformOrigin: "100% 50%",
+              backfaceVisibility: "hidden",
+              WebkitBackfaceVisibility: "hidden",
+            }}
+            animate={{ scaleX: [1, 1.5, 1, 1, 1] }}
+            transition={{
+              duration: 3.4,
+              times: [0, 0.16, 0.32, 0.66, 1],
+              repeat: Infinity,
+              ease: "easeInOut",
+            }}
           >
             <Image
               src="/assets/profile/pass-tab.svg"
@@ -991,7 +1010,38 @@ function WorldPassCard({
               height={93}
               style={{ width: 11, height: 93, display: "block" }}
             />
-          </div>
+          </motion.div>
+          <motion.div
+            className="pointer-events-none absolute"
+            style={{
+              left: CARD_W - 11,
+              top: 64,
+              width: 11,
+              height: 93,
+              rotateY: 180,
+              // Same anchor: the element's own 180 and the card's 180
+              // cancel, so its local +x still runs screen-right and the
+              // inner edge is still 100%.
+              transformOrigin: "100% 50%",
+              backfaceVisibility: "hidden",
+              WebkitBackfaceVisibility: "hidden",
+            }}
+            animate={{ scaleX: [1, 1.5, 1, 1, 1] }}
+            transition={{
+              duration: 3.4,
+              times: [0, 0.16, 0.32, 0.66, 1],
+              repeat: Infinity,
+              ease: "easeInOut",
+            }}
+          >
+            <Image
+              src="/assets/profile/pass-tab.svg"
+              alt=""
+              width={11}
+              height={93}
+              style={{ width: 11, height: 93, display: "block" }}
+            />
+          </motion.div>
         </motion.div>
         </motion.div>
       </motion.div>
