@@ -37,6 +37,52 @@ import MedicalCard from "./MedicalCard";
 
 const IN_EASE = [0.22, 1, 0.36, 1] as const;
 
+/* The completion ring around the orb. Its fraction is READ OFF the
+ * headline ("Found 6/8 flight preferences") rather than stored separately,
+ * so the ring and the number can never disagree — there is one source of
+ * truth and the user is looking at it. */
+function progressOf(headline?: string): number | null {
+  const m = headline?.match(/(\d+)\s*\/\s*(\d+)/);
+  if (!m) return null;
+  const done = Number(m[1]);
+  const total = Number(m[2]);
+  return total > 0 ? Math.min(1, done / total) : null;
+}
+
+const RING_D = 84;
+const RING_R = 38;
+const RING_C = 2 * Math.PI * RING_R;
+
+function ProgressRing({ frac }: { frac: number }) {
+  return (
+    <svg
+      className="pointer-events-none absolute"
+      width={RING_D}
+      height={RING_D}
+      viewBox={`0 0 ${RING_D} ${RING_D}`}
+      fill="none"
+      style={{ left: "50%", top: "50%", marginLeft: -RING_D / 2, marginTop: -RING_D / 2 }}
+    >
+      <circle cx={RING_D / 2} cy={RING_D / 2} r={RING_R} stroke="#f0f0f1" strokeWidth={3} />
+      <motion.circle
+        cx={RING_D / 2}
+        cy={RING_D / 2}
+        r={RING_R}
+        stroke="#5DA97E"
+        strokeWidth={3}
+        strokeLinecap="round"
+        strokeDasharray={RING_C}
+        // Starts at the top and opens the gap toward the right, where the
+        // design has it.
+        transform={`rotate(-68 ${RING_D / 2} ${RING_D / 2})`}
+        initial={{ strokeDashoffset: RING_C }}
+        animate={{ strokeDashoffset: RING_C * (1 - frac) }}
+        transition={{ delay: 0.25, duration: 1.1, ease: IN_EASE }}
+      />
+    </svg>
+  );
+}
+
 export type Meal = { code: string; desc: string };
 export type AgentSection = {
   label: string;
@@ -90,6 +136,8 @@ export default function AgentSheet({
       };
     });
   };
+  const frac = progressOf(spec?.headline);
+
   const isOn = (section: AgentSection, chip: string) =>
     (picked[section.label] ?? section.on ?? []).includes(chip);
 
@@ -140,12 +188,13 @@ export default function AgentSheet({
               </p>
 
               <motion.div
-                className="absolute left-1/2"
-                style={{ top: 73, x: "-50%" }}
+                className="absolute left-1/2 flex items-center justify-center"
+                style={{ top: 73, width: 72, height: 72, marginLeft: -36 }}
                 animate={{ y: [0, -5, 0] }}
                 transition={{ duration: 5.4, repeat: Infinity, ease: "easeInOut" }}
               >
                 <AgentOrb size={72} blob={spec.blob} />
+                {frac !== null && <ProgressRing frac={frac} />}
               </motion.div>
 
               {spec.headline && (
@@ -388,20 +437,24 @@ export default function AgentSheet({
                         dot, matching Group 1991428614 at 9×9. Not every
                         section carries one. */}
                     {sec.note && (
-                    <div className="mt-[24px] flex items-start gap-[12px]">
+                    <div className="mt-[24px] flex items-start gap-[10px]">
+                      {/* The agent's own mark, not a bullet. */}
+                      <span style={{ flexShrink: 0, marginTop: 1 }}>
+                        <AgentOrb size={16} blob={spec.blob} />
+                      </span>
                       <span
+                        // Onboarding's loading treatment: a static grey
+                        // base with one bright band sweeping across it.
+                        // Staggered per section — a shared CSS animation
+                        // fires every line in unison, which reads as a
+                        // flash rather than as work being done.
+                        className="grey-shine-text font-medium"
                         style={{
-                          width: 9,
-                          height: 9,
-                          marginTop: 4,
-                          borderRadius: 5,
-                          background: "#c9c9ce",
-                          flexShrink: 0,
+                          fontSize: 12,
+                          lineHeight: "16px",
+                          letterSpacing: "-0.12px",
+                          animationDelay: `${si * 0.45}s`,
                         }}
-                      />
-                      <span
-                        className="font-medium"
-                        style={{ fontSize: 12, lineHeight: "16px", letterSpacing: "-0.12px", color: "#8a8a90" }}
                       >
                         {sec.note}
                       </span>

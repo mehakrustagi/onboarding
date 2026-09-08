@@ -22,6 +22,13 @@ const HEADER_H = 68;
  * the sequence needs the same breathing room the other sheets have. */
 const FOOT_H = 44;
 const FIT = (SHEET_H - HEADER_H - FOOT_H) / CANVAS_H;
+/* Fitting 965 into the sheet's height also narrows the canvas to ~361, so
+ * the cars stopped short of the sheet's edges with white bars either side.
+ * Rendering the canvas WIDER by exactly the same factor means it lands at
+ * 440 after scaling — full-bleed, cars running off both sides as they do
+ * in onboarding. Screen 7's content is centre-anchored, so it doesn't care
+ * how wide the canvas is. */
+const CANVAS_W = Math.round(440 / FIT);
 
 export default function AirportSheet({
   open,
@@ -63,10 +70,12 @@ export default function AirportSheet({
                 and the offset silently does nothing — which put Screen 7
                 back at the top edge, over the header. */}
             <div
-              className="absolute left-0"
+              className="absolute"
               style={{
                 top: HEADER_H,
-                width: 440,
+                left: "50%",
+                marginLeft: -CANVAS_W / 2,
+                width: CANVAS_W,
                 height: CANVAS_H,
                 transform: `scale(${FIT})`,
                 transformOrigin: "50% 0%",
@@ -82,9 +91,9 @@ export default function AirportSheet({
               className="pointer-events-none absolute left-0 top-0 w-full"
               style={{
                 zIndex: 10,
-                height: 96,
+                height: 132,
                 background:
-                  "linear-gradient(180deg, #ffffff 0%, rgba(255,255,255,0.92) 52%, rgba(255,255,255,0) 100%)",
+                  "linear-gradient(180deg, #ffffff 0%, #ffffff 38%, rgba(255,255,255,0.86) 58%, rgba(255,255,255,0.5) 78%, rgba(255,255,255,0) 100%)",
               }}
             />
 

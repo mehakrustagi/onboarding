@@ -368,7 +368,13 @@ export default function Screen7({
         className="absolute overflow-hidden rounded-full text-[14px] font-semibold tracking-[-0.01em] text-black"
         style={{
           top: 833,
-          left: 30,
+          // Centre-anchored rather than left:30. Identical on the 440
+          // canvas, but the airport sheet renders this canvas WIDER than
+          // 440 so the peek cars can reach the screen edges — and a
+          // left-anchored CTA would drift off with it. marginLeft rather
+          // than a translate, so it can't fight framer's own transform.
+          left: "50%",
+          marginLeft: -190,
           width: 380,
           height: 50,
           background:

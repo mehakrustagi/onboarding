@@ -558,10 +558,12 @@ function WorldPassCard({
             // Stacked elevation — a tight contact shadow under a wide
             // soft one, so the card sits ON the pedestal instead of
             // hovering over a single blur.
+            // Halved from 0.5/0.7/0.55 — the stack read as a much
+            // heavier object than the card is.
             boxShadow: [
-              "0 2px 6px -2px rgba(0,0,0,0.5)",
-              "0 26px 50px -22px rgba(0,0,0,0.7)",
-              "0 50px 90px -40px rgba(0,0,0,0.55)",
+              "0 2px 6px -2px rgba(0,0,0,0.25)",
+              "0 26px 50px -22px rgba(0,0,0,0.35)",
+              "0 50px 90px -40px rgba(0,0,0,0.28)",
             ].join(", "),
           }}
         >

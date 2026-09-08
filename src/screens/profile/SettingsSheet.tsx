@@ -406,7 +406,9 @@ export default function SettingsSheet({
                 <motion.div
                   className="pointer-events-none absolute"
                   style={{ right: 26, top: 27, width: 20, height: 20 }}
-                  animate={{ rotate: accountsOpen ? 180 : 0 }}
+                  // st-down is `navigate_next` — it points RIGHT at rest.
+                  // 180 turned it to point LEFT; 90 is what points it down.
+                  animate={{ rotate: accountsOpen ? 90 : 0 }}
                   transition={{ duration: 0.32, ease: IN_EASE }}
                 >
                   <Image
