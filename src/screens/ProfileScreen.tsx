@@ -9,7 +9,15 @@ import CardBack from "./profile/CardBack";
 import VerifyGate from "./profile/VerifyGate";
 import ConnectScan from "./profile/ConnectScan";
 import ProgramsConnected from "./profile/ProgramsConnected";
+import ProgramDetail from "./profile/ProgramDetail";
 import SettingsSheet from "./profile/SettingsSheet";
+import DisconnectTerms from "./profile/DisconnectTerms";
+import BenefitDetail, { type BenefitDetailContent } from "./profile/BenefitDetail";
+import { FLIGHT_BENEFIT } from "./profile/BenefitDeck";
+import AgentSheet from "./profile/AgentSheet";
+import AirportSheet from "./profile/AirportSheet";
+import { AGENT_SPECS } from "./profile/agentSpecs";
+import DisconnectProgress from "./profile/DisconnectProgress";
 
 /* Profile — Figma node 853:15690 (Dump_work).
  *
@@ -62,6 +70,10 @@ const TRACE_LAP_S = 2.6;
  * cutting on the exact frame reads as the animation being interrupted. */
 const TRACE_HOLD_MS = 260;
 
+/* Same terms copy the all-benefits sheet uses for an unspecified card. */
+const PROFILE_BENEFIT_TERMS =
+  "Enjoy 5% off on eligible flight bookings. The offer may apply only to selected airlines, routes, travel dates or fare types and is subject to availability. Additional terms, exclusions and booking conditions may apply.";
+
 export default function ProfileScreen() {
   /* Staged entrance. The disk lands first and the card arrives onto it,
      so the pedestal reads as something the card is placed ON rather than
@@ -83,6 +95,21 @@ export default function ProfileScreen() {
      forward, so one has to still be on screen as the other arrives. */
   const [programsOpen, setProgramsOpen] = useState(false);
   const [settingsOpen, setSettingsOpen] = useState(false);
+  /* Which Travel preferences agent is open. Held as the key so the sheet
+     can look its content up, and so closing keeps the content through the
+     exit animation. */
+  const [agentKey, setAgentKey] = useState<string | null>(null);
+  /* Which loyalty card's detail is open (853:75340). Index rather than a
+     flag, so the card stays rendered through the exit. */
+  const [programDetail, setProgramDetail] = useState<number | null>(null);
+  const [airportOpen, setAirportOpen] = useState(false);
+  const [verifyOpen, setVerifyOpen] = useState(false);
+  /* The detail the profile's own benefit deck opens. Held as CONTENT
+     rather than a flag so the panel keeps its copy through the exit. */
+  const [cardDetail, setCardDetail] = useState<BenefitDetailContent | null>(null);
+  const [disconnectOpen, setDisconnectOpen] = useState(false);
+  const [progressOpen, setProgressOpen] = useState(false);
+  const [settingsReset, setSettingsReset] = useState(0);
   useEffect(() => {
     const t = window.setTimeout(() => setLit(true), GREEN_DELAY_MS);
     return () => window.clearTimeout(t);
@@ -258,6 +285,20 @@ export default function ProfileScreen() {
       <ProfileBody
         show={bodyIn}
         onViewBenefits={() => setBenefitsOpen(true)}
+        onOpenBenefit={() => setVerifyOpen(true)}
+        onOpenAgent={(k) => {
+          // Airport logistics isn't a preference sheet — it opens the
+          // supercar sequence, so it routes elsewhere.
+          if (k === "airport") setAirportOpen(true);
+          else if (AGENT_SPECS[k]) setAgentKey(k);
+        }}
+        onActivateBenefit={() =>
+          setCardDetail({
+            title: FLIGHT_BENEFIT.title,
+            terms: PROFILE_BENEFIT_TERMS,
+            art: FLIGHT_BENEFIT.art,
+          })
+        }
       />
 
       {/* Gives the scroll container the design's full height, so the
@@ -273,15 +314,51 @@ export default function ProfileScreen() {
         onClose={() => setBenefitsOpen(false)}
       />
 
-      {/* Verification gate (853:22081). Built, but held back — mounted
-          with `open` pinned false rather than deleted, so the screen and
-          its glow stay ready to switch on. */}
-      <VerifyGate open={false} onClose={() => {}} />
+      {/* Verification gate (853:22081) — what tapping the benefit deck
+          opens, with that card lifted onto the scrim. */}
+      {/* Airport logistics — onboarding's supercar sequence, in a sheet. */}
+      <AirportSheet open={airportOpen} onClose={() => setAirportOpen(false)} />
+
+      {/* Agent preference sheet (853:63443 and siblings). */}
+      <AgentSheet
+        spec={agentKey ? (AGENT_SPECS[agentKey] ?? null) : null}
+        open={agentKey !== null}
+        onClose={() => setAgentKey(null)}
+      />
+
+      <VerifyGate open={verifyOpen} onClose={() => setVerifyOpen(false)} />
+
+      {/* ACTIVATE on the profile's own deck opens the same detail panel
+          every other benefit card uses (853:63181). */}
+      <BenefitDetail benefit={cardDetail} onClose={() => setCardDetail(null)} />
 
       {/* Settings (853:18801) — a sheet over the profile, from the gear. */}
       <SettingsSheet
         open={settingsOpen}
         onClose={() => setSettingsOpen(false)}
+        onDisconnect={() => setDisconnectOpen(true)}
+        resetSignal={settingsReset}
+      />
+
+      {/* Disconnect terms (853:74070). Full-bleed 440×965, so it is a
+          sibling of the settings sheet rather than a page inside it. */}
+      <DisconnectTerms
+        open={disconnectOpen}
+        onClose={() => setDisconnectOpen(false)}
+        onConfirm={() => setProgressOpen(true)}
+      />
+
+      {/* Disconnecting (853:74636). Runs itself, then hands back to the
+          account centre — so completing it clears the terms page and sends
+          the settings stack home. */}
+      <DisconnectProgress
+        open={progressOpen}
+        onStop={() => setProgressOpen(false)}
+        onComplete={() => {
+          setProgressOpen(false);
+          setDisconnectOpen(false);
+          setSettingsReset((n) => n + 1);
+        }}
       />
 
       {/* Connect scan (853:17974) — what the card's "+" opens. */}
@@ -300,6 +377,13 @@ export default function ProfileScreen() {
           setProgramsOpen(false);
           setScanOpen(false);
         }}
+        onOpenProgram={(i) => setProgramDetail(i)}
+      />
+
+      {/* Tapping either face of a loyalty card (853:75340). */}
+      <ProgramDetail
+        index={programDetail}
+        onClose={() => setProgramDetail(null)}
       />
     </div>
   );
@@ -542,11 +626,17 @@ function WorldPassCard({
                 lit
                   ? {
                       opacity: 1,
+                      // RISES to the centre rather than pooling at the
+                      // bottom edge. Figma (853:76904) centres it at 40%
+                      // of the card with radii 94%×66% and stops
+                      // #10B981 → rgba(8,130,89,0.5) → rgba(0,74,50,0);
+                      // the first keyframe is that same light still down
+                      // at the sill, so the run reads as one movement up.
                       background: [
-                        "radial-gradient(48% 32% at 50% 100%, rgba(20,190,135,0.52) 0%, rgba(20,190,135,0.28) 38%, rgba(20,190,135,0.08) 66%, rgba(20,190,135,0) 100%)",
-                        "radial-gradient(72% 46% at 50% 100%, rgba(20,190,135,0.62) 0%, rgba(20,190,135,0.34) 38%, rgba(20,190,135,0.11) 66%, rgba(20,190,135,0) 100%)",
-                        "radial-gradient(56% 38% at 50% 100%, rgba(20,190,135,0.55) 0%, rgba(20,190,135,0.3) 38%, rgba(20,190,135,0.09) 66%, rgba(20,190,135,0) 100%)",
-                        "radial-gradient(48% 32% at 50% 100%, rgba(20,190,135,0.52) 0%, rgba(20,190,135,0.28) 38%, rgba(20,190,135,0.08) 66%, rgba(20,190,135,0) 100%)",
+                        "radial-gradient(94% 44% at 50% 104%, rgba(16,185,129,0.95) 0%, rgba(8,130,89,0.5) 50%, rgba(0,74,50,0) 100%)",
+                        "radial-gradient(94% 66% at 50% 40%, rgba(16,185,129,1) 0%, rgba(8,130,89,0.5) 50%, rgba(0,74,50,0) 100%)",
+                        "radial-gradient(88% 62% at 50% 43%, rgba(16,185,129,0.92) 0%, rgba(8,130,89,0.46) 50%, rgba(0,74,50,0) 100%)",
+                        "radial-gradient(94% 66% at 50% 40%, rgba(16,185,129,1) 0%, rgba(8,130,89,0.5) 50%, rgba(0,74,50,0) 100%)",
                       ],
                     }
                   : { opacity: 0 }
@@ -556,12 +646,51 @@ function WorldPassCard({
                 // bulb cutting, where fading reads as it powering down.
                 opacity: { duration: lit ? 0.9 : 1.15, ease: IN_EASE },
                 background: {
-                  duration: 5.6,
+                  // The rise happens once, over the first leg; after that
+                  // it only breathes. times weights that first step long
+                  // enough to read as travel rather than a pop.
+                  duration: 7.2,
+                  times: [0, 0.32, 0.66, 1],
                   repeat: Infinity,
+                  repeatDelay: 0,
                   ease: "easeInOut",
                 },
               }}
             />
+
+            {/* Status label (853:76905). Arrives with the light, not
+                before it — the green IS the confirmation, and a label
+                that lands first states the result before the card has
+                shown it. */}
+            <motion.div
+              className="pointer-events-none absolute left-1/2 flex flex-col items-center gap-[4px] text-center"
+              style={{ top: "50%", width: 88, x: "-50%", y: "-50%", zIndex: 3 }}
+              initial={false}
+              animate={{ opacity: lit ? 1 : 0, y: lit ? "-50%" : "-38%" }}
+              transition={{
+                duration: 0.7,
+                ease: IN_EASE,
+                delay: lit ? 0.85 : 0,
+              }}
+            >
+              <span
+                className="whitespace-nowrap font-bold uppercase"
+                style={{
+                  fontSize: 11,
+                  lineHeight: "14px",
+                  letterSpacing: "0.88px",
+                  color: "#ffffff",
+                }}
+              >
+                KYC COMPLETE
+              </span>
+              <span
+                className="font-medium"
+                style={{ fontSize: 11, lineHeight: "16px", color: "rgba(255,255,255,0.7)" }}
+              >
+                Active till Dec 27
+              </span>
+            </motion.div>
 
             {/* Scan trace. The same green runs the card's OUTLINE — one
                 complete lap, leaving a point and returning to that same

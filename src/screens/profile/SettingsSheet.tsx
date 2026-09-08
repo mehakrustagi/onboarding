@@ -4,6 +4,8 @@ import Image from "next/image";
 import { useEffect, useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import ConnectorsGraph from "./ConnectorsGraph";
+import ControlPanel from "./ControlPanel";
+import TermsPage from "./TermsPage";
 
 /* Settings — Figma node 853:18801.
  *
@@ -40,7 +42,16 @@ type Page =
   | "citizenship"
   | "contact"
   | "currency"
-  | "connectors";
+  | "connectors"
+  | "controlPanel"
+  | "terms";
+/* Two different things, and conflating them cost connectors its back
+ * button: SELF_TITLED pages draw their own heading, SELF_BACKED pages
+ * draw their own back control. Connectors draws a title but NOT a back —
+ * it relies on the sheet's, so the sheet's has to stay. */
+const SELF_TITLED: Page[] = ["connectors", "controlPanel", "terms"];
+const SELF_BACKED: Page[] = ["controlPanel", "terms"];
+
 const PAGE_HEIGHT: Record<Page, number> = {
   root: 691,
   more: 300,
@@ -57,6 +68,8 @@ const PAGE_HEIGHT: Record<Page, number> = {
   currency: 660,
   contact: 620,
   connectors: 903,
+  controlPanel: 903,
+  terms: 903,
 };
 
 /* Pickers. Same shape, different data — one component renders all three,
@@ -129,21 +142,42 @@ const ACCOUNT_ROWS = [
 /* Height the card grows to, and how far the list below it is pushed. */
 const ACCOUNTS_EXTRA = ACCOUNT_ROWS.length * 54 + 14;
 
-const ROWS = [
+const ROWS: { icon: string; label: string; page?: Page }[] = [
   { icon: "/assets/profile/st-edit.svg", label: "Edit Traveler" },
   { icon: "/assets/profile/st-add.svg", label: "Coupons" },
   { icon: "/assets/profile/st-gift.svg", label: "Loyalty Programs" },
-  { icon: "/assets/profile/st-logout.svg", label: "Terms of Service" },
+  {
+    icon: "/assets/profile/st-logout.svg",
+    label: "Terms of Service",
+    page: "terms",
+  },
 ];
 
 export default function SettingsSheet({
   open,
   onClose,
+  onDisconnect,
+  resetSignal = 0,
 }: {
   open: boolean;
   onClose: () => void;
+  /** Bubbles the control panel's disconnect CTA up to ProfileScreen. */
+  onDisconnect?: () => void;
+  /** Bumped by ProfileScreen to send the stack back to root — the
+   *  disconnect flow finishes on the account centre, not on the control
+   *  panel it started from. */
+  resetSignal?: number;
 }) {
   const [stack, setStack] = useState<Page[]>(["root"]);
+
+  /* Adjusting state during render rather than in an effect — this is the
+     sanctioned "reset state when a prop changes" pattern, and it lands
+     before paint instead of causing a second render. */
+  const [seenReset, setSeenReset] = useState(resetSignal);
+  if (resetSignal !== seenReset) {
+    setSeenReset(resetSignal);
+    setStack(["root"]);
+  }
   const [reason, setReason] = useState("");
   const [accountsOpen, setAccountsOpen] = useState(false);
   /* Selection per picker. Keyed by page so residence and citizenship keep
@@ -242,6 +276,9 @@ export default function SettingsSheet({
               onClick={page === "root" ? onClose : back}
               className="absolute flex items-center justify-center"
               style={{
+                // Stands down only where the page brings its own back.
+                opacity: SELF_BACKED.includes(page) ? 0 : 1,
+                pointerEvents: SELF_BACKED.includes(page) ? "none" : "auto",
                 // Above the page layer. Each page is an `absolute
                 // inset-0` wrapper rendered AFTER this button, and a
                 // transparent div still captures clicks — so without a
@@ -286,7 +323,7 @@ export default function SettingsSheet({
                 top: 40,
                 gap: 12,
                 zIndex: 9,
-                opacity: page === "connectors" ? 0 : 1,
+                opacity: SELF_TITLED.includes(page) ? 0 : 1,
               }}
             >
               <Image
@@ -456,7 +493,13 @@ export default function SettingsSheet({
                 }}
               >
                 {ROWS.map((r, i) => (
-                  <Row key={r.label} icon={r.icon} label={r.label} top={22 + i * 54} />
+                  <Row
+                    key={r.label}
+                    icon={r.icon}
+                    label={r.label}
+                    top={22 + i * 54}
+                    onClick={r.page ? () => push(r.page as Page) : undefined}
+                  />
                 ))}
 
                 {/* Dotted rule. "more" is a different kind of thing from the
@@ -732,7 +775,33 @@ export default function SettingsSheet({
                   exit={{ opacity: 0, x: 22 }}
                   transition={{ duration: 0.26, ease: IN_EASE }}
                 >
-                  <ConnectorsGraph onPanel={back} />
+                  <ConnectorsGraph onPanel={() => push("controlPanel")} />
+                </motion.div>
+              )}
+
+              {page === "terms" && (
+                <motion.div
+                  key="terms"
+                  className="absolute inset-0"
+                  initial={{ opacity: 0, x: 22 }}
+                  animate={{ opacity: 1, x: 0 }}
+                  exit={{ opacity: 0, x: 22 }}
+                  transition={{ duration: 0.26, ease: IN_EASE }}
+                >
+                  <TermsPage onBack={back} />
+                </motion.div>
+              )}
+
+              {page === "controlPanel" && (
+                <motion.div
+                  key="controlPanel"
+                  className="absolute inset-0"
+                  initial={{ opacity: 0, x: 22 }}
+                  animate={{ opacity: 1, x: 0 }}
+                  exit={{ opacity: 0, x: 22 }}
+                  transition={{ duration: 0.26, ease: IN_EASE }}
+                >
+                  <ControlPanel onBack={back} onDisconnect={onDisconnect} />
                 </motion.div>
               )}
 

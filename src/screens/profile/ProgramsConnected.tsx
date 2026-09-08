@@ -1,7 +1,6 @@
 "use client";
 
 import Image from "next/image";
-import { useEffect, useState } from "react";
 import {
   motion,
   AnimatePresence,
@@ -27,8 +26,8 @@ import {
 
 const IN_EASE = [0.22, 1, 0.36, 1] as const;
 
-const LP_W = 380;
-const LP_H = 253;
+export const LP_W = 380;
+export const LP_H = 253;
 const LP_FIRST_Y = 445;
 const LP_PITCH = 273;
 
@@ -57,7 +56,7 @@ const LP_GAP = 14;
  * neighbouring card you can see. */
 const PEEK = 30;
 
-const PROGRAMS = [
+export const PROGRAMS = [
   {
     insight:
       "You have 50,000 Chase points. I found a 70% transfer bonus to IHG — turning them into 85,000 points.",
@@ -93,9 +92,12 @@ const PROGRAMS = [
 export default function ProgramsConnected({
   open,
   onClose,
+  onOpenProgram,
 }: {
   open: boolean;
   onClose: () => void;
+  /** Tapping either face of a card opens its detail (853:75340). */
+  onOpenProgram?: (index: number) => void;
 }) {
   /* Scroll position, fed by the container's own onScroll rather than
      useScroll({ container }).
@@ -106,9 +108,6 @@ export default function ProgramsConnected({
      nothing, and the wheel never moves. Reading the event directly has no
      such ordering problem. */
   const scrollY = useMotionValue(0);
-  /* Which card is open. One at a time — two expanded cards would overlap,
-     and the point of expanding is to single one out. */
-  const [expanded, setExpanded] = useState<number | null>(null);
 
   return (
     <AnimatePresence>
@@ -315,8 +314,7 @@ export default function ProgramsConnected({
                 program={p}
                 index={i}
                 scrollY={scrollY}
-                expanded={expanded === i}
-                onTap={() => setExpanded(expanded === i ? null : i)}
+                onTap={() => onOpenProgram?.(i)}
               />
             ))}
 
@@ -404,13 +402,11 @@ function ProgramCard({
   program,
   index,
   scrollY,
-  expanded,
   onTap,
 }: {
   program: (typeof PROGRAMS)[number];
   index: number;
   scrollY: MotionValue<number>;
-  expanded: boolean;
   onTap: () => void;
 }) {
   const baseTop = LP_FIRST_Y + index * LP_PITCH;
@@ -526,44 +522,11 @@ function ProgramCard({
               height={LP_H}
               style={{ width: LP_W, height: LP_H, display: "block" }}
             />
-            <CardFace program={program} expanded={expanded} />
+            <CardFace program={program} back={slide === 1} />
           </div>
         ))}
       </div>
 
-      {/* Glare. A narrow band of light sweeping diagonally across the
-          metal on tap — the Nothing-phone reveal.
-
-          On `screen` so it ADDS light rather than painting over: the card
-          brightens where it passes and the artwork stays visible through
-          it, which is what makes it read as a reflection travelling over
-          the surface rather than a white shape sliding across. Keyed on
-          the expanded state so it re-runs on every tap. */}
-      <AnimatePresence>
-        {expanded && (
-          <motion.div
-            key="glare"
-            className="pointer-events-none absolute inset-0 overflow-hidden"
-            style={{ borderRadius: 30, mixBlendMode: "screen" }}
-          >
-            <motion.div
-              className="absolute"
-              style={{
-                top: -LP_H,
-                width: 130,
-                height: LP_H * 3,
-                background:
-                  "linear-gradient(90deg, rgba(255,255,255,0) 0%, rgba(255,255,255,0.55) 45%, rgba(255,255,255,0.85) 50%, rgba(255,255,255,0.55) 55%, rgba(255,255,255,0) 100%)",
-                filter: "blur(6px)",
-                transform: "rotate(18deg)",
-              }}
-              initial={{ x: -160 }}
-              animate={{ x: LP_W + 120 }}
-              transition={{ duration: 0.9, ease: [0.35, 0, 0.2, 1] }}
-            />
-          </motion.div>
-        )}
-      </AnimatePresence>
     </motion.div>
     </motion.div>
   );
@@ -621,72 +584,21 @@ function ViewFlightsPill() {
   );
 }
 
-/* The insight, typed rather than faded in — the design frames this as the
- * agent generating a finding, and text that appears all at once reads as
- * a label that was always there.
- *
- * Reveals by SLICING the full string rather than appending to state, so
- * the layout is computed once from the complete text. Growing the string
- * character by character reflows the paragraph on every tick and the
- * lines jump around as words wrap. */
-function TypedInsight({ text, run }: { text: string; run: boolean }) {
-  const [count, setCount] = useState(0);
-
-  useEffect(() => {
-    if (!run) return;
-    let raf = 0;
-    const start = performance.now();
-    // ~32 chars/second — fast enough not to be a wait, slow enough to
-    // read as being written.
-    const tick = (now: number) => {
-      const n = Math.floor((now - start) / 31);
-      setCount(Math.min(n, text.length));
-      if (n < text.length) raf = requestAnimationFrame(tick);
-    };
-    raf = requestAnimationFrame(tick);
-    return () => cancelAnimationFrame(raf);
-  }, [run, text]);
-
-  const shown = run ? count : 0;
-  return (
-    <p
-      className="font-medium"
-      style={{
-        fontSize: 11,
-        lineHeight: "16px",
-        color: "rgba(255,255,255,0.86)",
-      }}
-    >
-      {/* The full string is always laid out; the untyped tail is just
-          invisible. That keeps the wrap fixed from the first frame. */}
-      <span>{text.slice(0, shown)}</span>
-      <span style={{ opacity: 0 }}>{text.slice(shown)}</span>
-      {run && shown < text.length && (
-        <motion.span
-          style={{
-            display: "inline-block",
-            width: 5,
-            height: 11,
-            marginLeft: 1,
-            verticalAlign: "-1px",
-            background: "rgba(255,255,255,0.8)",
-          }}
-          animate={{ opacity: [1, 0.2, 1] }}
-          transition={{ duration: 0.7, repeat: Infinity, ease: "linear" }}
-        />
-      )}
-    </p>
-  );
-}
 
 /* Everything printed on the card. Lives inside each slide so it travels
  * with the art rather than floating over the track. */
-function CardFace({
+/** Exported so the detail page renders the identical card. */
+export function CardFace({
   program,
-  expanded,
+  back,
 }: {
   program: (typeof PROGRAMS)[number];
-  expanded: boolean;
+  /* Figma ships the two faces as one card (853:75045 / 853:75832): the
+     insight and the CTA sit at opacity 0 on the front and become visible
+     on the back. Nothing moves — it is a horizontal scroll between two
+     states, not a reveal, so these render plainly rather than animating
+     in. */
+  back: boolean;
 }) {
   return (
     <>
@@ -761,39 +673,31 @@ function CardFace({
       points
     </p>
 
-    {/* Insight, revealed on tap (853:75340). */}
-    <motion.div
-      className="pointer-events-none absolute"
-      style={{ left: 22, top: 125, width: 275 }}
-      initial={false}
-      animate={{ opacity: expanded ? 1 : 0, y: expanded ? 0 : 8 }}
-      transition={{ duration: 0.45, ease: IN_EASE, delay: expanded ? 0.16 : 0 }}
-    >
-      <TypedInsight text={program.insight} run={expanded} />
-    </motion.div>
-
-    <motion.div
-      className="absolute"
-      style={{ left: 22, top: 195 }}
-      initial={false}
-      animate={{ opacity: expanded ? 1 : 0, y: expanded ? 0 : 10 }}
-      // Lands after the text has finished writing — a CTA that appears
-      // mid-sentence invites a tap before the answer is even there.
-      transition={{
-        duration: 0.45,
-        ease: IN_EASE,
-        delay: expanded ? 0.16 + (program.insight.length * 31) / 1000 : 0,
+    {/* Insight (853:75844): 275 wide at (22, 125). */}
+    <p
+      className="pointer-events-none absolute font-medium"
+      style={{
+        left: 22,
+        top: 125,
+        width: 275,
+        fontSize: 11,
+        lineHeight: "16px",
+        color: "rgba(255,255,255,0.85)",
+        opacity: back ? 1 : 0,
       }}
     >
-      <ViewFlightsPill />
-    </motion.div>
+      {program.insight}
+    </p>
 
-    <motion.div
+    {/* "View flights" (853:75914) at (21, 193). */}
+    <div className="absolute" style={{ left: 21, top: 193, opacity: back ? 1 : 0 }}>
+      <ViewFlightsPill />
+    </div>
+
+    {/* Present on both faces — 36×36 at card (323, 195). */}
+    <div
       className="pointer-events-none absolute"
-      style={{ right: 22, bottom: 22, width: 36, height: 36 }}
-      initial={false}
-      animate={{ opacity: expanded ? 1 : 0 }}
-      transition={{ duration: 0.4, ease: IN_EASE, delay: expanded ? 0.2 : 0 }}
+      style={{ right: 21, bottom: 22, width: 36, height: 36 }}
     >
       <Image
         src="/assets/profile/lp-flight.svg"
@@ -802,7 +706,7 @@ function CardFace({
         height={36}
         style={{ width: 36, height: 36, display: "block" }}
       />
-    </motion.div>
+    </div>
 
     </>
   );

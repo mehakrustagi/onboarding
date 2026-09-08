@@ -4,6 +4,7 @@ import Image from "next/image";
 import { motion } from "framer-motion";
 import PlanetCluster from "./PlanetCluster";
 import ActivatePill from "./ActivatePill";
+import BenefitDeck from "./BenefitDeck";
 
 /* Everything below the pedestal — Figma node 853:16315.
  *
@@ -174,12 +175,21 @@ const AGENTS = [
 export default function ProfileBody({
   show,
   onViewBenefits,
+  onOpenBenefit,
+  onActivateBenefit,
+  onOpenAgent,
 }: {
   show: boolean;
   /* The benefits sheet has to cover the whole phone, and this block sits
      in an offset container 614px down — so the sheet is owned by
      ProfileScreen and this only asks for it. */
   onViewBenefits: () => void;
+  /** Tapping the benefit deck anywhere but ACTIVATE (853:21346). */
+  onOpenBenefit: () => void;
+  /** ACTIVATE on the deck — the same detail every benefit card opens. */
+  onActivateBenefit: () => void;
+  /** Tapping a Travel preferences tile opens that agent's sheet. */
+  onOpenAgent: (key: string) => void;
 }) {
   /* Triggered rather than time-delayed: the body waits for the card's
      scan lap to close, so the sequence reads as cause and effect — the
@@ -260,75 +270,13 @@ export default function ProfileBody({
         </div>
       </Reveal>
 
-      {/* Benefit card — opens the same sheet as the CTA below it. The
-          card IS a benefit, so tapping it is the natural way in; making
-          only the CTA work would leave the more obvious target dead. */}
+      {/* Benefit deck (853:20914) — three stacked cards. Tapping the
+          card opens the verification gate; ACTIVATE is a different action
+          and stops the click itself. Browsing every benefit is the CTA
+          below, and only that. */}
       <Reveal delay={t(2)} show={show}>
-        <div
-          role="button"
-          tabIndex={0}
-          onClick={onViewBenefits}
-          onKeyDown={(e) => {
-            if (e.key === "Enter" || e.key === " ") {
-              e.preventDefault();
-              onViewBenefits();
-            }
-          }}
-          className="relative mx-auto mt-[24px] cursor-pointer overflow-hidden"
-          style={{ width: 380, height: 130, ...CARD_SHELL }}
-        >
-          <p
-            className="absolute font-medium"
-            style={{
-              left: 26,
-              top: 22,
-              fontSize: 16,
-              lineHeight: "20px",
-              letterSpacing: "-0.32px",
-              color: "#0b0b0b",
-            }}
-          >
-            Flat 5% back on flights
-          </p>
-          <p
-            className="absolute"
-            style={{
-              left: 26,
-              top: 48,
-              width: 186,
-              fontSize: 12,
-              lineHeight: "16px",
-              letterSpacing: "-0.12px",
-              color: "#8a8a90",
-            }}
-          >
-            Book flights in the app and get a flat 5% back in Atlys credits.
-          </p>
-          {/* stopPropagation: activating a benefit is a different action
-              from browsing them, so the pill must not open the sheet. */}
-          <div onClick={(e) => e.stopPropagation()}>
-            <ActivatePill left={26} top={90} bolt={false} />
-          </div>
-
-          {/* Plane, cropped by the card's right edge. */}
-          <div
-            className="pointer-events-none absolute"
-            style={{ left: 222, top: 18, width: 190, height: 96 }}
-          >
-            <Image
-              src="/assets/profile/plane.png"
-              alt=""
-              width={190}
-              height={96}
-              unoptimized
-              style={{
-                width: 190,
-                height: 96,
-                display: "block",
-                objectFit: "contain",
-              }}
-            />
-          </div>
+        <div className="mt-[24px]">
+          <BenefitDeck onOpen={onOpenBenefit} onActivate={onActivateBenefit} />
         </div>
       </Reveal>
 
@@ -408,7 +356,7 @@ export default function ProfileBody({
       >
         {AGENTS.map((a, i) => (
           <Reveal key={a.key} delay={t(7) + i * 0.06} show={show}>
-            <AgentCard agent={a} index={i} />
+            <AgentCard agent={a} index={i} onOpen={() => onOpenAgent(a.key)} />
           </Reveal>
         ))}
       </div>
@@ -442,15 +390,30 @@ function Reveal({
 }
 
 function AgentCard({
+  onOpen,
   agent,
   index,
 }: {
   agent: (typeof AGENTS)[number];
   index: number;
+  onOpen?: () => void;
 }) {
   return (
+    /* The whole tile opens the agent's sheet, ACTIVATE included — the
+       design refers to both "clicking the agent" and "activate" as the
+       same way in, and a dead card body with one live pill would be the
+       more surprising reading. */
     <div
-      className="relative overflow-hidden"
+      role="button"
+      tabIndex={0}
+      onClick={onOpen}
+      onKeyDown={(e) => {
+        if (e.key === "Enter" || e.key === " ") {
+          e.preventDefault();
+          onOpen?.();
+        }
+      }}
+      className="relative cursor-pointer overflow-hidden"
       style={{
         height: 168,
         borderRadius: 28,
@@ -519,7 +482,11 @@ function AgentCard({
         {agent.desc}
       </p>
 
-      <ActivatePill left={18} top={128} index={index} />
+      {/* ActivatePill stops propagation — deliberately, so on a BENEFIT
+          card it opens the detail rather than the card's own target. On an
+          agent tile both routes lead to the same sheet, so it has to be
+          handed the opener explicitly or the CTA swallows the tap. */}
+      <ActivatePill left={18} top={128} index={index} onActivate={onOpen} />
     </div>
   );
 }
