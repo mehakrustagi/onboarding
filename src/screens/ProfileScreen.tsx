@@ -4,6 +4,12 @@ import Image from "next/image";
 import { motion, useMotionValue, useSpring, useTransform } from "framer-motion";
 import { useEffect, useRef, useState } from "react";
 import ProfileBody from "./profile/ProfileBody";
+import BenefitsSheet from "./profile/BenefitsSheet";
+import CardBack from "./profile/CardBack";
+import VerifyGate from "./profile/VerifyGate";
+import ConnectScan from "./profile/ConnectScan";
+import ProgramsConnected from "./profile/ProgramsConnected";
+import SettingsSheet from "./profile/SettingsSheet";
 
 /* Profile — Figma node 853:15690 (Dump_work).
  *
@@ -64,6 +70,19 @@ export default function ProfileScreen() {
      card looks like part of the card, not like something switching on. */
   const [lit, setLit] = useState(false);
   const [bodyIn, setBodyIn] = useState(false);
+  /* Benefits opens OVER this screen rather than replacing it — the design
+     keeps the WorldPass cards visible behind its scrim. So it's a sibling
+     of the stage, and closing it simply unmounts: the profile underneath
+     was never torn down, so it returns exactly as it was. */
+  const [benefitsOpen, setBenefitsOpen] = useState(false);
+  /* The verification gate is parked — see below.
+     The "+" on the card's back face opens the connect scan instead. */
+  const [scanOpen, setScanOpen] = useState(false);
+  /* The scan resolves into the programs screen. Both are open during the
+     handover — the scan recedes in z while the programs screen comes
+     forward, so one has to still be on screen as the other arrives. */
+  const [programsOpen, setProgramsOpen] = useState(false);
+  const [settingsOpen, setSettingsOpen] = useState(false);
   useEffect(() => {
     const t = window.setTimeout(() => setLit(true), GREEN_DELAY_MS);
     return () => window.clearTimeout(t);
@@ -86,13 +105,20 @@ export default function ProfileScreen() {
   }, [lit]);
 
   return (
+    // The phone is a plain frame. Scrolling lives on an inner layer so the
+    // benefits sheet can sit OVER it as a sibling — a sheet inside the
+    // scroller gets carried by the scroll, which is why the sticky version
+    // of this didn't hold position.
     <div
-      // Scrolls: the design runs 1781px against a 965px viewport. The
-      // card stage stays put and the content below it moves, which is the
-      // behaviour the design implies rather than a shrunken full-page fit.
-      className="relative h-[965px] w-[440px] select-none overflow-y-auto overflow-x-hidden rounded-[44px] shadow-[0_40px_80px_-20px_rgba(0,0,0,0.5)] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
+      className="relative h-[965px] w-[440px] select-none overflow-hidden rounded-[44px] shadow-[0_40px_80px_-20px_rgba(0,0,0,0.5)]"
       style={{ background: "#ffffff" }}
     >
+      <div
+        // Scrolls: the design runs 1781px against a 965px viewport. The
+        // card stage stays put and the content below it moves, which is
+        // the behaviour the design implies rather than a shrunken fit.
+        className="absolute inset-0 overflow-y-auto overflow-x-hidden [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
+      >
       {/* Status bar — the design uses the iOS component; this is the
           9:41 / signal / wifi / battery row it renders as. */}
       <div
@@ -115,6 +141,7 @@ export default function ProfileScreen() {
         x={360}
         icon="/assets/profile/settings.svg"
         label="Settings"
+        onClick={() => setSettingsOpen(true)}
       />
 
       {/* Card carousel. The second card is deliberately cut off by the
@@ -214,7 +241,12 @@ export default function ProfileScreen() {
       {/* Card carousel — arrives AFTER the disk, and drops onto it. The
           second card is deliberately cut off by the screen edge: that's
           the affordance telling you there are more. */}
-      <WorldPassCard x={CARD_X} delay={CARD_DELAY} lit={lit} />
+      <WorldPassCard
+        x={CARD_X}
+        delay={CARD_DELAY}
+        lit={lit}
+        onConnect={() => setScanOpen(true)}
+      />
       <WorldPassCard
         x={CARD_X + CARD_GAP}
         delay={CARD_DELAY + 0.1}
@@ -223,11 +255,52 @@ export default function ProfileScreen() {
       />
 
       {/* Everything below the pedestal (853:16315) — see ProfileBody. */}
-      <ProfileBody show={bodyIn} />
+      <ProfileBody
+        show={bodyIn}
+        onViewBenefits={() => setBenefitsOpen(true)}
+      />
 
       {/* Gives the scroll container the design's full height, so the
           absolutely-positioned body has room to scroll into. */}
-      <div style={{ height: 1781 }} />
+        <div style={{ height: 1781 }} />
+      </div>
+
+      {/* All benefits (853:22811). A sibling of the scroller, not a child,
+          so it covers the whole phone and holds still while its own list
+          scrolls inside it. */}
+      <BenefitsSheet
+        open={benefitsOpen}
+        onClose={() => setBenefitsOpen(false)}
+      />
+
+      {/* Verification gate (853:22081). Built, but held back — mounted
+          with `open` pinned false rather than deleted, so the screen and
+          its glow stay ready to switch on. */}
+      <VerifyGate open={false} onClose={() => {}} />
+
+      {/* Settings (853:18801) — a sheet over the profile, from the gear. */}
+      <SettingsSheet
+        open={settingsOpen}
+        onClose={() => setSettingsOpen(false)}
+      />
+
+      {/* Connect scan (853:17974) — what the card's "+" opens. */}
+      <ConnectScan
+        open={scanOpen}
+        onClose={() => setScanOpen(false)}
+        onComplete={() => setProgramsOpen(true)}
+        lifted={programsOpen}
+      />
+
+      {/* Programs connected (853:74983). Closing it returns all the way
+          out, since the scan behind it has already been dismissed. */}
+      <ProgramsConnected
+        open={programsOpen}
+        onClose={() => {
+          setProgramsOpen(false);
+          setScanOpen(false);
+        }}
+      />
     </div>
   );
 }
@@ -237,15 +310,18 @@ function IconButton({
   x,
   icon,
   label,
+  onClick,
 }: {
   x: number;
   icon: string;
   label: string;
+  onClick?: () => void;
 }) {
   return (
     <motion.button
       type="button"
       aria-label={label}
+      onClick={onClick}
       className="absolute flex items-center justify-center"
       style={{
         left: x,
@@ -294,9 +370,12 @@ function WorldPassCard({
   delay,
   lit,
   interactive = true,
+  onConnect,
 }: {
   x: number;
   delay: number;
+  /** Opens the verification gate from the back face's "+". */
+  onConnect?: () => void;
   /** Whether the green has woken. Held off until 2s after the card has
    *  landed, so it reads as a status light switching on rather than as
    *  part of the card's own arrival. */
@@ -306,6 +385,11 @@ function WorldPassCard({
   interactive?: boolean;
 }) {
   const ref = useRef<HTMLDivElement | null>(null);
+  /* Which face is showing. Counted rather than toggled, so repeated
+     swipes keep turning the card the same way instead of rocking it
+     back and forth — a card you swipe twice should be back where it
+     started, having gone all the way round. */
+  const [turns, setTurns] = useState(0);
 
   const rx = useMotionValue(0);
   const ry = useMotionValue(0);
@@ -352,14 +436,37 @@ function WorldPassCard({
           x: { duration: 8.9, repeat: Infinity, ease: "easeInOut" },
         }}
       >
+        {/* Flip plane. Swipe horizontally to turn the card.
+            transformStyle must be preserve-3d the whole way down this
+            chain, or the back face renders flat on top of the front
+            instead of behind it. */}
+        <motion.div
+          className="h-full w-full"
+          style={{ transformStyle: "preserve-3d" }}
+          animate={{ rotateY: turns * 180 }}
+          transition={{ type: "spring", stiffness: 60, damping: 14, mass: 1.1 }}
+          drag={interactive ? "x" : false}
+          dragSnapToOrigin
+          dragElastic={0.16}
+          dragConstraints={{ left: 0, right: 0 }}
+          onDragEnd={(_, info) => {
+            // Distance OR speed — a short flick should turn the card just
+            // as a slow long drag does, which is how a physical card
+            // behaves under a thumb.
+            const far = Math.abs(info.offset.x) > 55;
+            const fast = Math.abs(info.velocity.x) > 380;
+            if (far || fast) {
+              setTurns((t) => t + (info.offset.x < 0 ? 1 : -1));
+            }
+          }}
+        >
         <motion.div
           ref={ref}
           onMouseMove={onMove}
           onMouseLeave={onLeave}
-          className="relative h-full w-full overflow-hidden"
+          className="relative h-full w-full"
           style={{
             borderRadius: 30,
-            background: "#000000",
             rotateX: rxs,
             rotateY: rys,
             transformStyle: "preserve-3d",
@@ -376,9 +483,18 @@ function WorldPassCard({
         >
           {/* Idle rotation. Very small and on its own long period, so the
               card is never quite still even before the cursor arrives. */}
+          {/* Front face. backfaceVisibility hidden is what stops it
+              showing through mirrored once the card is past 90° — without
+              it both faces paint at once and the card looks doubled. */}
           <motion.div
-            className="absolute inset-0"
-            style={{ transformStyle: "preserve-3d" }}
+            className="absolute inset-0 overflow-hidden"
+            style={{
+              transformStyle: "preserve-3d",
+              backfaceVisibility: "hidden",
+              WebkitBackfaceVisibility: "hidden",
+              borderRadius: 30,
+              background: "#000000",
+            }}
             animate={{ rotateY: [-2.2, 2.2, -2.2], rotateX: [1.1, -1.1, 1.1] }}
             transition={{
               rotateY: { duration: 11, repeat: Infinity, ease: "easeInOut" },
@@ -620,6 +736,23 @@ function WorldPassCard({
               </p>
             </div>
           </motion.div>
+
+          {/* Back face, pre-turned 180° so it faces away at rest and comes
+              round as the plane turns. */}
+          <div
+            className="absolute inset-0"
+            style={{
+              transform: "rotateY(180deg)",
+              backfaceVisibility: "hidden",
+              WebkitBackfaceVisibility: "hidden",
+              borderRadius: 30,
+              overflow: "hidden",
+              boxShadow: "inset 0 0 0 1px rgba(0,0,0,0.06)",
+            }}
+          >
+            <CardBack onConnect={onConnect} />
+          </div>
+        </motion.div>
         </motion.div>
       </motion.div>
     </motion.div>
