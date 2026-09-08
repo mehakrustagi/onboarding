@@ -482,7 +482,11 @@ function AgentCard({
         {agent.desc}
       </p>
 
-      <ActivatePill left={18} top={128} index={index} />
+      {/* ActivatePill stops propagation — deliberately, so on a BENEFIT
+          card it opens the detail rather than the card's own target. On an
+          agent tile both routes lead to the same sheet, so it has to be
+          handed the opener explicitly or the CTA swallows the tap. */}
+      <ActivatePill left={18} top={128} index={index} onActivate={onOpen} />
     </div>
   );
 }
