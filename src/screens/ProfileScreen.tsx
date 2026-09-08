@@ -216,10 +216,14 @@ export default function ProfileScreen() {
           style={{
             opacity: 0.5,
             filter: "blur(9px)",
+            // Tapers before the box ends. Running to `black 100%` left
+            // the layer fully opaque at the container's bottom edge, so
+            // the shadow was sliced off on a straight line instead of
+            // fading out.
             maskImage:
-              "linear-gradient(to bottom, transparent 22%, black 58%, black 100%)",
+              "linear-gradient(to bottom, transparent 22%, black 56%, black 74%, transparent 100%)",
             WebkitMaskImage:
-              "linear-gradient(to bottom, transparent 22%, black 58%, black 100%)",
+              "linear-gradient(to bottom, transparent 22%, black 56%, black 74%, transparent 100%)",
           }}
         >
           <Image
@@ -585,7 +589,11 @@ function WorldPassCard({
             boxShadow: [
               "0 2px 6px -2px rgba(0,0,0,0.25)",
               "0 26px 50px -22px rgba(0,0,0,0.35)",
-              "0 50px 90px -40px rgba(0,0,0,0.28)",
+              // Pulled in hard. At 90px blur under a 264-wide card this cast a
+              // wash far wider than the plinth it lands on — which is what
+              // kept reading as an uncropped shadow around the pedestal,
+              // rather than the plinth's own.
+              "0 30px 46px -32px rgba(0,0,0,0.22)",
             ].join(", "),
           }}
         >

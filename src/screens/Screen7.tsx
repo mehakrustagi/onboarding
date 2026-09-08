@@ -39,14 +39,15 @@ const CAR_TOP = 220;
 const STRIDE = 230;
 const HALO_TOP = 296.5;
 
-/* The airport sheet wears the agent-sheet header — 72px orb, 18px/25
- * headline, 12px body — which runs ~40px deeper than onboarding's. The
- * SELECT phase therefore gets its own car geometry: lower and shorter, so
- * the header clears it and the info panel at 659.8 still has room. The
- * staged phase has no header and keeps the originals. */
-const AIRPORT_CAR_TOP = 265;
-const AIRPORT_CAR_H = 380;
-const AIRPORT_HALO_TOP = 341.5;
+/* The airport sheet wears the agent-sheet header — orb at 73, 72px, an
+ * 18/25 headline and a 12px body, plus the eligibility line — which runs
+ * to ~277 against onboarding's ~181. The SELECT phase therefore gets its
+ * own car geometry: lower and shorter, so the header clears it and the
+ * info panel at 659.8 still has room. The staged phase has no header and
+ * keeps the originals. */
+const AIRPORT_CAR_TOP = 292;
+const AIRPORT_CAR_H = 352;
+const AIRPORT_HALO_TOP = 368;
 
 /* The airport variant's header is taller than onboarding's: a 72px agent
  * orb in place of the 24px seat glyph, plus the "Available only in
@@ -235,7 +236,7 @@ export default function Screen7({
         // layout below it can give up. Everything under the header is
         // fixed against the CTA at y833, so the HEADER compresses to fit
         // the car's start at 220 rather than the car moving down.
-        style={{ top: airport ? 56 : 70 }}
+        style={{ top: airport ? 73 : 70 }}
         initial={{ opacity: 0, y: -8 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ duration: 0.6, ease: IN_EASE }}

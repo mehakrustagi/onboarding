@@ -147,6 +147,10 @@ const ROWS: { icon: string; label: string; page?: Page }[] = [
   { icon: "/assets/profile/st-add.svg", label: "Coupons" },
   { icon: "/assets/profile/st-gift.svg", label: "Loyalty Programs" },
   {
+    /* Figma uses Material's info_outline here (853:19077), but that node
+       is a Code Connect reference with no exportable asset, and drawing a
+       glyph by hand is guesswork. Keeping the existing icon until the real
+       one is exported — flagged rather than faked. */
     icon: "/assets/profile/st-logout.svg",
     label: "Terms of Service",
     page: "terms",
@@ -383,14 +387,15 @@ export default function SettingsSheet({
               <motion.div
                 className="absolute"
                 style={{
+                  // 853:19032 verbatim: 380×514 at top 129, r40, #f9fafb.
                   left: 30,
-                  top: 141,
+                  top: 129,
                   width: 380,
-                  borderRadius: 28,
-                  background: "#f4f5f6",
+                  borderRadius: 40,
+                  background: "#f9fafb",
                 }}
                 animate={{
-                  height: 496 + (accountsOpen ? ACCOUNTS_EXTRA : 0),
+                  height: 514 + (accountsOpen ? ACCOUNTS_EXTRA : 0),
                 }}
                 transition={{ duration: 0.36, ease: IN_EASE }}
               />
@@ -400,14 +405,18 @@ export default function SettingsSheet({
               <motion.div
                 className="absolute overflow-hidden"
                 style={{
-                  left: 30,
-                  top: 133,
-                  width: 380,
-                  borderRadius: 28,
+                  // 853:19035 sits at (10, 9.55) INSIDE the panel at
+                  // 360×134 — inset on every side, which is what makes it
+                  // read as a card ON the panel. Flush at 380 it looked
+                  // like the panel's own head.
+                  left: 40,
+                  top: 138.55,
+                  width: 360,
+                  borderRadius: 34,
                   background: "#ffffff",
                   boxShadow: "0 6px 26px 0 rgba(0,0,0,0.07)",
                 }}
-                animate={{ height: accountsOpen ? 140 + ACCOUNTS_EXTRA : 140 }}
+                animate={{ height: accountsOpen ? 134 + ACCOUNTS_EXTRA : 134 }}
                 transition={{ duration: 0.36, ease: IN_EASE }}
               >
                 {/* The whole header toggles, not just the chevron — a 20px
@@ -418,14 +427,14 @@ export default function SettingsSheet({
                 <Image
                   src="/assets/profile/st-person.svg"
                   alt=""
-                  width={22}
-                  height={22}
+                  width={24}
+                  height={24}
                   className="absolute"
-                  style={{ left: 26, top: 26, width: 22, height: 22 }}
+                  style={{ left: 28, top: 23.45, width: 24, height: 24 }}
                 />
                 <motion.div
                   className="pointer-events-none absolute"
-                  style={{ right: 26, top: 27, width: 20, height: 20 }}
+                  style={{ left: 316, top: 23, width: 20, height: 20 }}
                   // st-down is `navigate_next` — it points RIGHT at rest.
                   // 180 turned it to point LEFT; 90 is what points it down.
                   animate={{ rotate: accountsOpen ? 90 : 0 }}
@@ -442,12 +451,12 @@ export default function SettingsSheet({
                 <p
                   className="absolute font-medium"
                   style={{
-                    left: 26,
-                    top: 71,
+                    left: 28,
+                    top: 61.45,
                     fontSize: 16,
                     lineHeight: "20px",
-                    letterSpacing: "-0.32px",
-                    color: "#0b0b0b",
+                    letterSpacing: "-0.64px",
+                    color: "#000000",
                   }}
                 >
                   Accounts center
@@ -455,12 +464,12 @@ export default function SettingsSheet({
                 <p
                   className="absolute font-medium"
                   style={{
-                    left: 26,
-                    top: 97,
+                    left: 28,
+                    top: 87.45,
                     fontSize: 12,
                     lineHeight: "16px",
-                    letterSpacing: "-0.12px",
-                    color: "#9a9aa2",
+                    letterSpacing: "-0.24px",
+                    color: "#999999",
                   }}
                 >
                   Residence, Citizenship, Connectors &amp; Contact Info
@@ -496,7 +505,7 @@ export default function SettingsSheet({
                   aria-label="Accounts center"
                   onClick={() => setAccountsOpen((v) => !v)}
                   className="absolute"
-                  style={{ left: 0, top: 0, width: 380, height: 128, zIndex: 2 }}
+                  style={{ left: 0, top: 0, width: 360, height: 134, zIndex: 2 }}
                 />
               </motion.div>
 

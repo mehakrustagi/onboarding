@@ -174,17 +174,21 @@ export default function ConnectorsGraph({ onPanel }: { onPanel?: () => void }) {
       {/* Trunk: 29 tall at centre, y 309. Draws itself in. */}
       <motion.div
         className="pointer-events-none absolute left-1/2 -translate-x-1/2 overflow-hidden"
-        style={{ top: 309, width: 8, height: 29 }}
+        // Natural 5.333×34.333, NOT squashed into 8×29 — that turned the
+        // round cap at each end into an oval. Figma's box is 29 with the
+        // art overflowing 9.2% each side (inset -9.2%), which is exactly
+        // this asset at full size centred on that box: 309 - 2.67.
+        style={{ top: 306.33, width: 5.333, height: 34.333 }}
         initial={{ height: 0 }}
-        animate={{ height: 29 }}
+        animate={{ height: 34.333 }}
         transition={{ delay: 0.15, duration: 0.45, ease: IN_EASE }}
       >
         <Image
           src="/assets/profile/cn-trunk.svg"
           alt=""
-          width={8}
-          height={29}
-          style={{ width: 8, height: 29, display: "block" }}
+          width={6}
+          height={35}
+          style={{ width: 5.333, height: 34.333, display: "block" }}
         />
       </motion.div>
 

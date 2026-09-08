@@ -5,30 +5,20 @@ import Image from "next/image";
 import Screen7 from "../Screen7";
 
 /* Airport logistics — the onboarding supercar sequence (Screen 7) shown as
- * a bottom sheet rather than a full screen.
+ * a bottom sheet.
  *
- * Screen 7 lays itself out against the 440×965 phone canvas, so it is
- * SCALED to the sheet's 903 rather than clipped: cropping the last 62px
- * would take the "Reserve my car" CTA with it. 903/965 = 0.9358, from the
- * top centre so the cars stay put and only the bottom closes up.
+ * FULL FRAME HEIGHT, and NOT scaled. Screen 7 lays out against 440×965;
+ * squeezing that into a 903 sheet shrank everything with it — a 72px orb
+ * rendered at 59, the type at 82%, and fitting the height narrowed the
+ * canvas so the cars stopped short of the edges. Every one of those was a
+ * symptom of the scale, so the scale goes: at 1:1 the orb and copy match
+ * the other agent sheets exactly and the cars span the screen. It still
+ * rises from the bottom, so it still reads as a sheet.
  */
 
-const SHEET_H = 903;
-const CANVAS_H = 965;
-/* Clears the header before Screen 7's own content begins. */
-const HEADER_H = 68;
-/* And room at the foot. Fitting the canvas flush to the sheet's bottom put
- * Screen 7's closing caption hard against the edge and the home indicator;
- * the sequence needs the same breathing room the other sheets have. */
-const FOOT_H = 44;
-const FIT = (SHEET_H - HEADER_H - FOOT_H) / CANVAS_H;
-/* Fitting 965 into the sheet's height also narrows the canvas to ~361, so
- * the cars stopped short of the sheet's edges with white bars either side.
- * Rendering the canvas WIDER by exactly the same factor means it lands at
- * 440 after scaling — full-bleed, cars running off both sides as they do
- * in onboarding. Screen 7's content is centre-anchored, so it doesn't care
- * how wide the canvas is. */
-const CANVAS_W = Math.round(440 / FIT);
+const SHEET_H = 965;
+/* The chrome overlays the canvas rather than displacing it — Screen 7's
+ * airport header is positioned to start below it. */
 
 export default function AirportSheet({
   open,
@@ -70,16 +60,8 @@ export default function AirportSheet({
                 and the offset silently does nothing — which put Screen 7
                 back at the top edge, over the header. */}
             <div
-              className="absolute"
-              style={{
-                top: HEADER_H,
-                left: "50%",
-                marginLeft: -CANVAS_W / 2,
-                width: CANVAS_W,
-                height: CANVAS_H,
-                transform: `scale(${FIT})`,
-                transformOrigin: "50% 0%",
-              }}
+              className="absolute left-0 top-0"
+              style={{ width: 440, height: SHEET_H }}
             >
               <Screen7 onComplete={onClose} variant="airport" />
             </div>
