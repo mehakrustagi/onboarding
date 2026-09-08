@@ -52,6 +52,13 @@ const AIRPORT_HALO_TOP = 368;
 /* Headroom above the staged car in which it dissolves as it drives off.
  * The fade lives entirely in this zone, so the car is solid until it
  * starts moving. */
+/* With the tagline gone the info block is brand(50) + gap + name(25) = 95,
+ * sitting in the 189px between the airport car's base (644) and the CTA
+ * (833). Dead-centre would be 31; pushed further so the block sits nearer
+ * the button than the car — the name belongs with the thing you press,
+ * and the car needs the breathing room more than the CTA does. */
+const AIRPORT_INFO_SHIFT = 58;
+
 const CAR_FADE_ZONE = 210;
 /* Stops are expressed against the WHOLE wrapper (zone + car), so the fade
  * has to finish by zone/(zone+CAR_H) — 210/650 ≈ 32%. Running it further
@@ -247,7 +254,14 @@ export default function Screen7({
         // layout below it can give up. Everything under the header is
         // fixed against the CTA at y833, so the HEADER compresses to fit
         // the car's start at 220 rather than the car moving down.
-        style={{ top: airport ? 73 : 70 }}
+        style={{
+          top: airport ? 73 : 70,
+          // Above the sheet's head fade (z-10). The canvas renders at 1:1
+          // with no transform, so nothing here creates a stacking context
+          // and this z-index competes in the sheet's — which is what lets
+          // the orb sit on top of the fade rather than under it.
+          zIndex: airport ? 12 : undefined,
+        }}
         initial={{ opacity: 0, y: -8 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ duration: 0.6, ease: IN_EASE }}
@@ -416,6 +430,7 @@ export default function Screen7({
           car={car}
           wrappedX={carXs[i]}
           dist={carDists[i]}
+          airport={airport}
         />
       ))}
 
@@ -887,10 +902,14 @@ function InfoSlot({
   car,
   wrappedX,
   dist,
+  airport = false,
 }: {
   car: Car;
   wrappedX: import("framer-motion").MotionValue<number>;
   dist: import("framer-motion").MotionValue<number>;
+  /** 853:66675 carries the brand mark and the car's name only — no spec
+   *  line. Dropping it also gives the mark room under the car. */
+  airport?: boolean;
 }) {
   const absDist = useTransform(dist, (d) => Math.abs(d));
   // Aggressive fade — text is fully gone by 40% of the way to the next slot,
@@ -905,7 +924,7 @@ function InfoSlot({
       <motion.div
         className="pointer-events-none absolute top-0 left-1/2"
         style={{
-          top: 659.8,
+          top: 659.8 + (airport ? AIRPORT_INFO_SHIFT : 0),
           width: 50,
           height: 50,
           x: wrappedX,
@@ -919,7 +938,7 @@ function InfoSlot({
       <motion.p
         className="pointer-events-none absolute left-1/2 text-center font-serif text-[20px] leading-[25px] font-bold text-black whitespace-nowrap"
         style={{
-          top: 729.8,
+          top: 729.8 + (airport ? AIRPORT_INFO_SHIFT : 0),
           x: wrappedX,
           translateX: "-50%",
           opacity,
@@ -927,18 +946,21 @@ function InfoSlot({
       >
         {car.name}
       </motion.p>
-      {/* Tagline — Figma y 764.8 */}
-      <motion.p
-        className="pointer-events-none absolute left-1/2 text-center text-[12px] font-semibold leading-[16px] tracking-[-0.01em] text-[#999] whitespace-nowrap"
-        style={{
-          top: 764.8,
-          x: wrappedX,
-          translateX: "-50%",
-          opacity,
-        }}
-      >
-        {car.tagline}
-      </motion.p>
+      {/* Tagline — Figma y 764.8. Absent from 853:66675, so the airport
+          sheet drops it. */}
+      {!airport && (
+        <motion.p
+          className="pointer-events-none absolute left-1/2 text-center text-[12px] font-semibold leading-[16px] tracking-[-0.01em] text-[#999] whitespace-nowrap"
+          style={{
+            top: 764.8,
+            x: wrappedX,
+            translateX: "-50%",
+            opacity,
+          }}
+        >
+          {car.tagline}
+        </motion.p>
+      )}
     </>
   );
 }

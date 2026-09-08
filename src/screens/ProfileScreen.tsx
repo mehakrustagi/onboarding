@@ -1,7 +1,9 @@
 "use client";
 
 import Image from "next/image";
-import { motion, useMotionValue, useSpring, useTransform } from "framer-motion";
+import { motion, useMotionValue, useSpring, useTransform,
+  AnimatePresence,
+} from "framer-motion";
 import { useEffect, useRef, useState } from "react";
 import ProfileBody from "./profile/ProfileBody";
 import BenefitsSheet from "./profile/BenefitsSheet";
@@ -103,6 +105,8 @@ export default function ProfileScreen() {
      flag, so the card stays rendered through the exit. */
   const [programDetail, setProgramDetail] = useState<number | null>(null);
   const [airportOpen, setAirportOpen] = useState(false);
+  /* Retires the turn hint once the card has actually been flipped. */
+  const [flipHinted, setFlipHinted] = useState(false);
   const [verifyOpen, setVerifyOpen] = useState(false);
   /* The detail the profile's own benefit deck opens. Held as CONTENT
      rather than a flag so the panel keeps its copy through the exit. */
@@ -266,7 +270,48 @@ export default function ProfileScreen() {
         delay={CARD_DELAY}
         lit={lit}
         onConnect={() => setScanOpen(true)}
+        onFlipped={() => setFlipHinted(true)}
       />
+
+      {/* Turn affordance (899:13965) — the gradient tab peeking from the
+          card's left edge, with the curved arrow beside it. A SIBLING of
+          the card, not a child: it must not tilt or rotate with it, since
+          it is a hint pointing AT the card rather than part of its face.
+          Its right edge tucks 14px behind the card so it reads as the
+          reverse side showing through. */}
+      <AnimatePresence>
+        {!flipHinted && (
+          <motion.div
+            className="pointer-events-none absolute"
+            style={{ left: CARD_X - 55.9 + 14, top: CARD_Y + 60, width: 55.9, height: 93, zIndex: 3 }}
+            initial={{ opacity: 0, x: 8 }}
+            animate={{ opacity: 1, x: 0 }}
+            exit={{ opacity: 0, x: 6 }}
+            transition={{ delay: CARD_DELAY + 1.1, duration: 0.6, ease: IN_EASE }}
+          >
+            {/* Nudges left and back — the direction the card wants to be
+                swiped. Slow, and with a long pause between, so it prompts
+                rather than nags. */}
+            <motion.div
+              animate={{ x: [0, -5, 0, 0, 0] }}
+              transition={{
+                duration: 3.4,
+                times: [0, 0.16, 0.32, 0.66, 1],
+                repeat: Infinity,
+                ease: "easeInOut",
+              }}
+            >
+              <Image
+                src="/assets/profile/pass-turn.svg"
+                alt=""
+                width={56}
+                height={93}
+                style={{ width: 55.9, height: 93, display: "block" }}
+              />
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
       <WorldPassCard
         x={CARD_X + CARD_GAP}
         delay={CARD_DELAY + 0.1}
@@ -481,11 +526,15 @@ function WorldPassCard({
   lit,
   interactive = true,
   onConnect,
+  onFlipped,
 }: {
   x: number;
   delay: number;
   /** Opens the verification gate from the back face's "+". */
   onConnect?: () => void;
+  /** Fires on the first flip, so the turn hint can retire once it has
+   *  done its job. */
+  onFlipped?: () => void;
   /** Whether the green has woken. Held off until 2s after the card has
    *  landed, so it reads as a status light switching on rather than as
    *  part of the card's own arrival. */
@@ -567,6 +616,7 @@ function WorldPassCard({
             const fast = Math.abs(info.velocity.x) > 380;
             if (far || fast) {
               setTurns((t) => t + (info.offset.x < 0 ? 1 : -1));
+              onFlipped?.();
             }
           }}
         >

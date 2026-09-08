@@ -1,0 +1,30 @@
+<svg preserveAspectRatio="none" overflow="visible" style="display: block;" width="55.8992" height="93" viewBox="0 0 55.8992 93" fill="none" xmlns="http://www.w3.org/2000/svg">
+<g id="TURN">
+<g id="ARROW" opacity="0.4">
+<path id="Vector 4878" d="M37.5735 54C36.6468 54.5665 35.7351 55.1028 34.8387 55.6097C26.6769 60.1369 17.4899 64.1545 8.40514 63.3251C6.22793 63.0575 3.95798 62.2731 2.99753 60.836C2.03805 59.4644 2.87632 57.7084 4.47486 56.3552C7.69635 53.7052 12.2932 52.5275 16.786 51.8408C17.776 51.6965 18.7563 51.5825 19.8182 51.485C19.6553 50.1617 19.4925 48.8383 19.3296 47.515C18.2051 47.6873 17.1652 47.8776 16.1118 48.101C11.3119 49.1828 6.43492 50.6037 2.50426 54.2276C1.5302 55.1903 0.663955 56.3114 0.221213 57.7743C-0.250856 59.2182 0.0409883 61.0805 1.01662 62.2777C3.00167 64.666 5.7661 65.1134 8.21984 65.3165C18.2467 65.5417 27.0136 60.8095 34.9428 55.7805C35.8063 55.2155 36.6833 54.6223 37.5735 54Z" fill="#939393"/>
+<path id="Vector 4879" d="M16.8992 56V44L25.8992 48.2778L16.8992 56Z" fill="#939393"/>
+</g>
+<g id="MARK" filter="url(#filter0_i_0_4)">
+<path d="M55.8992 79C55.8992 82.9999 52.8991 84.9995 49.8992 86.2588C45.2639 88.2044 45.3992 91.0773 44.8992 93V0C45.3992 1.92273 45.2639 4.79556 49.8992 6.74121C52.8991 8.00047 55.8992 10.0001 55.8992 14V79Z" fill="#D9D9D9"/>
+<path d="M55.8992 79C55.8992 82.9999 52.8991 84.9995 49.8992 86.2588C45.2639 88.2044 45.3992 91.0773 44.8992 93V0C45.3992 1.92273 45.2639 4.79556 49.8992 6.74121C52.8991 8.00047 55.8992 10.0001 55.8992 14V79Z" fill="url(#paint0_linear_0_4)"/>
+</g>
+</g>
+<defs>
+<filter id="filter0_i_0_4" x="44.8992" y="0" width="11" height="97" filterUnits="userSpaceOnUse" color-interpolation-filters="sRGB">
+<feFlood flood-opacity="0" result="BackgroundImageFix"/>
+<feBlend mode="normal" in="SourceGraphic" in2="BackgroundImageFix" result="shape"/>
+<feColorMatrix in="SourceAlpha" type="matrix" values="0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 127 0" result="hardAlpha"/>
+<feOffset dy="4"/>
+<feGaussianBlur stdDeviation="2.5"/>
+<feComposite in2="hardAlpha" operator="arithmetic" k2="-1" k3="1"/>
+<feColorMatrix type="matrix" values="0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0.5 0"/>
+<feBlend mode="normal" in2="shape" result="effect1_innerShadow_0_4"/>
+</filter>
+<linearGradient id="paint0_linear_0_4" x1="14.8992" y1="47.1533" x2="75.3992" y2="16" gradientUnits="userSpaceOnUse">
+<stop stop-color="white"/>
+<stop offset="0.163462" stop-color="white"/>
+<stop offset="0.456008" stop-color="#FFF8D1"/>
+<stop offset="0.925754" stop-color="#E83DFF"/>
+</linearGradient>
+</defs>
+</svg>
