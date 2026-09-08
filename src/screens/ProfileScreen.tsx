@@ -503,6 +503,11 @@ function WorldPassCard({
 
   const rx = useMotionValue(0);
   const ry = useMotionValue(0);
+  /* The flip plane owns the horizontal drag, and the turn mark sits ABOVE
+     it (so the turn doesn't rotate the mark away). That left the card
+     sliding under the thumb while the mark stayed put. Handing framer this
+     motion value lets both read the same offset. */
+  const dragX = useMotionValue(0);
   // Soft spring: the card settles rather than snapping, which reads as
   // something with mass.
   const rxs = useSpring(rx, { stiffness: 150, damping: 20, mass: 0.9 });
@@ -566,15 +571,18 @@ function WorldPassCard({
           <motion.div
             className="pointer-events-none absolute inset-0"
             style={{
+              x: dragX,
               rotateX: rxs,
               rotateY: rys,
               transformStyle: "preserve-3d",
-              zIndex: 5,
+              // NO z-index. The card's faces paint over the part that
+              // overlaps, which is what makes the tab read as tucked into
+              // the card's side rather than stuck on its front.
             }}
           >
             <motion.div
               className="absolute"
-              style={{ left: -55.9 + 14, top: 60, width: 55.9, height: 93 }}
+              style={{ left: -44, top: 60, width: 55.9, height: 93 }}
               initial={{ opacity: 0, x: 8 }}
               animate={{ opacity: 1, x: 0 }}
               transition={{ delay: delay + 1.1, duration: 0.6, ease: IN_EASE }}
@@ -608,7 +616,7 @@ function WorldPassCard({
             instead of behind it. */}
         <motion.div
           className="h-full w-full"
-          style={{ transformStyle: "preserve-3d" }}
+          style={{ transformStyle: "preserve-3d", x: dragX }}
           animate={{ rotateY: turns * 180 }}
           transition={{ type: "spring", stiffness: 60, damping: 14, mass: 1.1 }}
           drag={interactive ? "x" : false}
