@@ -160,11 +160,22 @@ export default function ProfileScreen() {
           // (inset -66.67% -4.36%), so it's placed at its NATURAL size
           // centred on that box. Squashing it into 321×21 was what turned
           // it into a hard dark bar.
-          left: 18 + (321 - 349) / 2,
+          //
+          // Centred on the DISC, not on Figma's 321-wide box: that box
+          // centres at x178.5 while the disc centres at 220, so following
+          // it put the shadow 41.5px to the left and spilled it out past
+          // the plinth's edge.
+          left: 43 + 354 / 2 - 349 / 2,
           top: 567 + (21 - 49) / 2,
           width: 349,
           height: 49,
           zIndex: 1,
+          // Cropped at the ends. A cast shadow has no hard vertical edge —
+          // it has to run out before the plinth does.
+          maskImage:
+            "linear-gradient(90deg, transparent 0%, #000 14%, #000 86%, transparent 100%)",
+          WebkitMaskImage:
+            "linear-gradient(90deg, transparent 0%, #000 14%, #000 86%, transparent 100%)",
         }}
         initial={{ opacity: 0 }}
         animate={{ opacity: 1 }}
@@ -420,10 +431,11 @@ function IconButton({
         width: 50,
         height: 50,
         borderRadius: 54,
-        // Figma has rgba(255,255,255,0.1) — invisible on a white page, so
-        // it must be resolving against something. Using a light grey fill
-        // of the same weight so the control actually reads.
-        background: "rgba(0,0,0,0.04)",
+        // Solid, not a wash. Figma has rgba(255,255,255,0.1), which is
+        // invisible on a white page; a translucent grey was readable but
+        // now that these are pinned above the scroller, content slides
+        // underneath and shows straight through them.
+        background: "#f2f2f4",
       }}
       initial={{ opacity: 0, y: -6 }}
       animate={{ opacity: 1, y: 0 }}

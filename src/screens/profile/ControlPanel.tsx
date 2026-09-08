@@ -194,9 +194,6 @@ export default function ControlPanel({
   });
   const progress = useTransform(pulled, [0, BREAK_AT], [0, 1]);
   const iconScale = useTransform(progress, [0, 1], [1, 0.9]);
-  /* The fire rises to meet the icon — frame 1556 → 1557 is one scrub, not
-     two states. */
-  const fireLit = useTransform(progress, [0, 1], [0.85, 1]);
   const copyFade = useTransform(progress, [0, 0.55], [1, 0]);
 
   /* The icon never sits still — it floats, and the closer it gets to the
@@ -465,7 +462,11 @@ export default function ControlPanel({
               isolation: "isolate",
               overflow: "hidden",
               zIndex: 3,
-              opacity: stage === "idle" ? fireLit : 1,
+              // Full strength. 899:11351 is this exact asset — same path,
+              // same stops, same fill-opacity 0.6 — so the reference IS
+              // the file rendered plainly. Dimming it at rest, then adding
+              // light back with flames, is what made it read differently.
+              opacity: 1,
             }}
           >
             <Image
@@ -549,7 +550,7 @@ export default function ControlPanel({
               className="absolute inset-0"
               style={{
                 background:
-                  "linear-gradient(0deg, rgba(255,226,61,0.45) 0%, rgba(255,137,60,0.14) 38%, rgba(255,137,60,0) 70%)",
+                  "linear-gradient(0deg, rgba(255,226,61,0.3) 0%, rgba(255,137,60,0.09) 38%, rgba(255,137,60,0) 70%)",
                 mixBlendMode: "plus-lighter",
                 ...FLAME_MASK_STYLE,
               }}
@@ -558,7 +559,7 @@ export default function ControlPanel({
               animate={
                 stage === "done" || stage === "final"
                   ? { opacity: 0 }
-                  : { opacity: [0.3, 0.55, 0.36, 0.62, 0.32, 0.5, 0.3] }
+                  : { opacity: [0.08, 0.16, 0.1, 0.18, 0.09, 0.14, 0.08] }
               }
               transition={
                 stage === "done" || stage === "final"
@@ -994,7 +995,10 @@ export default function ControlPanel({
 
 /* Flame layers. Slow and small — the brief is slow-motion, and fire that
  * moves fast at this scale reads as a glitching gradient. */
+/* Deliberately faint. The brief was fire, but the gradient itself is the
+ * design — so these carry motion without carrying brightness, and a still
+ * frame matches 899:11351. */
 const FLAMES = [
-  { opacity: 0.34, rise: 26, stretch: 1.1, lick: 1.03, dur: 5.2 },
-  { opacity: 0.22, rise: 44, stretch: 1.17, lick: 0.97, dur: 7.9 },
+  { opacity: 0.1, rise: 26, stretch: 1.08, lick: 1.02, dur: 5.2 },
+  { opacity: 0.07, rise: 44, stretch: 1.13, lick: 0.98, dur: 7.9 },
 ] as const;
