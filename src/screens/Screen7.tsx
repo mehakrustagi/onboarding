@@ -614,7 +614,12 @@ function TireTracks() {
     <motion.div
       className="pointer-events-none absolute overflow-hidden"
       style={{
-        left: 143,
+        // Centre-anchored, not left:143. That value assumed a 440-wide
+        // canvas; the airport sheet renders it wider so the cars can
+        // reach the edges, which slid the tracks away from the wheels.
+        // 143 + 157/2 = 221.5 against a 220 centre, hence the 1.5.
+        left: "50%",
+        marginLeft: -157 / 2 + 1.5,
         top: 207.6,
         width: 157,
         height: 258,
