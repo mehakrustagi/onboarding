@@ -6,6 +6,7 @@ import AgentOrb from "@/components/AgentOrb";
 import { haptic } from "@/lib/haptics";
 import { useState } from "react";
 import SavePill from "./SavePill";
+import MedicalCard from "./MedicalCard";
 
 /* Agent preference sheet — Figma 853:63443 (flight) and its siblings for
  * stay, medical, itinerary, food and airport logistics.
@@ -220,7 +221,9 @@ export default function AgentSheet({
 
                     {/* Header — label with the "already learned" tick 8px
                         after it, so the badge tracks the word rather than
-                        sitting at a fixed column. */}
+                        sitting at a fixed column. The medical card brings
+                        its own name and toggle, so it takes neither. */}
+                    {!sec.fields && (
                     <div className="flex items-center gap-[8px]">
                       <span
                         className="whitespace-nowrap font-bold uppercase"
@@ -263,8 +266,18 @@ export default function AgentSheet({
                         </span>
                       )}
                     </div>
+                    )}
 
-                    {sec.toggle && (
+                    {sec.fields && (
+                      <MedicalCard
+                        fields={sec.fields}
+                        toggleLabel={sec.toggle}
+                        on={isOn(sec, sec.toggle ?? "")}
+                        onToggle={() => toggle(sec, sec.toggle ?? "")}
+                      />
+                    )}
+
+                    {!sec.fields && sec.toggle && (
                       <button
                         type="button"
                         onClick={() => toggle(sec, sec.toggle as string)}
@@ -301,40 +314,6 @@ export default function AgentSheet({
                           />
                         </span>
                       </button>
-                    )}
-
-                    {sec.fields && (
-                      <div
-                        className="mt-[24px] flex flex-col gap-[14px]"
-                        style={{
-                          padding: 20,
-                          borderRadius: 28,
-                          background: "#f7f7f8",
-                          border: "1px solid #f4f5f6",
-                        }}
-                      >
-                        {sec.fields.map((f) => (
-                          <div key={f.label} className="flex items-center justify-between">
-                            <span
-                              className="font-bold uppercase"
-                              style={{
-                                fontSize: 11,
-                                lineHeight: "14px",
-                                letterSpacing: "0.88px",
-                                color: "#8a8a90",
-                              }}
-                            >
-                              {f.label}
-                            </span>
-                            <span
-                              className="font-medium"
-                              style={{ fontSize: 14, lineHeight: "19px", color: "#0b0b0b" }}
-                            >
-                              {f.value}
-                            </span>
-                          </div>
-                        ))}
-                      </div>
                     )}
 
                     {sec.chips && (

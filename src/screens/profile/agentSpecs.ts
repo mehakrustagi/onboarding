@@ -101,12 +101,12 @@ export const FLIGHT_AGENT: AgentSpec = {
 };
 
 
-/* Stay — 853:64159. No "Found X/Y" headline in this node; it goes from the
- * eyebrow straight to the body. Its section notes are copy-pasted from the
- * flight sheet in the design file ("scan flights 24x7" under PREFERRED
- * HOTELS), reproduced as-is. */
+/* Stay — 853:64159. Its section notes are copy-pasted from the flight
+ * sheet in the design file ("scan flights 24x7" under PREFERRED HOTELS),
+ * reproduced as-is. */
 export const STAY_AGENT: AgentSpec = {
   eyebrow: "STAY AGENT",
+  headline: "Found 6/8 stay preferences",
   body: "You’ve flown Emirates to Dubai three times in the past year, and you’ve chosen an aisle seat every time.",
   sources: "3 Sources",
   sections: [
@@ -164,8 +164,9 @@ export const STAY_AGENT: AgentSpec = {
   ],
 };
 
-/* Medical — 853:64710. Carries two blocks the other agents don't: a lock
- * screen toggle and an ID card of label/value rows. */
+/* Medical — 853:64710. Opens on the dark ID card (853:65145), which is a
+ * card in its own right rather than a list of rows: it carries the name,
+ * the caduceus, and the lock-screen toggle inside itself. */
 export const MEDICAL_AGENT: AgentSpec = {
   eyebrow: "MEDICAL AGENT",
   headline: "Found 6/8 medical preferences",
@@ -173,8 +174,8 @@ export const MEDICAL_AGENT: AgentSpec = {
   sources: "3 Sources",
   sections: [
     {
+      /* No heading in the design — the card names itself. */
       label: "MEDICAL CARD",
-      done: true,
       toggle: "Open medical card when phone is locked",
       fields: [
         { label: "NAME", value: "mohak n." },
