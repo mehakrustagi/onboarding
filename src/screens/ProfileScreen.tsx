@@ -549,40 +549,55 @@ function WorldPassCard({
         {/* Turn affordance (899:13965) — the gradient tab on the card's
             left edge with the arrow beside it.
 
-            Inside the FLOAT wrapper so it drifts and settles with the
-            card and reads as part of it, but OUTSIDE the flip plane, so
-            turning the card does not rotate it away. It has no z-index,
-            so the card's own faces paint over the overlapping 14px and
-            the tab reads as tucked behind the edge.
+            Pasted ON the card: it carries the card's OWN tilt values, in a
+            wrapper the full size of the card, so it pivots about the
+            card's centre exactly as a sticker on its surface would —
+            rather than spinning about its own.
+
+            It sits in the float wrapper, one level ABOVE the flip plane,
+            which is what lets it tilt and drift with the card while
+            surviving the turn. Inside the flip it would rotate away with
+            the front face. z-index puts it over the card rather than
+            tucked behind it.
 
             Permanent: the card can be turned at any time, so the thing
             that says so has to stay. */}
         {interactive && (
           <motion.div
-            className="pointer-events-none absolute"
-            style={{ left: -55.9 + 14, top: 60, width: 55.9, height: 93 }}
-            initial={{ opacity: 0, x: 8 }}
-            animate={{ opacity: 1, x: 0 }}
-            transition={{ delay: delay + 1.1, duration: 0.6, ease: IN_EASE }}
+            className="pointer-events-none absolute inset-0"
+            style={{
+              rotateX: rxs,
+              rotateY: rys,
+              transformStyle: "preserve-3d",
+              zIndex: 5,
+            }}
           >
-            {/* Nudges toward the swipe direction, then rests — it prompts
-                rather than nags. */}
             <motion.div
-              animate={{ x: [0, -5, 0, 0, 0] }}
-              transition={{
-                duration: 3.4,
-                times: [0, 0.16, 0.32, 0.66, 1],
-                repeat: Infinity,
-                ease: "easeInOut",
-              }}
+              className="absolute"
+              style={{ left: -55.9 + 14, top: 60, width: 55.9, height: 93 }}
+              initial={{ opacity: 0, x: 8 }}
+              animate={{ opacity: 1, x: 0 }}
+              transition={{ delay: delay + 1.1, duration: 0.6, ease: IN_EASE }}
             >
-              <Image
-                src="/assets/profile/pass-turn.svg"
-                alt=""
-                width={56}
-                height={93}
-                style={{ width: 55.9, height: 93, display: "block" }}
-              />
+              {/* Nudges toward the swipe direction, then rests — it
+                  prompts rather than nags. */}
+              <motion.div
+                animate={{ x: [0, -5, 0, 0, 0] }}
+                transition={{
+                  duration: 3.4,
+                  times: [0, 0.16, 0.32, 0.66, 1],
+                  repeat: Infinity,
+                  ease: "easeInOut",
+                }}
+              >
+                <Image
+                  src="/assets/profile/pass-turn.svg"
+                  alt=""
+                  width={56}
+                  height={93}
+                  style={{ width: 55.9, height: 93, display: "block" }}
+                />
+              </motion.div>
             </motion.div>
           </motion.div>
         )}
