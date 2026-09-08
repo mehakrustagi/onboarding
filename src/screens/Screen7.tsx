@@ -45,7 +45,7 @@ const HALO_TOP = 296.5;
  * starts at 220, so the two collide. The carousel and its halo drop by
  * this much to clear it — the header is the fixed thing here, not the
  * car's position. */
-const AIRPORT_CAR_SHIFT = 55;
+
 const HALO_SIZE = 260;
 
 type Car = {
@@ -220,7 +220,13 @@ export default function Screen7({
 
       {/* Header — seat icon + title + subtitle */}
       <motion.div
-        className="absolute left-1/2 top-[70px] -translate-x-1/2 flex flex-col items-center"
+        className="absolute left-1/2 -translate-x-1/2 flex flex-col items-center"
+        // The airport header carries a 72px orb where onboarding has a
+        // 24px glyph, plus the eligibility line — 43px more than the
+        // layout below it can give up. Everything under the header is
+        // fixed against the CTA at y833, so the HEADER compresses to fit
+        // the car's start at 220 rather than the car moving down.
+        style={{ top: airport ? 56 : 70 }}
         initial={{ opacity: 0, y: -8 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ duration: 0.6, ease: IN_EASE }}
@@ -233,12 +239,17 @@ export default function Screen7({
             animate={{ y: [0, -5, 0] }}
             transition={{ duration: 5.4, repeat: Infinity, ease: "easeInOut" }}
           >
-            <AgentOrb size={72} />
+            <AgentOrb size={56} />
           </motion.div>
         ) : (
           <SeatIcon />
         )}
-        <p className="mt-[20px] whitespace-nowrap text-[20px] font-medium leading-[25px] tracking-[-0.04em] text-[#0b0b0b] text-center">
+        <p
+          className="whitespace-nowrap text-[20px] font-medium leading-[25px] tracking-[-0.04em] text-[#0b0b0b] text-center"
+          // Tighter only where the header has to fit a 56px orb and a
+          // third line; onboarding keeps its original rhythm.
+          style={{ marginTop: airport ? 14 : 20 }}
+        >
           {airport ? "Select your airport pickup" : "Select your arrival supercar"}
         </p>
         <p
@@ -251,7 +262,7 @@ export default function Screen7({
         </p>
         {airport && (
           <p
-            className="mt-[18px] text-center text-[12px] font-semibold leading-[16px] tracking-[-0.01em] text-[#999]"
+            className="mt-[10px] text-center text-[12px] font-semibold leading-[16px] tracking-[-0.01em] text-[#999]"
             style={{ width: 360 }}
           >
             Available only in eligible regions
@@ -265,10 +276,7 @@ export default function Screen7({
       <div
         className="pointer-events-none absolute left-1/2 -translate-x-1/2"
         style={{
-          top: HALO_TOP + (airport ? AIRPORT_CAR_SHIFT : 0),
-          width: HALO_SIZE,
-          height: HALO_SIZE,
-        }}
+          top: HALO_TOP, width: HALO_SIZE, height: HALO_SIZE }}
       >
         {[0, 1, 2, 3, 4].map((i) => (
           <motion.div
@@ -315,7 +323,7 @@ export default function Screen7({
       <motion.div
         className="absolute left-0 cursor-grab active:cursor-grabbing"
         style={{
-          top: CAR_TOP + (airport ? AIRPORT_CAR_SHIFT : 0),
+          top: CAR_TOP,
           width: "100%",
           height: CAR_H,
           touchAction: "pan-y",
@@ -346,7 +354,6 @@ export default function Screen7({
           car={car}
           wrappedX={carXs[i]}
           dist={carDists[i]}
-          shift={airport ? AIRPORT_CAR_SHIFT : 0}
         />
       ))}
 
@@ -742,8 +749,6 @@ function CarSlot({
   car: Car;
   wrappedX: import("framer-motion").MotionValue<number>;
   dist: import("framer-motion").MotionValue<number>;
-  /** Follows the carousel down when the airport header is taller. */
-  shift?: number;
 }) {
   const absDist = useTransform(dist, (d) => Math.abs(d));
   const scale = useTransform(absDist, [0, 1], [1, 0.72], { clamp: true });
@@ -793,7 +798,6 @@ function CarSlot({
  * fade out on whichever side they drift toward.
  * -------------------------------------------------------------------------*/
 function InfoSlot({
-  shift = 0,
   car,
   wrappedX,
   dist,
@@ -801,8 +805,6 @@ function InfoSlot({
   car: Car;
   wrappedX: import("framer-motion").MotionValue<number>;
   dist: import("framer-motion").MotionValue<number>;
-  /** Follows the carousel down when the airport header is taller. */
-  shift?: number;
 }) {
   const absDist = useTransform(dist, (d) => Math.abs(d));
   // Aggressive fade — text is fully gone by 40% of the way to the next slot,
@@ -817,7 +819,7 @@ function InfoSlot({
       <motion.div
         className="pointer-events-none absolute top-0 left-1/2"
         style={{
-          top: 659.8 + shift,
+          top: 659.8,
           width: 50,
           height: 50,
           x: wrappedX,
