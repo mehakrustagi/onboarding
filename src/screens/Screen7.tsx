@@ -39,6 +39,15 @@ const CAR_TOP = 220;
 const STRIDE = 230;
 const HALO_TOP = 296.5;
 
+/* The airport sheet wears the agent-sheet header — 72px orb, 18px/25
+ * headline, 12px body — which runs ~40px deeper than onboarding's. The
+ * SELECT phase therefore gets its own car geometry: lower and shorter, so
+ * the header clears it and the info panel at 659.8 still has room. The
+ * staged phase has no header and keeps the originals. */
+const AIRPORT_CAR_TOP = 265;
+const AIRPORT_CAR_H = 380;
+const AIRPORT_HALO_TOP = 341.5;
+
 /* The airport variant's header is taller than onboarding's: a 72px agent
  * orb in place of the 24px seat glyph, plus the "Available only in
  * eligible regions" line. That pushes the copy to ~y263 while the car
@@ -239,22 +248,53 @@ export default function Screen7({
             animate={{ y: [0, -5, 0] }}
             transition={{ duration: 5.4, repeat: Infinity, ease: "easeInOut" }}
           >
-            <AgentOrb size={56} />
+            <AgentOrb size={72} />
           </motion.div>
         ) : (
           <SeatIcon />
         )}
         <p
-          className="whitespace-nowrap text-[20px] font-medium leading-[25px] tracking-[-0.04em] text-[#0b0b0b] text-center"
-          // Tighter only where the header has to fit a 56px orb and a
-          // third line; onboarding keeps its original rhythm.
-          style={{ marginTop: airport ? 14 : 20 }}
+          className={
+            airport
+              ? "text-center font-medium"
+              : "whitespace-nowrap text-[20px] font-medium leading-[25px] tracking-[-0.04em] text-[#0b0b0b] text-center"
+          }
+          // Airport wears the agent sheets' type: 18/25 at -0.72, over a
+          // 216 column, so it reads as one of them rather than as a
+          // borrowed onboarding screen.
+          style={
+            airport
+              ? {
+                  marginTop: 14,
+                  width: 216,
+                  fontSize: 18,
+                  lineHeight: "25px",
+                  letterSpacing: "-0.72px",
+                  color: "#0b0b0b",
+                }
+              : { marginTop: 20 }
+          }
         >
           {airport ? "Select your airport pickup" : "Select your arrival supercar"}
         </p>
         <p
-          className="mt-[10px] text-center text-[12px] font-semibold leading-[16px] tracking-[-0.01em] text-[#999]"
-          style={{ width: 360 }}
+          className={
+            airport
+              ? "text-center font-medium"
+              : "mt-[10px] text-center text-[12px] font-semibold leading-[16px] tracking-[-0.01em] text-[#999]"
+          }
+          style={
+            airport
+              ? {
+                  marginTop: 10,
+                  width: 310,
+                  fontSize: 12,
+                  lineHeight: "16px",
+                  letterSpacing: "-0.24px",
+                  color: "#8a8a90",
+                }
+              : { width: 360 }
+          }
         >
           Bypass standard taxi queues with an on-demand
           <br />
@@ -262,8 +302,15 @@ export default function Screen7({
         </p>
         {airport && (
           <p
-            className="mt-[10px] text-center text-[12px] font-semibold leading-[16px] tracking-[-0.01em] text-[#999]"
-            style={{ width: 360 }}
+            className="text-center font-medium"
+            style={{
+              marginTop: 10,
+              width: 310,
+              fontSize: 12,
+              lineHeight: "16px",
+              letterSpacing: "-0.24px",
+              color: "#8a8a90",
+            }}
           >
             Available only in eligible regions
           </p>
@@ -276,7 +323,10 @@ export default function Screen7({
       <div
         className="pointer-events-none absolute left-1/2 -translate-x-1/2"
         style={{
-          top: HALO_TOP, width: HALO_SIZE, height: HALO_SIZE }}
+          top: airport ? AIRPORT_HALO_TOP : HALO_TOP,
+          width: HALO_SIZE,
+          height: HALO_SIZE,
+        }}
       >
         {[0, 1, 2, 3, 4].map((i) => (
           <motion.div
@@ -323,9 +373,9 @@ export default function Screen7({
       <motion.div
         className="absolute left-0 cursor-grab active:cursor-grabbing"
         style={{
-          top: CAR_TOP,
+          top: airport ? AIRPORT_CAR_TOP : CAR_TOP,
           width: "100%",
-          height: CAR_H,
+          height: airport ? AIRPORT_CAR_H : CAR_H,
           touchAction: "pan-y",
         }}
         onPanStart={handlePanStart}

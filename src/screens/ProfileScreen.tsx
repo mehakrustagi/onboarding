@@ -146,31 +146,6 @@ export default function ProfileScreen() {
         // the behaviour the design implies rather than a shrunken fit.
         className="absolute inset-0 overflow-y-auto overflow-x-hidden [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
       >
-      {/* Status bar — the design uses the iOS component; this is the
-          9:41 / signal / wifi / battery row it renders as. */}
-      <div
-        className="absolute flex items-center justify-between"
-        style={{ left: 30, right: 30, top: 18, height: 24 }}
-      >
-        <span className="text-[16px] font-semibold tracking-[-0.3px] text-black">
-          9:41
-        </span>
-        <div className="flex items-center gap-1.5 text-black">
-          <SignalBars />
-          <WifiGlyph />
-          <BatteryGlyph />
-        </div>
-      </div>
-
-      {/* Back + settings */}
-      <IconButton x={30} icon="/assets/profile/arrow-back.svg" label="Back" />
-      <IconButton
-        x={360}
-        icon="/assets/profile/settings.svg"
-        label="Settings"
-        onClick={() => setSettingsOpen(true)}
-      />
-
       {/* Card carousel. The second card is deliberately cut off by the
           screen edge — that's the affordance telling you there are more,
           so it isn't centred or scaled down. */}
@@ -306,6 +281,38 @@ export default function ProfileScreen() {
         <div style={{ height: 1781 }} />
       </div>
 
+      {/* Header row — a SIBLING of the scroller, not a child. Inside it,
+          the back and settings controls scrolled away with the content,
+          and a status bar that scrolls off is plainly wrong on a phone.
+          Sitting outside, they hold still for the whole page. */}
+      <div className="pointer-events-none absolute inset-0" style={{ zIndex: 20 }}>
+      {/* Status bar — the design uses the iOS component; this is the
+          9:41 / signal / wifi / battery row it renders as. */}
+      <div
+        className="absolute flex items-center justify-between"
+        style={{ left: 30, right: 30, top: 18, height: 24 }}
+      >
+        <span className="text-[16px] font-semibold tracking-[-0.3px] text-black">
+          9:41
+        </span>
+        <div className="flex items-center gap-1.5 text-black">
+          <SignalBars />
+          <WifiGlyph />
+          <BatteryGlyph />
+        </div>
+      </div>
+
+      {/* Back + settings */}
+      <IconButton x={30} icon="/assets/profile/arrow-back.svg" label="Back" />
+      <IconButton
+        x={360}
+        icon="/assets/profile/settings.svg"
+        label="Settings"
+        onClick={() => setSettingsOpen(true)}
+      />
+
+      </div>
+
       {/* All benefits (853:22811). A sibling of the scroller, not a child,
           so it covers the whole phone and holds still while its own list
           scrolls inside it. */}
@@ -406,7 +413,7 @@ function IconButton({
       type="button"
       aria-label={label}
       onClick={onClick}
-      className="absolute flex items-center justify-center"
+      className="pointer-events-auto absolute flex items-center justify-center"
       style={{
         left: x,
         top: 86,
