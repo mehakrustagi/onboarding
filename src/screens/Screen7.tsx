@@ -49,6 +49,17 @@ const AIRPORT_CAR_TOP = 292;
 const AIRPORT_CAR_H = 352;
 const AIRPORT_HALO_TOP = 368;
 
+/* Headroom above the staged car in which it dissolves as it drives off.
+ * The fade lives entirely in this zone, so the car is solid until it
+ * starts moving. */
+const CAR_FADE_ZONE = 210;
+/* Stops are expressed against the WHOLE wrapper (zone + car), so the fade
+ * has to finish by zone/(zone+CAR_H) — 210/650 ≈ 32%. Running it further
+ * puts the fade back onto the car's own body, which is the thing being
+ * fixed. */
+const CAR_FADE_MASK =
+  "linear-gradient(180deg, rgba(0,0,0,0) 0%, rgba(0,0,0,0.22) 13%, rgba(0,0,0,0.7) 24%, #000 32%)";
+
 /* The airport variant's header is taller than onboarding's: a 72px agent
  * orb in place of the 24px seat glyph, plus the "Available only in
  * eligible regions" line. That pushes the copy to ~y263 while the car
@@ -491,13 +502,37 @@ function StagedView({ car, airport = false }: { car: Car; airport?: boolean }) {
       {/* Car drives forward — settle-back-and-launch: a small preview dip
           before it accelerates off the top of the phone. Ease-in curve gives
           a real "hitting the throttle" feel (slow start → whoosh). */}
-      <motion.div
+      {/* The dissolve frame. Fixed in SCREEN space and 200px taller than
+          the car, with the fade living in that headroom — so the car
+          starts fully solid and only dissolves as it RISES into the zone.
+          Masking the sprite itself put the fade on the car from the first
+          frame, which is why it arrived already faded.
+
+          A mask on a wrapper that contains nothing but the car leaves no
+          artifact: the gradient is uniform horizontally, so there are no
+          vertical edges to show — the failure mode a white band over the
+          top had. */}
+      <div
         className="pointer-events-none absolute left-1/2"
         style={{
-          top: CAR_TOP,
+          top: CAR_TOP - CAR_FADE_ZONE,
+          width: CAR_W,
+          height: CAR_H + CAR_FADE_ZONE,
+          transform: "translateX(-50%)",
+          ...(airport
+            ? {
+                maskImage: CAR_FADE_MASK,
+                WebkitMaskImage: CAR_FADE_MASK,
+              }
+            : null),
+        }}
+      >
+      <motion.div
+        className="pointer-events-none absolute left-0"
+        style={{
+          top: CAR_FADE_ZONE,
           width: CAR_W,
           height: CAR_H,
-          translateX: "-50%",
         }}
         initial={{ y: 0, scaleY: 1 }}
         animate={{
@@ -523,21 +558,10 @@ function StagedView({ car, airport = false }: { car: Car; airport?: boolean }) {
             objectPosition: "center",
             transform: car.imgScale ? `scale(${car.imgScale})` : undefined,
             transformOrigin: "center",
-            // The car dissolves as it drives up and off. Masking the
-            // SPRITE, not overlaying a white band: a band is a rectangle,
-            // and its vertical edges show against the car and the tracks.
-            // The mask travels with the car, so there is no box at all.
-            ...(airport
-              ? {
-                  maskImage:
-                    "linear-gradient(180deg, rgba(0,0,0,0) 0%, rgba(0,0,0,0.35) 26%, rgba(0,0,0,0.85) 54%, #000 76%)",
-                  WebkitMaskImage:
-                    "linear-gradient(180deg, rgba(0,0,0,0) 0%, rgba(0,0,0,0.35) 26%, rgba(0,0,0,0.85) 54%, #000 76%)",
-                }
-              : null),
           }}
         />
       </motion.div>
+      </div>
 
       {/* White wash over the departing car — the airport sheet's staged
           state (right frame of the reference). Transparent at the roof and
