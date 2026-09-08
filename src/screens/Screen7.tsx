@@ -38,6 +38,14 @@ const CAR_H = 440;
 const CAR_TOP = 220;
 const STRIDE = 230;
 const HALO_TOP = 296.5;
+
+/* The airport variant's header is taller than onboarding's: a 72px agent
+ * orb in place of the 24px seat glyph, plus the "Available only in
+ * eligible regions" line. That pushes the copy to ~y263 while the car
+ * starts at 220, so the two collide. The carousel and its halo drop by
+ * this much to clear it — the header is the fixed thing here, not the
+ * car's position. */
+const AIRPORT_CAR_SHIFT = 55;
 const HALO_SIZE = 260;
 
 type Car = {
@@ -171,9 +179,17 @@ export default function Screen7({
 
   return (
     <div
-      className="relative h-full w-full overflow-hidden rounded-[44px]"
+      className={`relative h-full w-full overflow-hidden ${
+        airport ? "" : "rounded-[44px]"
+      }`}
       style={{
-        background: "linear-gradient(to bottom, #f9fafb 0%, #ffffff 100%)",
+        // Inside the sheet this canvas is scaled, so its own 44px radius
+        // and grey head read as a second card floating in a white sheet.
+        // Flat white lets it meet the sheet's edges — and lets the peek
+        // cars bleed off the sides, as 853:66675 has them.
+        background: airport
+          ? "#ffffff"
+          : "linear-gradient(to bottom, #f9fafb 0%, #ffffff 100%)",
       }}
       onClick={(e) => {
         // Block the OnboardingFlow's global click-to-advance on the select
@@ -248,7 +264,11 @@ export default function Screen7({
           screen at different radii, giving a continuous water-drop feel. */}
       <div
         className="pointer-events-none absolute left-1/2 -translate-x-1/2"
-        style={{ top: HALO_TOP, width: HALO_SIZE, height: HALO_SIZE }}
+        style={{
+          top: HALO_TOP + (airport ? AIRPORT_CAR_SHIFT : 0),
+          width: HALO_SIZE,
+          height: HALO_SIZE,
+        }}
       >
         {[0, 1, 2, 3, 4].map((i) => (
           <motion.div
@@ -295,7 +315,7 @@ export default function Screen7({
       <motion.div
         className="absolute left-0 cursor-grab active:cursor-grabbing"
         style={{
-          top: CAR_TOP,
+          top: CAR_TOP + (airport ? AIRPORT_CAR_SHIFT : 0),
           width: "100%",
           height: CAR_H,
           touchAction: "pan-y",
@@ -326,6 +346,7 @@ export default function Screen7({
           car={car}
           wrappedX={carXs[i]}
           dist={carDists[i]}
+          shift={airport ? AIRPORT_CAR_SHIFT : 0}
         />
       ))}
 
@@ -438,6 +459,18 @@ function StagedView({ car, airport = false }: { car: Car; airport?: boolean }) {
             objectPosition: "center",
             transform: car.imgScale ? `scale(${car.imgScale})` : undefined,
             transformOrigin: "center",
+            // The car dissolves as it drives up and off. Masking the
+            // SPRITE, not overlaying a white band: a band is a rectangle,
+            // and its vertical edges show against the car and the tracks.
+            // The mask travels with the car, so there is no box at all.
+            ...(airport
+              ? {
+                  maskImage:
+                    "linear-gradient(180deg, rgba(0,0,0,0) 0%, rgba(0,0,0,0.35) 26%, rgba(0,0,0,0.85) 54%, #000 76%)",
+                  WebkitMaskImage:
+                    "linear-gradient(180deg, rgba(0,0,0,0) 0%, rgba(0,0,0,0.35) 26%, rgba(0,0,0,0.85) 54%, #000 76%)",
+                }
+              : null),
           }}
         />
       </motion.div>
@@ -447,17 +480,6 @@ function StagedView({ car, airport = false }: { car: Car; airport?: boolean }) {
           solid by the tail, so the car reads as dissolving forward into
           the page rather than being covered by a panel. Only here: on the
           selector the car is the thing you are choosing. */}
-      {airport && (
-        <div
-          className="pointer-events-none absolute left-0 z-[6] w-full"
-          style={{
-            top: CAR_TOP + 40,
-            height: 420,
-            background:
-              "linear-gradient(180deg, rgba(255,255,255,0) 0%, rgba(255,255,255,0.55) 34%, rgba(255,255,255,0.92) 64%, #ffffff 100%)",
-          }}
-        />
-      )}
 
       {/* "Your ride is staged" — grey caption below the orb row. Figma
           spec: (137.82, 589.6), 164×25. */}
@@ -493,8 +515,12 @@ function StagedView({ car, airport = false }: { car: Car; airport?: boolean }) {
       {/* Exhaust cloud — billows in from bottom, then keeps drifting/
           breathing so it feels alive. Two layers offset horizontally for
           parallax so the smoke reads as three-dimensional. */}
-      <SmokeLayer delay={0.35} offsetX={-14} scaleAmp={0.06} drift={12} loopMs={10400} />
-      <SmokeLayer delay={0.55} offsetX={14} scaleAmp={0.05} drift={-10} loopMs={13600} opacity={0.45} />
+      {!airport && (
+        <>
+          <SmokeLayer delay={0.35} offsetX={-14} scaleAmp={0.06} drift={12} loopMs={10400} />
+          <SmokeLayer delay={0.55} offsetX={14} scaleAmp={0.05} drift={-10} loopMs={13600} opacity={0.45} />
+        </>
+      )}
     </motion.div>
 
       {/* Agent orbs — mount at Screen 4's team-perks positions
@@ -716,6 +742,8 @@ function CarSlot({
   car: Car;
   wrappedX: import("framer-motion").MotionValue<number>;
   dist: import("framer-motion").MotionValue<number>;
+  /** Follows the carousel down when the airport header is taller. */
+  shift?: number;
 }) {
   const absDist = useTransform(dist, (d) => Math.abs(d));
   const scale = useTransform(absDist, [0, 1], [1, 0.72], { clamp: true });
@@ -765,6 +793,7 @@ function CarSlot({
  * fade out on whichever side they drift toward.
  * -------------------------------------------------------------------------*/
 function InfoSlot({
+  shift = 0,
   car,
   wrappedX,
   dist,
@@ -772,6 +801,8 @@ function InfoSlot({
   car: Car;
   wrappedX: import("framer-motion").MotionValue<number>;
   dist: import("framer-motion").MotionValue<number>;
+  /** Follows the carousel down when the airport header is taller. */
+  shift?: number;
 }) {
   const absDist = useTransform(dist, (d) => Math.abs(d));
   // Aggressive fade — text is fully gone by 40% of the way to the next slot,
@@ -786,7 +817,7 @@ function InfoSlot({
       <motion.div
         className="pointer-events-none absolute top-0 left-1/2"
         style={{
-          top: 659.8,
+          top: 659.8 + shift,
           width: 50,
           height: 50,
           x: wrappedX,
