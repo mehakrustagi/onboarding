@@ -551,22 +551,10 @@ function WorldPassCard({
           x: { duration: 8.9, repeat: Infinity, ease: "easeInOut" },
         }}
       >
-        {/* Turn affordance (899:13965) — the gradient tab on the card's
-            left edge with the arrow beside it.
-
-            Pasted ON the card: it carries the card's OWN tilt values, in a
-            wrapper the full size of the card, so it pivots about the
-            card's centre exactly as a sticker on its surface would —
-            rather than spinning about its own.
-
-            It sits in the float wrapper, one level ABOVE the flip plane,
-            which is what lets it tilt and drift with the card while
-            surviving the turn. Inside the flip it would rotate away with
-            the front face. z-index puts it over the card rather than
-            tucked behind it.
-
-            Permanent: the card can be turned at any time, so the thing
-            that says so has to stay. */}
+        {/* Turn hint — the ARROW half of 899:13965 only. It stays OUTSIDE
+            the flip plane: it points at the card, so it must not mirror
+            when the card turns. Shares the card's tilt and drag so it
+            travels with it. */}
         {interactive && (
           <motion.div
             className="pointer-events-none absolute inset-0"
@@ -575,20 +563,15 @@ function WorldPassCard({
               rotateX: rxs,
               rotateY: rys,
               transformStyle: "preserve-3d",
-              // NO z-index. The card's faces paint over the part that
-              // overlaps, which is what makes the tab read as tucked into
-              // the card's side rather than stuck on its front.
             }}
           >
             <motion.div
-              className="absolute"
-              style={{ left: -44, top: 60, width: 55.9, height: 93 }}
+              className="absolute overflow-hidden"
+              style={{ left: -44, top: 60, width: 38, height: 93 }}
               initial={{ opacity: 0, x: 8 }}
               animate={{ opacity: 1, x: 0 }}
               transition={{ delay: delay + 1.1, duration: 0.6, ease: IN_EASE }}
             >
-              {/* Nudges toward the swipe direction, then rests — it
-                  prompts rather than nags. */}
               <motion.div
                 animate={{ x: [0, -5, 0, 0, 0] }}
                 transition={{
@@ -661,6 +644,35 @@ function WorldPassCard({
             ].join(", "),
           }}
         >
+          {/* The pink tab — the right half of 899:13965, ATTACHED to the
+              card rather than floating beside it.
+
+              It lives inside the tilt element, before the faces, so it
+              inherits the card's every transform — tilt, drag AND flip —
+              and the faces paint over the part that overlaps, which is
+              what makes it read as fixed into the card's edge. No
+              backfaceVisibility, so it survives the turn: on the back face
+              it appears on the opposite edge, which is where a real tab on
+              a card's side would be once you turned it over. */}
+          <div
+            className="pointer-events-none absolute overflow-hidden"
+            style={{ left: -6, top: 60, width: 17.9, height: 93 }}
+          >
+            <Image
+              src="/assets/profile/pass-turn.svg"
+              alt=""
+              width={56}
+              height={93}
+              style={{
+                width: 55.9,
+                height: 93,
+                display: "block",
+                // Slides the asset so only its tab half shows.
+                marginLeft: -38,
+              }}
+            />
+          </div>
+
           {/* Idle rotation. Very small and on its own long period, so the
               card is never quite still even before the cursor arrives. */}
           {/* Front face. backfaceVisibility hidden is what stops it
