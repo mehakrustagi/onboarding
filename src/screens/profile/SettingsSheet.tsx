@@ -375,6 +375,26 @@ export default function SettingsSheet({
                   exit={{ opacity: 0, x: -18 }}
                   transition={{ duration: 0.26, ease: IN_EASE }}
                 >
+              {/* The panel everything sits on. It starts 8px below the
+                  Accounts card's top and runs to the foot of the list, so
+                  the white card overlaps it and reads as RAISED — rather
+                  than the two being separate blocks with a gap of sheet
+                  between them, which flattened the hierarchy. */}
+              <motion.div
+                className="absolute"
+                style={{
+                  left: 30,
+                  top: 141,
+                  width: 380,
+                  borderRadius: 28,
+                  background: "#f4f5f6",
+                }}
+                animate={{
+                  height: 496 + (accountsOpen ? ACCOUNTS_EXTRA : 0),
+                }}
+                transition={{ duration: 0.36, ease: IN_EASE }}
+              />
+
               {/* Accounts center — raised above the list, because it is the
                   account itself rather than one setting among many. */}
               <motion.div
@@ -490,8 +510,6 @@ export default function SettingsSheet({
                   top: 297,
                   width: 380,
                   height: 340,
-                  borderRadius: 28,
-                  background: "#fafafb",
                 }}
               >
                 {ROWS.map((r, i) => (

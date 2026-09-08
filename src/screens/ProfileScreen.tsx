@@ -161,14 +161,17 @@ export default function ProfileScreen() {
           // centred on that box. Squashing it into 321×21 was what turned
           // it into a hard dark bar.
           //
-          // Centred on the DISC, not on Figma's 321-wide box: that box
-          // centres at x178.5 while the disc centres at 220, so following
-          // it put the shadow 41.5px to the left and spilled it out past
-          // the plinth's edge.
-          left: 43 + 354 / 2 - 349 / 2,
-          top: 567 + (21 - 49) / 2,
-          width: 349,
-          height: 49,
+          // Sized to the DISC, not to the container. pedestal-disk.png
+          // has an alpha bbox of (155,58,1261,244) at 4x, so the plinth is
+          // only 276.5 wide inside its 354 box and its base sits at y587.
+          // A 349-wide shadow therefore overhung it by ~36px on each side
+          // whatever it was centred on — which is what kept reading as an
+          // uncropped smear. 300 gives the slight spread a cast shadow
+          // has without leaving the plinth.
+          left: 220 - 300 / 2,
+          top: 569,
+          width: 300,
+          height: 42,
           zIndex: 1,
           // Cropped at the ends. A cast shadow has no hard vertical edge —
           // it has to run out before the plinth does.
