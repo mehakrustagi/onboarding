@@ -567,7 +567,13 @@ function WorldPassCard({
           >
             <motion.div
               className="absolute overflow-hidden"
-              style={{ left: -44, top: 60, width: 38, height: 93 }}
+              style={{
+                left: -35,
+                top: 60,
+                width: 24,
+                height: 93,
+                clipPath: "inset(0)",
+              }}
               initial={{ opacity: 0, x: 8 }}
               animate={{ opacity: 1, x: 0 }}
               transition={{ delay: delay + 1.1, duration: 0.6, ease: IN_EASE }}
@@ -586,7 +592,8 @@ function WorldPassCard({
                   alt=""
                   width={56}
                   height={93}
-                  style={{ width: 55.9, height: 93, display: "block" }}
+                  // Arrow paths run x14→38, so this is the arrow alone.
+                  style={{ width: 55.9, height: 93, display: "block", marginLeft: -14 }}
                 />
               </motion.div>
             </motion.div>
@@ -644,35 +651,6 @@ function WorldPassCard({
             ].join(", "),
           }}
         >
-          {/* The pink tab — the right half of 899:13965, ATTACHED to the
-              card rather than floating beside it.
-
-              It lives inside the tilt element, before the faces, so it
-              inherits the card's every transform — tilt, drag AND flip —
-              and the faces paint over the part that overlaps, which is
-              what makes it read as fixed into the card's edge. No
-              backfaceVisibility, so it survives the turn: on the back face
-              it appears on the opposite edge, which is where a real tab on
-              a card's side would be once you turned it over. */}
-          <div
-            className="pointer-events-none absolute overflow-hidden"
-            style={{ left: -6, top: 60, width: 17.9, height: 93 }}
-          >
-            <Image
-              src="/assets/profile/pass-turn.svg"
-              alt=""
-              width={56}
-              height={93}
-              style={{
-                width: 55.9,
-                height: 93,
-                display: "block",
-                // Slides the asset so only its tab half shows.
-                marginLeft: -38,
-              }}
-            />
-          </div>
-
           {/* Idle rotation. Very small and on its own long period, so the
               card is never quite still even before the cursor arrives. */}
           {/* Front face. backfaceVisibility hidden is what stops it
@@ -988,6 +966,31 @@ function WorldPassCard({
             }}
           >
             <CardBack onConnect={onConnect} />
+          </div>
+
+          {/* The turn tab — 853:77298, an 11×93 Union sitting flush on the
+              card's left edge at card-relative (0, 64).
+
+              Its own asset rather than a crop of 899:13965: that one bakes
+              the arrow in, and cropping it inside a preserve-3d context
+              needed clip-path because overflow is ignored there.
+
+              Last child of the tilt element, so it paints over whichever
+              face is showing and inherits every transform the card has —
+              tilt, drag and flip. No backfaceVisibility, so turning the
+              card carries it to the opposite edge, where a tab on a card's
+              side would actually end up. */}
+          <div
+            className="pointer-events-none absolute"
+            style={{ left: 0, top: 64, width: 11, height: 93 }}
+          >
+            <Image
+              src="/assets/profile/pass-tab.svg"
+              alt=""
+              width={11}
+              height={93}
+              style={{ width: 11, height: 93, display: "block" }}
+            />
           </div>
         </motion.div>
         </motion.div>
