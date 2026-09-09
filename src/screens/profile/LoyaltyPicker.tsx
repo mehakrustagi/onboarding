@@ -27,7 +27,12 @@ import { haptic } from "@/lib/haptics";
  */
 
 const IN_EASE = [0.22, 1, 0.36, 1] as const;
+/* The picker needs room for the card rail; the details step is short, so
+ * the sheet shrinks to it. In the design that space is taken by the
+ * keyboard — we have none, and leaving 880 would strand Continue at the
+ * bottom of a mostly empty sheet. */
 const SHEET_H = 880;
+const SHEET_H_DETAILS = 592;
 
 const CHIPS = ["All", "Credit cards", "hotels", "flights", "lounges"];
 
@@ -88,7 +93,7 @@ function Field({
   top: number;
 }) {
   return (
-    <div className="absolute" style={{ left: 29.5, top, width: 380 }}>
+    <div className="absolute" style={{ left: 30, top, width: 380 }}>
       <p
         className="font-bold uppercase"
         style={{ fontSize: 11, lineHeight: "14px", letterSpacing: "0.88px", color: "#0b0b0b" }}
@@ -157,11 +162,16 @@ export default function LoyaltyPicker({
 
           <motion.div
             className="absolute bottom-0 left-0 w-full overflow-hidden bg-white"
-            style={{ height: SHEET_H, borderRadius: 40 }}
-            initial={{ y: SHEET_H }}
-            animate={{ y: 0 }}
+            style={{ borderRadius: 40 }}
+            initial={{ y: SHEET_H, height: SHEET_H }}
+            animate={{ y: 0, height: step === 0 ? SHEET_H : SHEET_H_DETAILS }}
             exit={{ y: SHEET_H }}
-            transition={{ type: "spring", stiffness: 240, damping: 30, mass: 0.9 }}
+            transition={{
+              y: { type: "spring", stiffness: 240, damping: 30, mass: 0.9 },
+              // Height on a tween, not a spring: a sheet that overshoots
+              // its own height wobbles at the edge and reads as a glitch.
+              height: { duration: 0.42, ease: IN_EASE },
+            }}
           >
             {/* Grab handle */}
             <div
@@ -356,13 +366,13 @@ export default function LoyaltyPicker({
                 >
                   <p
                     className="absolute left-1/2 -translate-x-1/2 whitespace-nowrap text-center font-medium"
-                    style={{ top: 240, fontSize: 20, lineHeight: "25px", letterSpacing: "-0.8px", color: "#0b0b0b" }}
+                    style={{ top: 159, fontSize: 20, lineHeight: "25px", letterSpacing: "-0.8px", color: "#0b0b0b" }}
                   >
                     {CARDS.find((c) => c.key === picked)?.name ?? "ITC Green Club"}
                   </p>
 
-                  <Field label="MEMBERSHIP NUMBER*" value={member} onChange={setMember} top={329} />
-                  <Field label="POINTS/MILES" value={points} onChange={setPoints} top={431} />
+                  <Field label="MEMBERSHIP NUMBER*" value={member} onChange={setMember} top={241} />
+                  <Field label="POINTS/MILES" value={points} onChange={setPoints} top={340} />
                 </motion.div>
               )}
             </AnimatePresence>
