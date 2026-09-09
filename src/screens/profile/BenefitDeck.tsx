@@ -1,7 +1,7 @@
 "use client";
 
-import Image from "next/image";
 import ActivatePill from "./ActivatePill";
+import { BENEFIT_CARDS, type BenefitCard } from "./benefitCards";
 
 /* Benefit deck — Figma 853:20914.
  *
@@ -27,17 +27,10 @@ const SHELL = {
   boxShadow: "0 4.675px 28px 0 rgba(0,0,0,0.05)",
 } as const;
 
-export type BenefitFace = {
-  title: string;
-  body: string;
-  art: string;
-};
+export type BenefitFace = BenefitCard;
 
-export const FLIGHT_BENEFIT: BenefitFace = {
-  title: "Flat 5% back on flights",
-  body: "Book flights in the app and get a flat 5% back in Atlys credits.",
-  art: "/assets/profile/plane.png",
-};
+/* The deck's front card. Figma leads the set with this one (914:4691). */
+export const FLIGHT_BENEFIT: BenefitFace = BENEFIT_CARDS[0];
 
 /** The 380×154 front on its own — reused by the verification gate, which
  *  lifts this exact card onto the scrim (853:21578). */
@@ -48,11 +41,15 @@ export function BenefitCardFace({
   benefit?: BenefitFace;
   onActivate?: () => void;
 }) {
+  const lines = Array.isArray(benefit.body) ? benefit.body : [benefit.body];
   return (
     <div
       className="relative overflow-hidden"
       style={{ width: 380, height: 154, ...SHELL }}
     >
+      {/* Artwork first — the copy and the pill sit over it. */}
+      {benefit.art}
+
       <div
         className="absolute flex flex-col gap-[10px]"
         style={{ left: 29.5, top: 22.25, width: 211 }}
@@ -68,17 +65,22 @@ export function BenefitCardFace({
         >
           {benefit.title}
         </p>
-        <p
+        <div
           className="font-medium"
           style={{
+            // Figma sets this per card, from 165 to 262 — two cards
+            // deliberately run wider than the 211 column.
+            width: benefit.bodyW ?? 211,
             fontSize: 12,
             lineHeight: "16px",
             letterSpacing: "-0.24px",
             color: "#999999",
           }}
         >
-          {benefit.body}
-        </p>
+          {lines.map((l, i) => (
+            <p key={i}>{l}</p>
+          ))}
+        </div>
       </div>
 
       {/* Activating is a different action from opening the card, so the
@@ -90,20 +92,6 @@ export function BenefitCardFace({
         }}
       >
         <ActivatePill left={29.5} top={104.25} bolt={false} onActivate={onActivate} />
-      </div>
-
-      <div
-        className="pointer-events-none absolute"
-        style={{ left: 233, top: -7, width: 322, height: 181 }}
-      >
-        <Image
-          src={benefit.art}
-          alt=""
-          width={322}
-          height={181}
-          unoptimized
-          style={{ width: 322, height: 181, display: "block", objectFit: "contain" }}
-        />
       </div>
     </div>
   );

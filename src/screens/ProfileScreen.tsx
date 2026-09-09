@@ -110,6 +110,13 @@ export default function ProfileScreen() {
   const [disconnectOpen, setDisconnectOpen] = useState(false);
   const [progressOpen, setProgressOpen] = useState(false);
   const [settingsReset, setSettingsReset] = useState(0);
+  /* Drives the sticky header. Fed by onScroll rather than useScroll —
+     the container ref is null on the first render, and useScroll captures
+     that null instead of re-reading it. */
+  const scrollY = useMotionValue(0);
+  /* The card leaves around y 500; the title arrives as it goes. */
+  const headerIn = useTransform(scrollY, [300, 420], [0, 1], { clamp: true });
+  const titleY = useTransform(scrollY, [300, 420], [10, 0], { clamp: true });
   useEffect(() => {
     const t = window.setTimeout(() => setLit(true), GREEN_DELAY_MS);
     return () => window.clearTimeout(t);
@@ -145,6 +152,7 @@ export default function ProfileScreen() {
         // card stage stays put and the content below it moves, which is
         // the behaviour the design implies rather than a shrunken fit.
         className="absolute inset-0 overflow-y-auto overflow-x-hidden [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
+        onScroll={(e) => scrollY.set(e.currentTarget.scrollTop)}
       >
       {/* Card carousel. The second card is deliberately cut off by the
           screen edge — that's the affordance telling you there are more,
@@ -298,6 +306,36 @@ export default function ProfileScreen() {
           absolutely-positioned body has room to scroll into. */}
         <div style={{ height: 1781 }} />
       </div>
+
+      {/* Sticky header. Fades in as the card scrolls away, so the screen
+          keeps a title once the card that WAS the title is gone. It sits
+          UNDER the two controls, which are already pinned — so the bar
+          arrives around them rather than replacing them. */}
+      <motion.div
+        className="pointer-events-none absolute inset-x-0 top-0"
+        style={{ zIndex: 15, opacity: headerIn }}
+      >
+        <div
+          style={{
+            height: 136,
+            background:
+              "linear-gradient(180deg, #ffffff 0%, #ffffff 62%, rgba(255,255,255,0) 100%)",
+          }}
+        />
+        <motion.p
+          className="absolute left-1/2 -translate-x-1/2 whitespace-nowrap text-center font-medium"
+          style={{
+            top: 99,
+            y: titleY,
+            fontSize: 18,
+            lineHeight: "22px",
+            letterSpacing: "-0.72px",
+            color: "#0e0e0e",
+          }}
+        >
+          mohak n.
+        </motion.p>
+      </motion.div>
 
       {/* Header row — a SIBLING of the scroller, not a child. Inside it,
           the back and settings controls scrolled away with the content,

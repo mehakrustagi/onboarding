@@ -2,7 +2,8 @@
 
 import Image from "next/image";
 import { motion, AnimatePresence } from "framer-motion";
-import ActivatePill from "./ActivatePill";
+import { BenefitCardFace } from "./BenefitDeck";
+import { BENEFIT_CARDS } from "./benefitCards";
 import BenefitDetail, { type BenefitDetailContent } from "./BenefitDetail";
 import { useState } from "react";
 
@@ -31,87 +32,11 @@ import { useState } from "react";
 const IN_EASE = [0.22, 1, 0.36, 1] as const;
 
 const CARD_X = 30.5;
-const CARD_W = 380;
-const CARD_H = 154;
 const CARD_PITCH = 178;
 const FIRST_CARD_Y = 278.25;
 
-/* Artwork geometry is Figma's exactly, and every piece is deliberately
- * larger than the space it occupies — the card clips it. The plane in
- * particular is 322×181 inside a 380×154 card, hanging off both the right
- * edge and the bottom, which is what gives these cards their depth.
- *
- * Source PNGs are 736×414 (1.778) against Figma's 322×181 (1.779), so the
- * ratio carries over exactly; only the scale had to be corrected. */
-type Benefit = {
-  title: string;
-  body: string;
-  /** Copy for the detail panel (853:63181). */
-  terms?: string;
-  art: {
-    src: string;
-    x: number;
-    y: number;
-    w: number;
-    h: number;
-  };
-  /** The visa card sits its artwork on a pale green disc (853:23095). */
-  disc?: { x: number; y: number; d: number };
-};
-
-const BENEFITS: Benefit[] = [
-  {
-    title: "Flat 5% back on flights",
-    body: "Book flights in the app and get a flat 5% back in Atlys credits.",
-    // image 516 (853:23070): 322×181 at (234, -6)
-    art: { src: "/assets/profile/plane.png", x: 234, y: -6, w: 322, h: 181 },
-  },
-  {
-    title: "Flat 10% off on hotels",
-    body: "Book flights in the app and get a flat 5% back in Atlys credits.",
-    // Group 1991428665 (853:23077): 107.5×113.68 at (262.5, 18.91)
-    art: {
-      src: "/assets/profile/b-key.png",
-      x: 262.5,
-      y: 18.91,
-      w: 107.5,
-      h: 113.68,
-    },
-  },
-  {
-    title: "$ 200 every trip",
-    body: "Book flights in the app and get a flat 5% back in Atlys credits.",
-    // image 518 (853:23087) is 201×246 at (249.39, -8.07), but the export
-    // comes back already clipped by the card — so it's placed at the
-    // clipped region's own origin and size rather than the node's.
-    art: {
-      src: "/assets/profile/b-cash.png",
-      x: 249.39,
-      y: 0,
-      w: 130.61,
-      h: 154,
-    },
-  },
-  {
-    title: "Visa fee, refunded",
-    body: "Book flights in the app and get a flat 5% back in Atlys credits.",
-    // image 521 (853:23094), likewise clipped on export.
-    art: {
-      src: "/assets/profile/b-passport.png",
-      x: 235,
-      y: 0,
-      w: 145,
-      h: 154,
-    },
-    // Ellipse 7115 (853:23095): 152×153 at (233.5, 24.75)
-    disc: { x: 233.5, y: 24.75, d: 152 },
-  },
-  {
-    title: "Flat 5% back on flights",
-    body: "Book flights in the app and get a flat 5% back in Atlys credits.",
-    art: { src: "/assets/profile/plane.png", x: 234, y: -6, w: 322, h: 181 },
-  },
-];
+/* The cards come from benefitCards.tsx — all 18 of 914:4690, each with
+ * its own composed artwork. This sheet only lays them out. */
 
 const DEFAULT_TERMS =
   "Enjoy 5% off on eligible flight bookings. The offer may apply only to selected airlines, routes, travel dates or fare types and is subject to availability. Additional terms, exclusions and booking conditions may apply.";
@@ -211,24 +136,34 @@ export default function BenefitsSheet({
               Know more
             </motion.button>
 
-            {BENEFITS.map((b, i) => (
-              <BenefitCard
-                key={i}
-                benefit={b}
+            {BENEFIT_CARDS.map((b, i) => (
+              <BenefitRow
+                key={b.key}
                 index={i}
                 onActivate={() =>
                   setDetail({
                     title: b.title,
-                    terms: b.terms ?? DEFAULT_TERMS,
-                    art: b.art.src,
+                    terms: DEFAULT_TERMS,
+                    art: b.art,
                   })
                 }
-              />
+              >
+                <BenefitCardFace
+                  benefit={b}
+                  onActivate={() =>
+                    setDetail({
+                      title: b.title,
+                      terms: DEFAULT_TERMS,
+                      art: b.art,
+                    })
+                  }
+                />
+              </BenefitRow>
             ))}
 
             {/* Gives the scroll container room for the last card. */}
             <div
-              style={{ height: FIRST_CARD_Y + BENEFITS.length * CARD_PITCH }}
+              style={{ height: FIRST_CARD_Y + BENEFIT_CARDS.length * CARD_PITCH }}
             />
           </div>
 
@@ -277,118 +212,31 @@ export default function BenefitsSheet({
   );
 }
 
-function BenefitCard({
-  benefit,
+/* Just placement and the entrance — the card itself is BenefitCardFace,
+ * shared with the profile deck so the two can't drift apart. */
+function BenefitRow({
   index,
-  onActivate,
+  children,
 }: {
-  benefit: Benefit;
   index: number;
   onActivate: () => void;
+  children: React.ReactNode;
 }) {
-  const { art, disc } = benefit;
   return (
     <motion.div
-      className="absolute overflow-hidden"
-      style={{
-        left: CARD_X,
-        top: FIRST_CARD_Y + index * CARD_PITCH,
-        width: CARD_W,
-        height: CARD_H,
-        borderRadius: 30,
-        background: "#ffffff",
-        boxShadow: "0 4px 26px 0 rgba(0,0,0,0.05)",
-      }}
+      className="absolute"
+      style={{ left: CARD_X, top: FIRST_CARD_Y + index * CARD_PITCH }}
       initial={{ opacity: 0, y: 24 }}
       animate={{ opacity: 1, y: 0 }}
       transition={{
-        delay: 0.26 + index * 0.07,
+        // Capped: past the first handful the stagger stops reading as a
+        // cascade and just delays the list.
+        delay: 0.26 + Math.min(index, 6) * 0.07,
         duration: 0.6,
         ease: IN_EASE,
       }}
     >
-      {/* Pale disc behind the artwork on the visa card (853:23095). */}
-      {disc && (
-        <div
-          className="pointer-events-none absolute"
-          style={{
-            left: disc.x,
-            top: disc.y,
-            width: disc.d,
-            height: disc.d,
-            borderRadius: "50%",
-            background:
-              "radial-gradient(circle at 50% 50%, rgba(206,236,214,0.9) 0%, rgba(226,242,230,0.5) 62%, rgba(255,255,255,0) 100%)",
-          }}
-        />
-      )}
-
-      {/* Artwork. Deliberately allowed to run past the card's right edge
-          and be clipped, as the design has it — the plane in particular
-          is far wider than the space it sits in. */}
-      <motion.div
-        className="pointer-events-none absolute"
-        style={{ left: art.x, top: art.y, width: art.w, height: art.h }}
-        // A slow drift, different per card, so the artwork feels placed in
-        // space rather than pasted on.
-        animate={{ y: [0, -3.5, 0] }}
-        transition={{
-          duration: 5.2 + index * 0.8,
-          repeat: Infinity,
-          ease: "easeInOut",
-        }}
-      >
-        <Image
-          src={art.src}
-          alt=""
-          width={art.w}
-          height={art.h}
-          unoptimized
-          style={{
-            width: art.w,
-            height: art.h,
-            display: "block",
-            objectFit: "contain",
-          }}
-        />
-      </motion.div>
-
-      <p
-        className="absolute font-medium"
-        style={{
-          left: 30.5,
-          top: 23.25,
-          width: 211,
-          fontSize: 16,
-          lineHeight: "20px",
-          letterSpacing: "-0.32px",
-          color: "#0b0b0b",
-        }}
-      >
-        {benefit.title}
-      </p>
-      <p
-        className="absolute"
-        style={{
-          left: 30.5,
-          top: 53.25,
-          width: 211,
-          fontSize: 12,
-          lineHeight: "16px",
-          letterSpacing: "-0.12px",
-          color: "#9a9aa2",
-        }}
-      >
-        {benefit.body}
-      </p>
-
-      <ActivatePill
-        left={30.5}
-        top={105.25}
-        index={index}
-        bolt={false}
-        onActivate={onActivate}
-      />
+      {children}
     </motion.div>
   );
 }
