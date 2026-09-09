@@ -31,8 +31,8 @@ const SHEET_H = 880;
 
 const CHIPS = ["All", "Credit cards", "hotels", "flights", "lounges"];
 
-/* Figma shows two cards; the row scrolls, and the second is deliberately
- * cut by the frame edge to say there are more. */
+/* The three card faces exported from 935:22786. The row scrolls, and the
+ * second is deliberately cut by the frame edge to say there are more. */
 const CARDS = [
   {
     key: "maharaja",
@@ -51,6 +51,15 @@ const CARDS = [
     y: 438.17,
     w: 170,
     h: 269.875,
+  },
+  {
+    key: "hdfc",
+    name: "HDFC Infinia",
+    src: "/assets/profile/lp-card-hdfc.png",
+    x: 512.13,
+    y: 446,
+    w: 162,
+    h: 257,
   },
 ];
 
@@ -273,7 +282,7 @@ export default function LoyaltyPicker({
                     className="absolute overflow-x-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
                     style={{ left: 0, top: 400, width: 440, height: 360, touchAction: "pan-y" }}
                   >
-                    <div className="relative" style={{ width: 620, height: 340 }}>
+                    <div className="relative" style={{ width: 704, height: 340 }}>
                       {CARDS.map((c) => (
                         <button
                           key={c.key}

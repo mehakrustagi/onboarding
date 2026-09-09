@@ -2,6 +2,7 @@
 
 import Image from "next/image";
 import { motion } from "framer-motion";
+import { haptic } from "@/lib/haptics";
 
 /* The pass's back for a profile with programs already connected —
  * Figma 935:22105.
@@ -92,11 +93,31 @@ function Values({
   );
 }
 
-export default function CardBackPrograms({ onConnect }: { onConnect?: () => void }) {
+export default function CardBackPrograms({
+  onConnect,
+  onOpenPrograms,
+}: {
+  onConnect?: () => void;
+  /** Swiping the card DOWN opens the full programs page (935:23129) —
+   *  the chevron at the foot is the cue for it. */
+  onOpenPrograms?: () => void;
+}) {
   return (
-    <div
+    <motion.div
       className="relative h-full w-full overflow-hidden"
       style={{ borderRadius: 30, background: "#ffffff", border: "2px solid #ebebeb" }}
+      /* onPan rather than drag: drag would capture the pointer and set
+         touch-action, which would break the flip the card already owns on
+         the horizontal axis. This only claims the gesture once it is
+         clearly vertical. */
+      onPanEnd={(_, info) => {
+        const down = info.offset.y > 60 || info.velocity.y > 420;
+        const vertical = Math.abs(info.offset.y) > Math.abs(info.offset.x);
+        if (down && vertical) {
+          haptic("carouselSnap");
+          onOpenPrograms?.();
+        }
+      }}
     >
       {/* Aurora wash. Turned slowly on its own long period — a static
           gradient behind a white card reads as a printed backdrop. */}
@@ -263,8 +284,14 @@ export default function CardBackPrograms({ onConnect }: { onConnect?: () => void
           WebkitBackdropFilter: "blur(10px)",
         }}
       />
-      <motion.div
-        className="pointer-events-none absolute"
+      <motion.button
+        type="button"
+        aria-label="See all programs"
+        onClick={(e) => {
+          e.stopPropagation();
+          onOpenPrograms?.();
+        }}
+        className="absolute"
         style={{ left: 112, top: 323.91, width: 20, height: 20 }}
         animate={{ y: [0, 2.5, 0] }}
         transition={{ duration: 2.4, repeat: Infinity, ease: "easeInOut" }}
@@ -276,7 +303,7 @@ export default function CardBackPrograms({ onConnect }: { onConnect?: () => void
           height={20}
           style={{ width: 20, height: 20, display: "block" }}
         />
-      </motion.div>
-    </div>
+      </motion.button>
+    </motion.div>
   );
 }

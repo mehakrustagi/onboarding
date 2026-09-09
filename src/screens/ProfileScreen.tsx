@@ -142,6 +142,7 @@ export default function ProfileScreen() {
      channels, so a trackpad swipe changes profile while a drag on the
      card still turns it. Same axis, two gestures, no conflict. */
   const [profileIdx, setProfileIdx] = useState(0);
+  const snapTimer = useRef<number | null>(null);
 
   /* Drives the sticky header. Fed by onScroll rather than useScroll —
      the container ref is null on the first render, and useScroll captures
@@ -318,6 +319,7 @@ export default function ProfileScreen() {
           height: CARD_H + CARD_PAD_T + CARD_PAD_B,
           zIndex: 2,
           scrollSnapType: "x mandatory",
+          scrollBehavior: "smooth",
           // Snaps to the design's x, so the pass in focus lands at 94
           // with its neighbour peeking at 387.
           scrollPaddingLeft: CARD_X,
@@ -326,11 +328,27 @@ export default function ProfileScreen() {
           touchAction: "pan-y",
         }}
         onScroll={(e) => {
-          const i = Math.round(e.currentTarget.scrollLeft / CARD_GAP);
+          const el = e.currentTarget;
+          const i = Math.round(el.scrollLeft / CARD_GAP);
           if (i !== profileIdx && i >= 0 && i < PROFILES.length) {
             haptic("carouselSnap");
             setProfileIdx(i);
           }
+          /* Settle the scroll ourselves once it goes quiet. CSS snapping
+             is supposed to do this, but trackpad momentum can end between
+             points and leave the card parked off-centre — which is what
+             was happening. Re-snapping after 120ms of stillness makes the
+             resting position exact regardless. */
+          if (snapTimer.current) window.clearTimeout(snapTimer.current);
+          snapTimer.current = window.setTimeout(() => {
+            const target = Math.min(
+              Math.max(Math.round(el.scrollLeft / CARD_GAP), 0),
+              PROFILES.length - 1,
+            ) * CARD_GAP;
+            if (Math.abs(el.scrollLeft - target) > 0.5) {
+              el.scrollTo({ left: target, behavior: "smooth" });
+            }
+          }, 120);
         }}
       >
         <div
@@ -347,7 +365,7 @@ export default function ProfileScreen() {
           {PROFILES.map((p, i) => (
             <div
               key={p.serial}
-              style={{ scrollSnapAlign: "start", flex: "0 0 auto" }}
+              style={{ scrollSnapAlign: "start", scrollSnapStop: "always", flex: "0 0 auto" }}
             >
               <WorldPassCard
                 delay={CARD_DELAY + i * 0.1}
@@ -358,6 +376,7 @@ export default function ProfileScreen() {
                 interactive={i === profileIdx}
                 onConnect={() => setScanOpen(true)}
                 onAddProgram={() => setLoyaltyOpen(true)}
+                onOpenPrograms={() => setProgramsOpen(true)}
               />
             </div>
           ))}
@@ -605,6 +624,7 @@ function WorldPassCard({
   interactive = true,
   onConnect,
   onAddProgram,
+  onOpenPrograms,
   profile,
 }: {
   delay: number;
@@ -612,6 +632,8 @@ function WorldPassCard({
   onConnect?: () => void;
   /** The "+" on a programs back — adds a loyalty program. */
   onAddProgram?: () => void;
+  /** Swiping that back downward opens the full programs page. */
+  onOpenPrograms?: () => void;
   /** Whether the green has woken. Held off until 2s after the card has
    *  landed, so it reads as a status light switching on rather than as
    *  part of the card's own arrival. */
@@ -1144,7 +1166,10 @@ function WorldPassCard({
             }}
           >
             {profile.back === "programs" ? (
-              <CardBackPrograms onConnect={onAddProgram} />
+              <CardBackPrograms
+                onConnect={onAddProgram}
+                onOpenPrograms={onOpenPrograms}
+              />
             ) : (
               <CardBack onConnect={onConnect} />
             )}
