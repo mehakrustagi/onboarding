@@ -8,6 +8,7 @@ import ProfileBody from "./profile/ProfileBody";
 import BenefitsSheet from "./profile/BenefitsSheet";
 import CardBack from "./profile/CardBack";
 import CardBackPrograms from "./profile/CardBackPrograms";
+import LoyaltyPicker from "./profile/LoyaltyPicker";
 import VerifyGate from "./profile/VerifyGate";
 import ConnectScan from "./profile/ConnectScan";
 import ProgramsConnected from "./profile/ProgramsConnected";
@@ -127,6 +128,8 @@ export default function ProfileScreen() {
      flag, so the card stays rendered through the exit. */
   const [programDetail, setProgramDetail] = useState<number | null>(null);
   const [airportOpen, setAirportOpen] = useState(false);
+  /* The "+" on a programs back opens the loyalty picker, not the scan. */
+  const [loyaltyOpen, setLoyaltyOpen] = useState(false);
   const [verifyOpen, setVerifyOpen] = useState(false);
   /* The detail the profile's own benefit deck opens. Held as CONTENT
      rather than a flag so the panel keeps its copy through the exit. */
@@ -354,6 +357,7 @@ export default function ProfileScreen() {
                 // fights between two cards.
                 interactive={i === profileIdx}
                 onConnect={() => setScanOpen(true)}
+                onAddProgram={() => setLoyaltyOpen(true)}
               />
             </div>
           ))}
@@ -457,6 +461,10 @@ export default function ProfileScreen() {
 
       {/* Verification gate (853:22081) — what tapping the benefit deck
           opens, with that card lifted onto the scrim. */}
+      {/* Add a loyalty program (935:22488 → 935:22825). Continue on the
+          second step dismisses back to the card it came from. */}
+      <LoyaltyPicker open={loyaltyOpen} onClose={() => setLoyaltyOpen(false)} />
+
       {/* Airport logistics — onboarding's supercar sequence, in a sheet. */}
       <AirportSheet open={airportOpen} onClose={() => setAirportOpen(false)} />
 
@@ -596,11 +604,14 @@ function WorldPassCard({
   lit,
   interactive = true,
   onConnect,
+  onAddProgram,
   profile,
 }: {
   delay: number;
   /** Opens the verification gate from the back face's "+". */
   onConnect?: () => void;
+  /** The "+" on a programs back — adds a loyalty program. */
+  onAddProgram?: () => void;
   /** Whether the green has woken. Held off until 2s after the card has
    *  landed, so it reads as a status light switching on rather than as
    *  part of the card's own arrival. */
@@ -1133,7 +1144,7 @@ function WorldPassCard({
             }}
           >
             {profile.back === "programs" ? (
-              <CardBackPrograms onConnect={onConnect} />
+              <CardBackPrograms onConnect={onAddProgram} />
             ) : (
               <CardBack onConnect={onConnect} />
             )}
