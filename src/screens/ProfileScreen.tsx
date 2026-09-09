@@ -551,10 +551,21 @@ function WorldPassCard({
           x: { duration: 8.9, repeat: Infinity, ease: "easeInOut" },
         }}
       >
-        {/* Turn hint — the ARROW half of 899:13965 only. It stays OUTSIDE
-            the flip plane: it points at the card, so it must not mirror
-            when the card turns. Shares the card's tilt and drag so it
-            travels with it. */}
+        {/* Turn hint — the arrow from 899:13965.
+
+            Its OWN asset, split out of that file rather than cropped from
+            it. The two halves live in one SVG (arrow x 0–37.6, pink mark
+            x 44.9–55.9), and cropping to a window kept leaking the mark's
+            gradient into the arrow's slot — which is why two pink bars
+            were showing instead of an arrow and a tab.
+
+            Placed by the same alignment the file implies: the mark sits on
+            the card's left edge, so asset x 44.9 ≡ card x 0, putting the
+            arrow at card x −44.9.
+
+            Outside the flip plane, since it points AT the card and must
+            not mirror when the card turns; it keeps the tilt and drag so
+            it still travels along. */}
         {interactive && (
           <motion.div
             className="pointer-events-none absolute inset-0"
@@ -563,26 +574,21 @@ function WorldPassCard({
               rotateX: rxs,
               rotateY: rys,
               // Deliberately NOT preserve-3d: the arrow is a flat hint
-              // beside the card, and leaving it in the 3D context let it
-              // be depth-sorted against the faces.
+              // beside the card, and in the 3D context it was being
+              // depth-sorted against the faces.
               zIndex: 6,
             }}
           >
             <motion.div
               className="absolute"
-              style={{ left: -35, top: 60, width: 24, height: 93 }}
+              style={{ left: -44.9, top: 64, width: 38, height: 93 }}
               initial={{ opacity: 0, x: 8 }}
               animate={{ opacity: 1, x: 0 }}
               transition={{ delay: delay + 1.1, duration: 0.6, ease: IN_EASE }}
             >
-              {/* The nudge moves the CROP BOX, not the asset inside it.
-                  Sliding the asset within a fixed box scrolled the tab's
-                  gradient in at the edge — the pink sliver that was
-                  showing outside the card. The window travels, so only
-                  ever the arrow is inside it. */}
+              {/* Nudges toward the swipe direction on the tab's period, so
+                  the two read as one gesture. */}
               <motion.div
-                className="absolute inset-0 overflow-hidden"
-                style={{ clipPath: "inset(0)" }}
                 animate={{ x: [0, -5, 0, 0, 0] }}
                 transition={{
                   duration: 3.4,
@@ -592,19 +598,11 @@ function WorldPassCard({
                 }}
               >
                 <Image
-                  src="/assets/profile/pass-turn.svg"
+                  src="/assets/profile/pass-arrow.svg"
                   alt=""
-                  width={56}
+                  width={38}
                   height={93}
-                  // Arrow paths run x14→38, so this is the arrow alone.
-                  style={{
-                    position: "absolute",
-                    left: -14,
-                    top: 0,
-                    width: 55.9,
-                    height: 93,
-                    display: "block",
-                  }}
+                  style={{ width: 38, height: 93, display: "block" }}
                 />
               </motion.div>
             </motion.div>
