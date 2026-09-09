@@ -3,6 +3,7 @@
 import Image from "next/image";
 import { motion, useMotionValue, useSpring, useTransform } from "framer-motion";
 import { useEffect, useRef, useState } from "react";
+import { haptic } from "@/lib/haptics";
 import ProfileBody from "./profile/ProfileBody";
 import BenefitsSheet from "./profile/BenefitsSheet";
 import CardBack from "./profile/CardBack";
@@ -70,6 +71,14 @@ const TRACE_LAP_S = 2.6;
  * cutting on the exact frame reads as the animation being interrupted. */
 const TRACE_HOLD_MS = 260;
 
+/* The passes you can swipe between. Figma already draws the second card
+ * peeking off the right edge as the affordance saying there are more — so
+ * swiping simply brings it in. */
+const PROFILES = [
+  { name: "mohak n.", serial: "6190001" },
+  { name: "mehak r.", serial: "6190002" },
+];
+
 /* Same terms copy the all-benefits sheet uses for an unspecified card. */
 const PROFILE_BENEFIT_TERMS =
   "Enjoy 5% off on eligible flight bookings. The offer may apply only to selected airlines, routes, travel dates or fare types and is subject to availability. Additional terms, exclusions and booking conditions may apply.";
@@ -110,6 +119,13 @@ export default function ProfileScreen() {
   const [disconnectOpen, setDisconnectOpen] = useState(false);
   const [progressOpen, setProgressOpen] = useState(false);
   const [settingsReset, setSettingsReset] = useState(0);
+  /* Which pass is in focus, and the track that carries them. */
+  const [profileIdx, setProfileIdx] = useState(0);
+  const trackX = useSpring(0, { stiffness: 260, damping: 34, mass: 0.9 });
+  useEffect(() => {
+    trackX.set(-profileIdx * CARD_GAP);
+  }, [profileIdx, trackX]);
+
   /* Drives the sticky header. Fed by onScroll rather than useScroll —
      the container ref is null on the first render, and useScroll captures
      that null instead of re-reading it. */
@@ -268,19 +284,50 @@ export default function ProfileScreen() {
 
       {/* Card carousel — arrives AFTER the disk, and drops onto it. The
           second card is deliberately cut off by the screen edge: that's
-          the affordance telling you there are more. */}
-      <WorldPassCard
-        x={CARD_X}
-        delay={CARD_DELAY}
-        lit={lit}
-        onConnect={() => setScanOpen(true)}
-      />
-      <WorldPassCard
-        x={CARD_X + CARD_GAP}
-        delay={CARD_DELAY + 0.1}
-        lit={lit}
-        interactive={false}
-      />
+          the affordance telling you there are more, so swiping simply
+          brings it in.
+
+          The track is only as tall as the cards. Spanning the whole frame
+          would swallow drags meant for the page beneath it. */}
+      <motion.div
+        className="absolute left-0"
+        style={{ top: CARD_Y, width: 440, height: CARD_H, x: trackX, zIndex: 2 }}
+        drag="x"
+        // Locks to the axis the gesture starts on, so a vertical scroll
+        // that wanders sideways doesn't drag the carousel with it.
+        dragDirectionLock
+        dragElastic={0.12}
+        dragConstraints={{ left: -CARD_GAP * (PROFILES.length - 1), right: 0 }}
+        onDragEnd={(_, info) => {
+          // Distance OR speed, so a flick counts as much as a long drag.
+          const far = Math.abs(info.offset.x) > 60;
+          const fast = Math.abs(info.velocity.x) > 400;
+          if (!far && !fast) return;
+          const dir = info.offset.x < 0 ? 1 : -1;
+          const next = Math.min(
+            Math.max(profileIdx + dir, 0),
+            PROFILES.length - 1,
+          );
+          if (next !== profileIdx) {
+            haptic("carouselSnap");
+            setProfileIdx(next);
+          }
+        }}
+      >
+        {PROFILES.map((p, i) => (
+          <WorldPassCard
+            key={p.serial}
+            x={CARD_X + i * CARD_GAP}
+            delay={CARD_DELAY + i * 0.1}
+            lit={lit}
+            profile={p}
+            // Only the pass in focus takes the cursor; the others are
+            // scenery, so tilt never fights between two cards.
+            interactive={i === profileIdx}
+            onConnect={() => setScanOpen(true)}
+          />
+        ))}
+      </motion.div>
 
       {/* Everything below the pedestal (853:16315) — see ProfileBody. */}
       <ProfileBody
@@ -333,7 +380,7 @@ export default function ProfileScreen() {
             color: "#0e0e0e",
           }}
         >
-          mohak n.
+          {PROFILES[profileIdx].name}
         </motion.p>
       </motion.div>
 
@@ -519,6 +566,7 @@ function WorldPassCard({
   lit,
   interactive = true,
   onConnect,
+  profile,
 }: {
   x: number;
   delay: number;
@@ -531,6 +579,8 @@ function WorldPassCard({
   /** The peeking card is scenery — it floats, but doesn't take the
    *  cursor, so tilt never fights between the two. */
   interactive?: boolean;
+  /** Whose pass this is. */
+  profile: { name: string; serial: string };
 }) {
   const ref = useRef<HTMLDivElement | null>(null);
   /* Which face is showing. Counted rather than toggled, so repeated
@@ -541,11 +591,6 @@ function WorldPassCard({
 
   const rx = useMotionValue(0);
   const ry = useMotionValue(0);
-  /* The flip plane owns the horizontal drag, and the turn mark sits ABOVE
-     it (so the turn doesn't rotate the mark away). That left the card
-     sliding under the thumb while the mark stayed put. Handing framer this
-     motion value lets both read the same offset. */
-  const dragX = useMotionValue(0);
   // Soft spring: the card settles rather than snapping, which reads as
   // something with mass.
   const rxs = useSpring(rx, { stiffness: 150, damping: 20, mass: 0.9 });
@@ -572,7 +617,7 @@ function WorldPassCard({
   return (
     <motion.div
       className="absolute"
-      style={{ left: x, top: CARD_Y, width: CARD_W, height: CARD_H }}
+      style={{ left: x, top: 0, width: CARD_W, height: CARD_H }}
       initial={{ opacity: 0, y: 26, scale: 0.96 }}
       animate={{ opacity: 1, y: 0, scale: 1 }}
       transition={{ delay, duration: 0.8, ease: IN_EASE }}
@@ -608,7 +653,6 @@ function WorldPassCard({
           <motion.div
             className="pointer-events-none absolute inset-0"
             style={{
-              x: dragX,
               rotateX: rxs,
               rotateY: rys,
               // Deliberately NOT preserve-3d: the arrow is a flat hint
@@ -647,28 +691,26 @@ function WorldPassCard({
           </motion.div>
         )}
 
-        {/* Flip plane. Swipe horizontally to turn the card.
+        {/* Flip plane. TAP to turn the card — horizontal drag now belongs
+            to the carousel, and two gestures on one axis cannot both win.
+            framer cancels the tap once a drag starts, so swiping across
+            the card pans the carousel without also flipping it.
+
             transformStyle must be preserve-3d the whole way down this
             chain, or the back face renders flat on top of the front
             instead of behind it. */}
         <motion.div
           className="h-full w-full"
-          style={{ transformStyle: "preserve-3d", x: dragX }}
+          style={{
+            transformStyle: "preserve-3d",
+            cursor: interactive ? "pointer" : "default",
+          }}
           animate={{ rotateY: turns * 180 }}
           transition={{ type: "spring", stiffness: 60, damping: 14, mass: 1.1 }}
-          drag={interactive ? "x" : false}
-          dragSnapToOrigin
-          dragElastic={0.16}
-          dragConstraints={{ left: 0, right: 0 }}
-          onDragEnd={(_, info) => {
-            // Distance OR speed — a short flick should turn the card just
-            // as a slow long drag does, which is how a physical card
-            // behaves under a thumb.
-            const far = Math.abs(info.offset.x) > 55;
-            const fast = Math.abs(info.velocity.x) > 380;
-            if (far || fast) {
-              setTurns((t) => t + (info.offset.x < 0 ? 1 : -1));
-            }
+          onTap={() => {
+            if (!interactive) return;
+            haptic("cardFlip");
+            setTurns((t) => t + 1);
           }}
         >
         <motion.div
@@ -961,7 +1003,7 @@ function WorldPassCard({
                   letterSpacing: "-0.72px",
                 }}
               >
-                mohak n.
+                {profile.name}
               </p>
 
               {/* Hairline under the name (853:15732) */}
@@ -994,7 +1036,7 @@ function WorldPassCard({
                   color: "transparent",
                 }}
               >
-                6190001
+                {profile.serial}
               </p>
             </div>
 
