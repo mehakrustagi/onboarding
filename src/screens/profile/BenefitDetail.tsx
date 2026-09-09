@@ -2,6 +2,7 @@
 
 import Image from "next/image";
 import { motion, AnimatePresence } from "framer-motion";
+import type { ReactNode } from "react";
 
 /* Benefit detail — Figma node 853:63181.
  *
@@ -72,7 +73,9 @@ const BLOOM_FIELDS = [
 export type BenefitDetailContent = {
   title: string;
   terms: string;
-  art: string;
+  /** The card's own artwork, composed — the same node tree the card
+   *  renders, so the detail can't drift from the card it opened from. */
+  art: ReactNode;
 };
 
 export default function BenefitDetail({
@@ -195,33 +198,37 @@ export default function BenefitDetail({
             </motion.div>
           </motion.div>
 
-          {/* Hero artwork. Same 736×414 source as the cards, so the ratio
-              carries over exactly; only the scale differs. */}
+          {/* Hero artwork — the card's own composition, scaled up. It is
+              laid out against the 380×154 card, so it is rendered at that
+              size and transformed rather than re-authored at hero scale;
+              anything else would drift from the card it opened from. */}
           <motion.div
             className="pointer-events-none absolute"
-            style={{ left: 42, top: 176, width: 356, height: 200 }}
+            style={{ left: 42, top: 176, width: 356, height: 200, overflow: "hidden" }}
             initial={{ opacity: 0, y: 14, scale: 0.96 }}
             animate={{ opacity: 1, y: 0, scale: 1 }}
             transition={{ delay: 0.14, duration: 0.7, ease: IN_EASE }}
           >
-            {/* Floats, so the artwork sits in the bloom rather than on it. */}
             <motion.div
               animate={{ y: [0, -7, 0] }}
               transition={{ duration: 6.4, repeat: Infinity, ease: "easeInOut" }}
+              style={{ width: 380, height: 154 }}
             >
-              <Image
-                src={benefit.art}
-                alt=""
-                width={356}
-                height={200}
-                unoptimized
+              <div
                 style={{
-                  width: 356,
-                  height: 200,
-                  display: "block",
-                  objectFit: "contain",
+                  position: "absolute",
+                  // The art sits in the card's right half, so this frames
+                  // that region and scales it to fill the hero.
+                  left: -190 * 1.32,
+                  top: 10,
+                  width: 380,
+                  height: 154,
+                  transform: "scale(1.32)",
+                  transformOrigin: "0 0",
                 }}
-              />
+              >
+                {benefit.art}
+              </div>
             </motion.div>
           </motion.div>
 
