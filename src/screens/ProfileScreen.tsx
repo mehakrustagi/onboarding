@@ -7,6 +7,7 @@ import { haptic } from "@/lib/haptics";
 import ProfileBody from "./profile/ProfileBody";
 import BenefitsSheet from "./profile/BenefitsSheet";
 import CardBack from "./profile/CardBack";
+import CardBackPrograms from "./profile/CardBackPrograms";
 import VerifyGate from "./profile/VerifyGate";
 import ConnectScan from "./profile/ConnectScan";
 import ProgramsConnected from "./profile/ProgramsConnected";
@@ -78,9 +79,15 @@ const TRACE_HOLD_MS = 260;
 /* The passes you can swipe between. Figma already draws the second card
  * peeking off the right edge as the affordance saying there are more — so
  * swiping simply brings it in. */
-const PROFILES = [
-  { name: "mohak n.", serial: "6190001" },
-  { name: "mehak r.", serial: "6190002" },
+const PROFILES: {
+  name: string;
+  serial: string;
+  /** Which back this pass turns to. "connect" invites you to add a
+   *  program; "programs" reports the ones already there (935:22105). */
+  back: "connect" | "programs";
+}[] = [
+  { name: "mohak n.", serial: "6190001", back: "connect" },
+  { name: "mehak r.", serial: "6190002", back: "programs" },
 ];
 
 /* Same terms copy the all-benefits sheet uses for an unspecified card. */
@@ -598,7 +605,7 @@ function WorldPassCard({
    *  cursor, so tilt never fights between the two. */
   interactive?: boolean;
   /** Whose pass this is. */
-  profile: { name: string; serial: string };
+  profile: (typeof PROFILES)[number];
 }) {
   const ref = useRef<HTMLDivElement | null>(null);
   /* Which face is showing. Counted rather than toggled, so repeated
@@ -1121,7 +1128,11 @@ function WorldPassCard({
               boxShadow: "inset 0 0 0 1px rgba(0,0,0,0.06)",
             }}
           >
-            <CardBack onConnect={onConnect} />
+            {profile.back === "programs" ? (
+              <CardBackPrograms onConnect={onConnect} />
+            ) : (
+              <CardBack onConnect={onConnect} />
+            )}
 
             {/* Same tab, on the back — at the same LEFT edge, unmirrored.
 
