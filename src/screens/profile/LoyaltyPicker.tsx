@@ -301,35 +301,45 @@ export default function LoyaltyPicker({
                           }}
                         >
                           <motion.div
-                            className="h-full w-full overflow-hidden"
+                            className="relative h-full w-full overflow-hidden"
                             style={{ borderRadius: 19 }}
                             animate={{
-                              scale: picked === c.key ? 1.03 : 1,
+                              // The enlargement IS the selected state —
+                              // no ring needed on top of it.
+                              scale: picked === c.key ? 1.06 : 1,
                               boxShadow:
                                 picked === c.key
                                   ? "0 18px 40px -14px rgba(0,0,0,0.35)"
-                                  : "0 10px 26px -16px rgba(0,0,0,0.25)",
+                                  : "0 10px 26px -16px rgba(0,0,0,0.22)",
                             }}
                             transition={{ duration: 0.3, ease: IN_EASE }}
                           >
-                            <Image
-                              src={c.src}
-                              alt={c.name}
-                              width={Math.round(c.w)}
-                              height={Math.round(c.h)}
-                              unoptimized
-                              style={{ width: "100%", height: "100%", objectFit: "cover", display: "block" }}
-                            />
+                            {/* The source art is LANDSCAPE; Figma turns it
+                                −90° to fill the portrait card rather than
+                                cropping it. Centring the landscape box
+                                first means the rotation lands it exactly
+                                over the portrait one. */}
+                            <div
+                              className="absolute"
+                              style={{
+                                width: c.h,
+                                height: c.w,
+                                left: (c.w - c.h) / 2,
+                                top: (c.h - c.w) / 2,
+                                transform: "rotate(-90deg)",
+                                transformOrigin: "center",
+                              }}
+                            >
+                              <Image
+                                src={c.src}
+                                alt={c.name}
+                                width={Math.round(c.h)}
+                                height={Math.round(c.w)}
+                                unoptimized
+                                style={{ width: "100%", height: "100%", objectFit: "cover", display: "block" }}
+                              />
+                            </div>
                           </motion.div>
-                          {/* A ring rather than a tick — the card IS the
-                              choice, so the selection should sit on it. */}
-                          <motion.span
-                            className="pointer-events-none absolute inset-0"
-                            style={{ borderRadius: 19, border: "2px solid #5057ea" }}
-                            initial={false}
-                            animate={{ opacity: picked === c.key ? 1 : 0 }}
-                            transition={{ duration: 0.25, ease: IN_EASE }}
-                          />
                         </button>
                       ))}
                     </div>
