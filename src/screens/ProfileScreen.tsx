@@ -119,12 +119,11 @@ export default function ProfileScreen() {
   const [disconnectOpen, setDisconnectOpen] = useState(false);
   const [progressOpen, setProgressOpen] = useState(false);
   const [settingsReset, setSettingsReset] = useState(0);
-  /* Which pass is in focus, and the track that carries them. */
+  /* Which pass is in focus. The carousel is a REAL scroll container, not
+     a drag: native scrolling and pointer drag are different input
+     channels, so a trackpad swipe changes profile while a drag on the
+     card still turns it. Same axis, two gestures, no conflict. */
   const [profileIdx, setProfileIdx] = useState(0);
-  const trackX = useSpring(0, { stiffness: 260, damping: 34, mass: 0.9 });
-  useEffect(() => {
-    trackX.set(-profileIdx * CARD_GAP);
-  }, [profileIdx, trackX]);
 
   /* Drives the sticky header. Fed by onScroll rather than useScroll —
      the container ref is null on the first render, and useScroll captures
@@ -289,45 +288,56 @@ export default function ProfileScreen() {
 
           The track is only as tall as the cards. Spanning the whole frame
           would swallow drags meant for the page beneath it. */}
-      <motion.div
-        className="absolute left-0"
-        style={{ top: CARD_Y, width: 440, height: CARD_H, x: trackX, zIndex: 2 }}
-        drag="x"
-        // Locks to the axis the gesture starts on, so a vertical scroll
-        // that wanders sideways doesn't drag the carousel with it.
-        dragDirectionLock
-        dragElastic={0.12}
-        dragConstraints={{ left: -CARD_GAP * (PROFILES.length - 1), right: 0 }}
-        onDragEnd={(_, info) => {
-          // Distance OR speed, so a flick counts as much as a long drag.
-          const far = Math.abs(info.offset.x) > 60;
-          const fast = Math.abs(info.velocity.x) > 400;
-          if (!far && !fast) return;
-          const dir = info.offset.x < 0 ? 1 : -1;
-          const next = Math.min(
-            Math.max(profileIdx + dir, 0),
-            PROFILES.length - 1,
-          );
-          if (next !== profileIdx) {
+      <div
+        className="absolute left-0 overflow-x-auto overflow-y-hidden [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
+        style={{
+          top: CARD_Y,
+          width: 440,
+          height: CARD_H,
+          zIndex: 2,
+          scrollSnapType: "x mandatory",
+          // Snaps to the design's x, so the pass in focus lands at 94
+          // with its neighbour peeking at 387.
+          scrollPaddingLeft: CARD_X,
+          // pan-y leaves vertical touch scrolling with the PAGE; only the
+          // horizontal axis belongs to this strip.
+          touchAction: "pan-y",
+        }}
+        onScroll={(e) => {
+          const i = Math.round(e.currentTarget.scrollLeft / CARD_GAP);
+          if (i !== profileIdx && i >= 0 && i < PROFILES.length) {
             haptic("carouselSnap");
-            setProfileIdx(next);
+            setProfileIdx(i);
           }
         }}
       >
-        {PROFILES.map((p, i) => (
-          <WorldPassCard
-            key={p.serial}
-            x={CARD_X + i * CARD_GAP}
-            delay={CARD_DELAY + i * 0.1}
-            lit={lit}
-            profile={p}
-            // Only the pass in focus takes the cursor; the others are
-            // scenery, so tilt never fights between two cards.
-            interactive={i === profileIdx}
-            onConnect={() => setScanOpen(true)}
-          />
-        ))}
-      </motion.div>
+        <div
+          className="flex"
+          style={{
+            paddingLeft: CARD_X,
+            // Lets the last card reach the snap position.
+            paddingRight: 440 - CARD_X - CARD_W,
+            gap: CARD_GAP - CARD_W,
+          }}
+        >
+          {PROFILES.map((p, i) => (
+            <div
+              key={p.serial}
+              style={{ scrollSnapAlign: "start", flex: "0 0 auto" }}
+            >
+              <WorldPassCard
+                delay={CARD_DELAY + i * 0.1}
+                lit={lit}
+                profile={p}
+                // Only the pass in focus takes the cursor, so tilt never
+                // fights between two cards.
+                interactive={i === profileIdx}
+                onConnect={() => setScanOpen(true)}
+              />
+            </div>
+          ))}
+        </div>
+      </div>
 
       {/* Everything below the pedestal (853:16315) — see ProfileBody. */}
       <ProfileBody
@@ -561,14 +571,12 @@ function IconButton({
  * never repeats, so the card is alive before you touch it.
  */
 function WorldPassCard({
-  x,
   delay,
   lit,
   interactive = true,
   onConnect,
   profile,
 }: {
-  x: number;
   delay: number;
   /** Opens the verification gate from the back face's "+". */
   onConnect?: () => void;
@@ -616,8 +624,11 @@ function WorldPassCard({
 
   return (
     <motion.div
-      className="absolute"
-      style={{ left: x, top: 0, width: CARD_W, height: CARD_H }}
+      // In flow, not absolute: the carousel is a scroll container and the
+      // flex item places it. It still creates the positioning context its
+      // own faces rely on.
+      className="relative"
+      style={{ width: CARD_W, height: CARD_H }}
       initial={{ opacity: 0, y: 26, scale: 0.96 }}
       animate={{ opacity: 1, y: 0, scale: 1 }}
       transition={{ delay, duration: 0.8, ease: IN_EASE }}
@@ -691,26 +702,35 @@ function WorldPassCard({
           </motion.div>
         )}
 
-        {/* Flip plane. TAP to turn the card — horizontal drag now belongs
-            to the carousel, and two gestures on one axis cannot both win.
-            framer cancels the tap once a drag starts, so swiping across
-            the card pans the carousel without also flipping it.
+        {/* Flip plane. Drag horizontally to turn the card — unchanged, and
+            it does not fight the carousel: that is a native SCROLL
+            container, and scrolling (wheel / trackpad) is a different
+            input channel from a pointer drag. framer's drag also sets
+            touch-action: pan-y here, so a touch drag on the card turns it
+            while vertical scrolling still belongs to the page.
 
             transformStyle must be preserve-3d the whole way down this
             chain, or the back face renders flat on top of the front
             instead of behind it. */}
         <motion.div
           className="h-full w-full"
-          style={{
-            transformStyle: "preserve-3d",
-            cursor: interactive ? "pointer" : "default",
-          }}
+          style={{ transformStyle: "preserve-3d" }}
           animate={{ rotateY: turns * 180 }}
           transition={{ type: "spring", stiffness: 60, damping: 14, mass: 1.1 }}
-          onTap={() => {
-            if (!interactive) return;
-            haptic("cardFlip");
-            setTurns((t) => t + 1);
+          drag={interactive ? "x" : false}
+          dragSnapToOrigin
+          dragElastic={0.16}
+          dragConstraints={{ left: 0, right: 0 }}
+          onDragEnd={(_, info) => {
+            // Distance OR speed — a short flick should turn the card just
+            // as a slow long drag does, which is how a physical card
+            // behaves under a thumb.
+            const far = Math.abs(info.offset.x) > 55;
+            const fast = Math.abs(info.velocity.x) > 380;
+            if (far || fast) {
+              haptic("cardFlip");
+              setTurns((t) => t + (info.offset.x < 0 ? 1 : -1));
+            }
           }}
         >
         <motion.div
@@ -888,7 +908,7 @@ function WorldPassCard({
             >
               <defs>
                 <linearGradient
-                  id={`trace-${x}`}
+                  id={`trace-${profile.serial}`}
                   x1="0"
                   y1="1"
                   x2="0"
@@ -905,7 +925,7 @@ function WorldPassCard({
                 width={CARD_W - 2}
                 height={CARD_H - 2}
                 rx={29}
-                stroke={`url(#trace-${x})`}
+                stroke={`url(#trace-${profile.serial})`}
                 strokeWidth={2}
                 strokeLinecap="round"
                 style={{ filter: "drop-shadow(0 0 6px rgba(20,190,135,0.75))" }}
