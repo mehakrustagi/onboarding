@@ -992,8 +992,8 @@ function WorldPassCard({
               dropping the tab behind the card's parallax layer at
               translateZ(22px), which is why it vanished.
 
-              Front sits at z +24. Back sits at −24: after the card's 180°
-              that maps to +24 in world space, in front of the back face.
+              Front sits at z +1, back at −1 — which after the card's 180°
+              maps to +1 in world space, just in front of the back face.
               The scale lives on an inner element so the mirror and the
               growth anchor can't fight — the back tab's own 180° and the
               card's cancel, so both grow from their inner edge. */}
@@ -1004,7 +1004,12 @@ function WorldPassCard({
               top: 64,
               width: 11,
               height: 93,
-              z: 24,
+              // Just 1px proud, not 24. It only has to win the coplanar
+              // tie against the face beneath it — the content plane above
+              // is transparent over this 11px strip, so it never occludes
+              // the tab. At 24 the tab swung on a visibly wider arc than
+              // the card during the flip and read as detached.
+              z: 1,
               backfaceVisibility: "hidden",
               WebkitBackfaceVisibility: "hidden",
             }}
@@ -1037,7 +1042,7 @@ function WorldPassCard({
               width: 11,
               height: 93,
               rotateY: 180,
-              z: -24,
+              z: -1,
               backfaceVisibility: "hidden",
               WebkitBackfaceVisibility: "hidden",
             }}
