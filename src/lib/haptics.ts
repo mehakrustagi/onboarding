@@ -7,7 +7,8 @@
 
 type Trigger =
   | "orbLand"          // Screen 4: each perk orb drops into a pill
-  | "carouselSnap"     // Screen 7: car snaps to center
+  | "carouselSnap"     // Screen 7: car snaps to center; profile carousel
+  | "cardFlip"         // Profile: WorldPass card turns
   | "stagedLock"       // Screen 7: car commits to Staged
   | "cardRise"         // Screen 5: WorldPass card clears the fold
   | "benefitLand"      // Screen 5: a benefit orb hits the card
@@ -47,6 +48,9 @@ const PATTERNS: Record<Trigger, number | number[]> = {
   tunnelEnter: [30, 40, 60],
   tunnelExit: [40, 60, 30],
   carouselSnap: 8,
+  /* A short double — the card has two faces, and the pattern says a
+     surface turned over rather than a button pressed. */
+  cardFlip: [10, 28, 14],
   stagedLock: [20, 40, 20],
   cardRise: 15,
   benefitLand: 10,

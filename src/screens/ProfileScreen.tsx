@@ -3,9 +3,12 @@
 import Image from "next/image";
 import { motion, useMotionValue, useSpring, useTransform } from "framer-motion";
 import { useEffect, useRef, useState } from "react";
+import { haptic } from "@/lib/haptics";
 import ProfileBody from "./profile/ProfileBody";
 import BenefitsSheet from "./profile/BenefitsSheet";
 import CardBack from "./profile/CardBack";
+import CardBackPrograms from "./profile/CardBackPrograms";
+import LoyaltyPicker from "./profile/LoyaltyPicker";
 import VerifyGate from "./profile/VerifyGate";
 import ConnectScan from "./profile/ConnectScan";
 import ProgramsConnected from "./profile/ProgramsConnected";
@@ -43,9 +46,17 @@ const CARD_W = 252.325;
 const CARD_H = 350;
 const CARD_X = 94;
 const CARD_Y = 152;
-/* Spacing between cards in the carousel — Figma puts the next card at
- * x 387 against this one at 94. */
-const CARD_GAP = 387 - CARD_X;
+/* Gap between passes. Figma's own peek puts the next card at x 387, a
+ * 40.675 gap — but the turn arrow lives in that gap, spanning card x
+ * −44.9 to −6.9, so at 40.675 it lands ON the previous card. Widened to
+ * clear it with real whitespace either side. */
+const CARD_PEEK_GAP = 76;
+/* Pitch: one card plus the gap. The carousel snaps and indexes by this. */
+const CARD_GAP = CARD_W + CARD_PEEK_GAP;
+/* Headroom in the carousel for the card's own shadow, which reaches about
+ * 110px below it and only a little above. */
+const CARD_PAD_T = 24;
+const CARD_PAD_B = 120;
 
 /* Perimeter of the card's rounded rect, for the scan trace's dash maths:
  * two straight runs per axis plus one full circle of corner arc. */
@@ -69,6 +80,20 @@ const TRACE_LAP_S = 2.6;
  * head land and the card settle for a moment reads as completion, where
  * cutting on the exact frame reads as the animation being interrupted. */
 const TRACE_HOLD_MS = 260;
+
+/* The passes you can swipe between. Figma already draws the second card
+ * peeking off the right edge as the affordance saying there are more — so
+ * swiping simply brings it in. */
+const PROFILES: {
+  name: string;
+  serial: string;
+  /** Which back this pass turns to. "connect" invites you to add a
+   *  program; "programs" reports the ones already there (935:22105). */
+  back: "connect" | "programs";
+}[] = [
+  { name: "mohak n.", serial: "6190001", back: "connect" },
+  { name: "mehak r.", serial: "6190002", back: "programs" },
+];
 
 /* Same terms copy the all-benefits sheet uses for an unspecified card. */
 const PROFILE_BENEFIT_TERMS =
@@ -103,6 +128,8 @@ export default function ProfileScreen() {
      flag, so the card stays rendered through the exit. */
   const [programDetail, setProgramDetail] = useState<number | null>(null);
   const [airportOpen, setAirportOpen] = useState(false);
+  /* The "+" on a programs back opens the loyalty picker, not the scan. */
+  const [loyaltyOpen, setLoyaltyOpen] = useState(false);
   const [verifyOpen, setVerifyOpen] = useState(false);
   /* The detail the profile's own benefit deck opens. Held as CONTENT
      rather than a flag so the panel keeps its copy through the exit. */
@@ -110,6 +137,13 @@ export default function ProfileScreen() {
   const [disconnectOpen, setDisconnectOpen] = useState(false);
   const [progressOpen, setProgressOpen] = useState(false);
   const [settingsReset, setSettingsReset] = useState(0);
+  /* Which pass is in focus. The carousel is a REAL scroll container, not
+     a drag: native scrolling and pointer drag are different input
+     channels, so a trackpad swipe changes profile while a drag on the
+     card still turns it. Same axis, two gestures, no conflict. */
+  const [profileIdx, setProfileIdx] = useState(0);
+  const snapTimer = useRef<number | null>(null);
+
   /* Drives the sticky header. Fed by onScroll rather than useScroll —
      the container ref is null on the first render, and useScroll captures
      that null instead of re-reading it. */
@@ -268,19 +302,92 @@ export default function ProfileScreen() {
 
       {/* Card carousel — arrives AFTER the disk, and drops onto it. The
           second card is deliberately cut off by the screen edge: that's
-          the affordance telling you there are more. */}
-      <WorldPassCard
-        x={CARD_X}
-        delay={CARD_DELAY}
-        lit={lit}
-        onConnect={() => setScanOpen(true)}
-      />
-      <WorldPassCard
-        x={CARD_X + CARD_GAP}
-        delay={CARD_DELAY + 0.1}
-        lit={lit}
-        interactive={false}
-      />
+          the affordance telling you there are more, so swiping simply
+          brings it in.
+
+          The track is only as tall as the cards. Spanning the whole frame
+          would swallow drags meant for the page beneath it. */}
+      <div
+        className="absolute left-0 overflow-x-auto overflow-y-hidden [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
+        style={{
+          // Padded well past the card, because overflow-y:hidden (which a
+          // horizontal scroller needs) clips at the container's edge — and
+          // the card's shadow falls ~110px below it. Sized to the card
+          // exactly, the shadow was being sliced off on a straight line.
+          top: CARD_Y - CARD_PAD_T,
+          width: 440,
+          height: CARD_H + CARD_PAD_T + CARD_PAD_B,
+          zIndex: 2,
+          scrollSnapType: "x mandatory",
+          scrollBehavior: "smooth",
+          // Snaps to the design's x, so the pass in focus lands at 94
+          // with its neighbour peeking at 387.
+          scrollPaddingLeft: CARD_X,
+          // pan-y leaves vertical touch scrolling with the PAGE; only the
+          // horizontal axis belongs to this strip.
+          touchAction: "pan-y",
+        }}
+        onScroll={(e) => {
+          const el = e.currentTarget;
+          const i = Math.round(el.scrollLeft / CARD_GAP);
+          if (i !== profileIdx && i >= 0 && i < PROFILES.length) {
+            haptic("carouselSnap");
+            setProfileIdx(i);
+          }
+          /* Settle the scroll ourselves once it goes quiet. CSS snapping
+             is supposed to do this, but trackpad momentum can end between
+             points and leave the card parked off-centre — which is what
+             was happening. Re-snapping after 120ms of stillness makes the
+             resting position exact regardless. */
+          if (snapTimer.current) window.clearTimeout(snapTimer.current);
+          snapTimer.current = window.setTimeout(() => {
+            const target = Math.min(
+              Math.max(Math.round(el.scrollLeft / CARD_GAP), 0),
+              PROFILES.length - 1,
+            ) * CARD_GAP;
+            if (Math.abs(el.scrollLeft - target) > 0.5) {
+              el.scrollTo({ left: target, behavior: "smooth" });
+            }
+          }, 120);
+        }}
+      >
+        <div
+          className="flex"
+          style={{
+            paddingLeft: CARD_X,
+            // Puts the cards back at their true y inside the padded box.
+            paddingTop: CARD_PAD_T,
+            gap: CARD_GAP - CARD_W,
+          }}
+        >
+          {PROFILES.map((p, i) => (
+            <div
+              key={p.serial}
+              style={{ scrollSnapAlign: "start", scrollSnapStop: "always", flex: "0 0 auto" }}
+            >
+              <WorldPassCard
+                delay={CARD_DELAY + i * 0.1}
+                lit={lit}
+                profile={p}
+                // Only the pass in focus takes the cursor, so tilt never
+                // fights between two cards.
+                interactive={i === profileIdx}
+                onConnect={() => setScanOpen(true)}
+                onAddProgram={() => setLoyaltyOpen(true)}
+                onOpenPrograms={() => setProgramsOpen(true)}
+              />
+            </div>
+          ))}
+          {/* Trailing space as an ELEMENT, not padding. A scroll
+              container's end padding is widely not counted in scrollWidth,
+              so the last pass could not scroll far enough left to reach
+              its snap point and parked against the right edge instead. */}
+          <div
+            aria-hidden
+            style={{ flex: "0 0 auto", width: 440 - CARD_X - CARD_W }}
+          />
+        </div>
+      </div>
 
       {/* Everything below the pedestal (853:16315) — see ProfileBody. */}
       <ProfileBody
@@ -333,7 +440,7 @@ export default function ProfileScreen() {
             color: "#0e0e0e",
           }}
         >
-          mohak n.
+          {PROFILES[profileIdx].name}
         </motion.p>
       </motion.div>
 
@@ -379,6 +486,10 @@ export default function ProfileScreen() {
 
       {/* Verification gate (853:22081) — what tapping the benefit deck
           opens, with that card lifted onto the scrim. */}
+      {/* Add a loyalty program (935:22488 → 935:22825). Continue on the
+          second step dismisses back to the card it came from. */}
+      <LoyaltyPicker open={loyaltyOpen} onClose={() => setLoyaltyOpen(false)} />
+
       {/* Airport logistics — onboarding's supercar sequence, in a sheet. */}
       <AirportSheet open={airportOpen} onClose={() => setAirportOpen(false)} />
 
@@ -514,16 +625,21 @@ function IconButton({
  * never repeats, so the card is alive before you touch it.
  */
 function WorldPassCard({
-  x,
   delay,
   lit,
   interactive = true,
   onConnect,
+  onAddProgram,
+  onOpenPrograms,
+  profile,
 }: {
-  x: number;
   delay: number;
   /** Opens the verification gate from the back face's "+". */
   onConnect?: () => void;
+  /** The "+" on a programs back — adds a loyalty program. */
+  onAddProgram?: () => void;
+  /** Swiping that back downward opens the full programs page. */
+  onOpenPrograms?: () => void;
   /** Whether the green has woken. Held off until 2s after the card has
    *  landed, so it reads as a status light switching on rather than as
    *  part of the card's own arrival. */
@@ -531,6 +647,8 @@ function WorldPassCard({
   /** The peeking card is scenery — it floats, but doesn't take the
    *  cursor, so tilt never fights between the two. */
   interactive?: boolean;
+  /** Whose pass this is. */
+  profile: (typeof PROFILES)[number];
 }) {
   const ref = useRef<HTMLDivElement | null>(null);
   /* Which face is showing. Counted rather than toggled, so repeated
@@ -541,11 +659,6 @@ function WorldPassCard({
 
   const rx = useMotionValue(0);
   const ry = useMotionValue(0);
-  /* The flip plane owns the horizontal drag, and the turn mark sits ABOVE
-     it (so the turn doesn't rotate the mark away). That left the card
-     sliding under the thumb while the mark stayed put. Handing framer this
-     motion value lets both read the same offset. */
-  const dragX = useMotionValue(0);
   // Soft spring: the card settles rather than snapping, which reads as
   // something with mass.
   const rxs = useSpring(rx, { stiffness: 150, damping: 20, mass: 0.9 });
@@ -571,8 +684,11 @@ function WorldPassCard({
 
   return (
     <motion.div
-      className="absolute"
-      style={{ left: x, top: CARD_Y, width: CARD_W, height: CARD_H }}
+      // In flow, not absolute: the carousel is a scroll container and the
+      // flex item places it. It still creates the positioning context its
+      // own faces rely on.
+      className="relative"
+      style={{ width: CARD_W, height: CARD_H }}
       initial={{ opacity: 0, y: 26, scale: 0.96 }}
       animate={{ opacity: 1, y: 0, scale: 1 }}
       transition={{ delay, duration: 0.8, ease: IN_EASE }}
@@ -608,7 +724,6 @@ function WorldPassCard({
           <motion.div
             className="pointer-events-none absolute inset-0"
             style={{
-              x: dragX,
               rotateX: rxs,
               rotateY: rys,
               // Deliberately NOT preserve-3d: the arrow is a flat hint
@@ -647,13 +762,19 @@ function WorldPassCard({
           </motion.div>
         )}
 
-        {/* Flip plane. Swipe horizontally to turn the card.
+        {/* Flip plane. Drag horizontally to turn the card — unchanged, and
+            it does not fight the carousel: that is a native SCROLL
+            container, and scrolling (wheel / trackpad) is a different
+            input channel from a pointer drag. framer's drag also sets
+            touch-action: pan-y here, so a touch drag on the card turns it
+            while vertical scrolling still belongs to the page.
+
             transformStyle must be preserve-3d the whole way down this
             chain, or the back face renders flat on top of the front
             instead of behind it. */}
         <motion.div
           className="h-full w-full"
-          style={{ transformStyle: "preserve-3d", x: dragX }}
+          style={{ transformStyle: "preserve-3d" }}
           animate={{ rotateY: turns * 180 }}
           transition={{ type: "spring", stiffness: 60, damping: 14, mass: 1.1 }}
           drag={interactive ? "x" : false}
@@ -667,6 +788,7 @@ function WorldPassCard({
             const far = Math.abs(info.offset.x) > 55;
             const fast = Math.abs(info.velocity.x) > 380;
             if (far || fast) {
+              haptic("cardFlip");
               setTurns((t) => t + (info.offset.x < 0 ? 1 : -1));
             }
           }}
@@ -846,7 +968,7 @@ function WorldPassCard({
             >
               <defs>
                 <linearGradient
-                  id={`trace-${x}`}
+                  id={`trace-${profile.serial}`}
                   x1="0"
                   y1="1"
                   x2="0"
@@ -863,7 +985,7 @@ function WorldPassCard({
                 width={CARD_W - 2}
                 height={CARD_H - 2}
                 rx={29}
-                stroke={`url(#trace-${x})`}
+                stroke={`url(#trace-${profile.serial})`}
                 strokeWidth={2}
                 strokeLinecap="round"
                 style={{ filter: "drop-shadow(0 0 6px rgba(20,190,135,0.75))" }}
@@ -961,7 +1083,7 @@ function WorldPassCard({
                   letterSpacing: "-0.72px",
                 }}
               >
-                mohak n.
+                {profile.name}
               </p>
 
               {/* Hairline under the name (853:15732) */}
@@ -994,7 +1116,7 @@ function WorldPassCard({
                   color: "transparent",
                 }}
               >
-                6190001
+                {profile.serial}
               </p>
             </div>
 
@@ -1049,7 +1171,14 @@ function WorldPassCard({
               boxShadow: "inset 0 0 0 1px rgba(0,0,0,0.06)",
             }}
           >
-            <CardBack onConnect={onConnect} />
+            {profile.back === "programs" ? (
+              <CardBackPrograms
+                onConnect={onAddProgram}
+                onOpenPrograms={onOpenPrograms}
+              />
+            ) : (
+              <CardBack onConnect={onConnect} />
+            )}
 
             {/* Same tab, on the back — at the same LEFT edge, unmirrored.
 
