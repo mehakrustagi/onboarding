@@ -355,8 +355,6 @@ export default function ProfileScreen() {
           className="flex"
           style={{
             paddingLeft: CARD_X,
-            // Lets the last card reach the snap position.
-            paddingRight: 440 - CARD_X - CARD_W,
             // Puts the cards back at their true y inside the padded box.
             paddingTop: CARD_PAD_T,
             gap: CARD_GAP - CARD_W,
@@ -380,6 +378,14 @@ export default function ProfileScreen() {
               />
             </div>
           ))}
+          {/* Trailing space as an ELEMENT, not padding. A scroll
+              container's end padding is widely not counted in scrollWidth,
+              so the last pass could not scroll far enough left to reach
+              its snap point and parked against the right edge instead. */}
+          <div
+            aria-hidden
+            style={{ flex: "0 0 auto", width: 440 - CARD_X - CARD_W }}
+          />
         </div>
       </div>
 
