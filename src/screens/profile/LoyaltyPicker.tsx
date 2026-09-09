@@ -374,10 +374,13 @@ export default function LoyaltyPicker({
                 zIndex: 4,
                 paddingTop: 110,
                 paddingBottom: 34,
+                // NO backdrop-filter. A backdrop blur applies across the
+                // element's whole box, not only where its background is
+                // opaque — so the 110px of transparent top padding was
+                // blurring the cards behind it, with a hard edge where the
+                // bar starts. The white ramp alone does the fade.
                 background:
-                  "linear-gradient(180deg, rgba(255,255,255,0) 15.263%, #ffffff 60%, #e9e9ea 127.89%)",
-                backdropFilter: "blur(2px)",
-                WebkitBackdropFilter: "blur(2px)",
+                  "linear-gradient(180deg, rgba(255,255,255,0) 0%, rgba(255,255,255,0.72) 34%, #ffffff 58%, #e9e9ea 127.89%)",
               }}
             >
               <motion.button

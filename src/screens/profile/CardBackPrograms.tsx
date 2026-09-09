@@ -275,13 +275,19 @@ export default function CardBackPrograms({
       <div
         className="pointer-events-none absolute"
         style={{
-          left: -2,
-          top: 310,
-          width: 244,
-          height: 36,
-          background: "linear-gradient(0deg, #ffffff 0%, rgba(255,255,255,0) 100%)",
-          backdropFilter: "blur(10px)",
-          WebkitBackdropFilter: "blur(10px)",
+          // Full width and flush to the foot. Figma's 244×36 at (−2, 310)
+          // is measured against its own 244-wide inner frame; against this
+          // 252.325 card it left a gap at the right and a hard edge above
+          // the bottom corners, so the fade read as a floating band.
+          left: 0,
+          right: 0,
+          bottom: 0,
+          height: 46,
+          // NO backdrop-filter. It applies across the element's whole box
+          // rather than only where the background is opaque, so it blurred
+          // the cards straight through the transparent top of the ramp.
+          background:
+            "linear-gradient(0deg, #ffffff 0%, #ffffff 34%, rgba(255,255,255,0.75) 62%, rgba(255,255,255,0) 100%)",
         }}
       />
       <motion.button
