@@ -1013,20 +1013,16 @@ function WorldPassCard({
           >
             <CardBack onConnect={onConnect} />
 
-            {/* Same tab, on the back. It sits at the face's LOCAL right
-                edge, which the face's own 180° maps to the viewer's left;
-                the scaleX un-mirrors the shape so its bulge still points
-                outward. */}
+            {/* Same tab, on the back — at the same LEFT edge, unmirrored.
+
+                The back face is pre-turned 180°, so when the card flips
+                180° the two cancel and this face renders the right way
+                round. Placing the tab at the local RIGHT edge with a
+                scaleX to compensate — as if the face were mirrored — put
+                it on the viewer's right instead. */}
             <div
               className="pointer-events-none absolute"
-              style={{
-                left: CARD_W - 11,
-                top: 64,
-                width: 11,
-                height: 93,
-                zIndex: 6,
-                transform: "scaleX(-1)",
-              }}
+              style={{ left: 0, top: 64, width: 11, height: 93, zIndex: 6 }}
             >
               <motion.div
                 className="h-full w-full"
