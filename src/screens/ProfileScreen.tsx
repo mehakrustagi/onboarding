@@ -146,31 +146,6 @@ export default function ProfileScreen() {
         // the behaviour the design implies rather than a shrunken fit.
         className="absolute inset-0 overflow-y-auto overflow-x-hidden [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
       >
-      {/* Status bar — the design uses the iOS component; this is the
-          9:41 / signal / wifi / battery row it renders as. */}
-      <div
-        className="absolute flex items-center justify-between"
-        style={{ left: 30, right: 30, top: 18, height: 24 }}
-      >
-        <span className="text-[16px] font-semibold tracking-[-0.3px] text-black">
-          9:41
-        </span>
-        <div className="flex items-center gap-1.5 text-black">
-          <SignalBars />
-          <WifiGlyph />
-          <BatteryGlyph />
-        </div>
-      </div>
-
-      {/* Back + settings */}
-      <IconButton x={30} icon="/assets/profile/arrow-back.svg" label="Back" />
-      <IconButton
-        x={360}
-        icon="/assets/profile/settings.svg"
-        label="Settings"
-        onClick={() => setSettingsOpen(true)}
-      />
-
       {/* Card carousel. The second card is deliberately cut off by the
           screen edge — that's the affordance telling you there are more,
           so it isn't centred or scaled down. */}
@@ -185,11 +160,25 @@ export default function ProfileScreen() {
           // (inset -66.67% -4.36%), so it's placed at its NATURAL size
           // centred on that box. Squashing it into 321×21 was what turned
           // it into a hard dark bar.
-          left: 18 + (321 - 349) / 2,
-          top: 567 + (21 - 49) / 2,
-          width: 349,
-          height: 49,
+          //
+          // Sized to the DISC, not to the container. pedestal-disk.png
+          // has an alpha bbox of (155,58,1261,244) at 4x, so the plinth is
+          // only 276.5 wide inside its 354 box and its base sits at y587.
+          // A 349-wide shadow therefore overhung it by ~36px on each side
+          // whatever it was centred on — which is what kept reading as an
+          // uncropped smear. 300 gives the slight spread a cast shadow
+          // has without leaving the plinth.
+          left: 220 - 300 / 2,
+          top: 569,
+          width: 300,
+          height: 42,
           zIndex: 1,
+          // Cropped at the ends. A cast shadow has no hard vertical edge —
+          // it has to run out before the plinth does.
+          maskImage:
+            "linear-gradient(90deg, transparent 0%, #000 14%, #000 86%, transparent 100%)",
+          WebkitMaskImage:
+            "linear-gradient(90deg, transparent 0%, #000 14%, #000 86%, transparent 100%)",
         }}
         initial={{ opacity: 0 }}
         animate={{ opacity: 1 }}
@@ -227,10 +216,14 @@ export default function ProfileScreen() {
           style={{
             opacity: 0.5,
             filter: "blur(9px)",
+            // Tapers before the box ends. Running to `black 100%` left
+            // the layer fully opaque at the container's bottom edge, so
+            // the shadow was sliced off on a straight line instead of
+            // fading out.
             maskImage:
-              "linear-gradient(to bottom, transparent 22%, black 58%, black 100%)",
+              "linear-gradient(to bottom, transparent 22%, black 56%, black 74%, transparent 100%)",
             WebkitMaskImage:
-              "linear-gradient(to bottom, transparent 22%, black 58%, black 100%)",
+              "linear-gradient(to bottom, transparent 22%, black 56%, black 74%, transparent 100%)",
           }}
         >
           <Image
@@ -304,6 +297,38 @@ export default function ProfileScreen() {
       {/* Gives the scroll container the design's full height, so the
           absolutely-positioned body has room to scroll into. */}
         <div style={{ height: 1781 }} />
+      </div>
+
+      {/* Header row — a SIBLING of the scroller, not a child. Inside it,
+          the back and settings controls scrolled away with the content,
+          and a status bar that scrolls off is plainly wrong on a phone.
+          Sitting outside, they hold still for the whole page. */}
+      <div className="pointer-events-none absolute inset-0" style={{ zIndex: 20 }}>
+      {/* Status bar — the design uses the iOS component; this is the
+          9:41 / signal / wifi / battery row it renders as. */}
+      <div
+        className="absolute flex items-center justify-between"
+        style={{ left: 30, right: 30, top: 18, height: 24 }}
+      >
+        <span className="text-[16px] font-semibold tracking-[-0.3px] text-black">
+          9:41
+        </span>
+        <div className="flex items-center gap-1.5 text-black">
+          <SignalBars />
+          <WifiGlyph />
+          <BatteryGlyph />
+        </div>
+      </div>
+
+      {/* Back + settings */}
+      <IconButton x={30} icon="/assets/profile/arrow-back.svg" label="Back" />
+      <IconButton
+        x={360}
+        icon="/assets/profile/settings.svg"
+        label="Settings"
+        onClick={() => setSettingsOpen(true)}
+      />
+
       </div>
 
       {/* All benefits (853:22811). A sibling of the scroller, not a child,
@@ -406,17 +431,18 @@ function IconButton({
       type="button"
       aria-label={label}
       onClick={onClick}
-      className="absolute flex items-center justify-center"
+      className="pointer-events-auto absolute flex items-center justify-center"
       style={{
         left: x,
         top: 86,
         width: 50,
         height: 50,
         borderRadius: 54,
-        // Figma has rgba(255,255,255,0.1) — invisible on a white page, so
-        // it must be resolving against something. Using a light grey fill
-        // of the same weight so the control actually reads.
-        background: "rgba(0,0,0,0.04)",
+        // Solid, not a wash. Figma has rgba(255,255,255,0.1), which is
+        // invisible on a white page; a translucent grey was readable but
+        // now that these are pinned above the scroller, content slides
+        // underneath and shows straight through them.
+        background: "#f2f2f4",
       }}
       initial={{ opacity: 0, y: -6 }}
       animate={{ opacity: 1, y: 0 }}
@@ -477,6 +503,11 @@ function WorldPassCard({
 
   const rx = useMotionValue(0);
   const ry = useMotionValue(0);
+  /* The flip plane owns the horizontal drag, and the turn mark sits ABOVE
+     it (so the turn doesn't rotate the mark away). That left the card
+     sliding under the thumb while the mark stayed put. Handing framer this
+     motion value lets both read the same offset. */
+  const dragX = useMotionValue(0);
   // Soft spring: the card settles rather than snapping, which reads as
   // something with mass.
   const rxs = useSpring(rx, { stiffness: 150, damping: 20, mass: 0.9 });
@@ -520,13 +551,71 @@ function WorldPassCard({
           x: { duration: 8.9, repeat: Infinity, ease: "easeInOut" },
         }}
       >
+        {/* Turn hint — the arrow from 899:13965.
+
+            Its OWN asset, split out of that file rather than cropped from
+            it. The two halves live in one SVG (arrow x 0–37.6, pink mark
+            x 44.9–55.9), and cropping to a window kept leaking the mark's
+            gradient into the arrow's slot — which is why two pink bars
+            were showing instead of an arrow and a tab.
+
+            Placed by the same alignment the file implies: the mark sits on
+            the card's left edge, so asset x 44.9 ≡ card x 0, putting the
+            arrow at card x −44.9.
+
+            Outside the flip plane, since it points AT the card and must
+            not mirror when the card turns; it keeps the tilt and drag so
+            it still travels along. */}
+        {interactive && (
+          <motion.div
+            className="pointer-events-none absolute inset-0"
+            style={{
+              x: dragX,
+              rotateX: rxs,
+              rotateY: rys,
+              // Deliberately NOT preserve-3d: the arrow is a flat hint
+              // beside the card, and in the 3D context it was being
+              // depth-sorted against the faces.
+              zIndex: 6,
+            }}
+          >
+            <motion.div
+              className="absolute"
+              style={{ left: -44.9, top: 64, width: 38, height: 93 }}
+              initial={{ opacity: 0, x: 8 }}
+              animate={{ opacity: 1, x: 0 }}
+              transition={{ delay: delay + 1.1, duration: 0.6, ease: IN_EASE }}
+            >
+              {/* Nudges toward the swipe direction on the tab's period, so
+                  the two read as one gesture. */}
+              <motion.div
+                animate={{ x: [0, -5, 0, 0, 0] }}
+                transition={{
+                  duration: 3.4,
+                  times: [0, 0.16, 0.32, 0.66, 1],
+                  repeat: Infinity,
+                  ease: "easeInOut",
+                }}
+              >
+                <Image
+                  src="/assets/profile/pass-arrow.svg"
+                  alt=""
+                  width={38}
+                  height={93}
+                  style={{ width: 38, height: 93, display: "block" }}
+                />
+              </motion.div>
+            </motion.div>
+          </motion.div>
+        )}
+
         {/* Flip plane. Swipe horizontally to turn the card.
             transformStyle must be preserve-3d the whole way down this
             chain, or the back face renders flat on top of the front
             instead of behind it. */}
         <motion.div
           className="h-full w-full"
-          style={{ transformStyle: "preserve-3d" }}
+          style={{ transformStyle: "preserve-3d", x: dragX }}
           animate={{ rotateY: turns * 180 }}
           transition={{ type: "spring", stiffness: 60, damping: 14, mass: 1.1 }}
           drag={interactive ? "x" : false}
@@ -558,10 +647,16 @@ function WorldPassCard({
             // Stacked elevation — a tight contact shadow under a wide
             // soft one, so the card sits ON the pedestal instead of
             // hovering over a single blur.
+            // Halved from 0.5/0.7/0.55 — the stack read as a much
+            // heavier object than the card is.
             boxShadow: [
-              "0 2px 6px -2px rgba(0,0,0,0.5)",
-              "0 26px 50px -22px rgba(0,0,0,0.7)",
-              "0 50px 90px -40px rgba(0,0,0,0.55)",
+              "0 2px 6px -2px rgba(0,0,0,0.25)",
+              "0 26px 50px -22px rgba(0,0,0,0.35)",
+              // Pulled in hard. At 90px blur under a 264-wide card this cast a
+              // wash far wider than the plinth it lands on — which is what
+              // kept reading as an uncropped shadow around the pedestal,
+              // rather than the plinth's own.
+              "0 30px 46px -32px rgba(0,0,0,0.22)",
             ].join(", "),
           }}
         >
@@ -881,6 +976,92 @@ function WorldPassCard({
           >
             <CardBack onConnect={onConnect} />
           </div>
+
+          {/* The turn tab — 853:77298, an 11×93 Union on the card's left
+              edge at card-relative (0, 64).
+
+              TWO copies, one per face, as the faces themselves are done: a
+              single tab inherits the card's 180° flip and lands on the
+              RIGHT once turned, and the cue has to stay left whichever way
+              the card faces. backfaceVisibility does the swap at 90° for
+              free.
+
+              `z` as a framer PROP, not a transform string. Framer composes
+              its own transform from x/y/z/scale/rotate and overwrites any
+              `transform` in style — so a raw translateZ silently became 0,
+              dropping the tab behind the card's parallax layer at
+              translateZ(22px), which is why it vanished.
+
+              Front sits at z +24. Back sits at −24: after the card's 180°
+              that maps to +24 in world space, in front of the back face.
+              The scale lives on an inner element so the mirror and the
+              growth anchor can't fight — the back tab's own 180° and the
+              card's cancel, so both grow from their inner edge. */}
+          <motion.div
+            className="pointer-events-none absolute"
+            style={{
+              left: 0,
+              top: 64,
+              width: 11,
+              height: 93,
+              z: 24,
+              backfaceVisibility: "hidden",
+              WebkitBackfaceVisibility: "hidden",
+            }}
+          >
+            <motion.div
+              className="h-full w-full"
+              style={{ transformOrigin: "100% 50%" }}
+              animate={{ scaleX: [1, 1.5, 1, 1, 1] }}
+              transition={{
+                duration: 3.4,
+                times: [0, 0.16, 0.32, 0.66, 1],
+                repeat: Infinity,
+                ease: "easeInOut",
+              }}
+            >
+              <Image
+                src="/assets/profile/pass-tab.svg"
+                alt=""
+                width={11}
+                height={93}
+                style={{ width: 11, height: 93, display: "block" }}
+              />
+            </motion.div>
+          </motion.div>
+          <motion.div
+            className="pointer-events-none absolute"
+            style={{
+              left: CARD_W - 11,
+              top: 64,
+              width: 11,
+              height: 93,
+              rotateY: 180,
+              z: -24,
+              backfaceVisibility: "hidden",
+              WebkitBackfaceVisibility: "hidden",
+            }}
+          >
+            <motion.div
+              className="h-full w-full"
+              style={{ transformOrigin: "100% 50%" }}
+              animate={{ scaleX: [1, 1.5, 1, 1, 1] }}
+              transition={{
+                duration: 3.4,
+                times: [0, 0.16, 0.32, 0.66, 1],
+                repeat: Infinity,
+                ease: "easeInOut",
+              }}
+            >
+              <Image
+                src="/assets/profile/pass-tab.svg"
+                alt=""
+                width={11}
+                height={93}
+                style={{ width: 11, height: 93, display: "block" }}
+              />
+            </motion.div>
+          </motion.div>
         </motion.div>
         </motion.div>
       </motion.div>

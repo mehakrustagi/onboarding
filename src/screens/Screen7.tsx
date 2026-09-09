@@ -39,6 +39,34 @@ const CAR_TOP = 220;
 const STRIDE = 230;
 const HALO_TOP = 296.5;
 
+/* The airport sheet wears the agent-sheet header — orb at 73, 72px, an
+ * 18/25 headline and a 12px body, plus the eligibility line — which runs
+ * to ~277 against onboarding's ~181. The SELECT phase therefore gets its
+ * own car geometry: lower and shorter, so the header clears it and the
+ * info panel at 659.8 still has room. The staged phase has no header and
+ * keeps the originals. */
+const AIRPORT_CAR_TOP = 292;
+const AIRPORT_CAR_H = 352;
+const AIRPORT_HALO_TOP = 368;
+
+/* Headroom above the staged car in which it dissolves as it drives off.
+ * The fade lives entirely in this zone, so the car is solid until it
+ * starts moving. */
+/* With the tagline gone the info block is brand(50) + gap + name(25) = 95,
+ * sitting in the 189px between the airport car's base (644) and the CTA
+ * (833). Dead-centre would be 31; pushed further so the block sits nearer
+ * the button than the car — the name belongs with the thing you press,
+ * and the car needs the breathing room more than the CTA does. */
+const AIRPORT_INFO_SHIFT = 58;
+
+const CAR_FADE_ZONE = 210;
+/* Stops are expressed against the WHOLE wrapper (zone + car), so the fade
+ * has to finish by zone/(zone+CAR_H) — 210/650 ≈ 32%. Running it further
+ * puts the fade back onto the car's own body, which is the thing being
+ * fixed. */
+const CAR_FADE_MASK =
+  "linear-gradient(180deg, rgba(0,0,0,0) 0%, rgba(0,0,0,0.22) 13%, rgba(0,0,0,0.7) 24%, #000 32%)";
+
 /* The airport variant's header is taller than onboarding's: a 72px agent
  * orb in place of the 24px seat glyph, plus the "Available only in
  * eligible regions" line. That pushes the copy to ~y263 while the car
@@ -226,7 +254,14 @@ export default function Screen7({
         // layout below it can give up. Everything under the header is
         // fixed against the CTA at y833, so the HEADER compresses to fit
         // the car's start at 220 rather than the car moving down.
-        style={{ top: airport ? 56 : 70 }}
+        style={{
+          top: airport ? 73 : 70,
+          // Above the sheet's head fade (z-10). The canvas renders at 1:1
+          // with no transform, so nothing here creates a stacking context
+          // and this z-index competes in the sheet's — which is what lets
+          // the orb sit on top of the fade rather than under it.
+          zIndex: airport ? 12 : undefined,
+        }}
         initial={{ opacity: 0, y: -8 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ duration: 0.6, ease: IN_EASE }}
@@ -239,22 +274,53 @@ export default function Screen7({
             animate={{ y: [0, -5, 0] }}
             transition={{ duration: 5.4, repeat: Infinity, ease: "easeInOut" }}
           >
-            <AgentOrb size={56} />
+            <AgentOrb size={72} />
           </motion.div>
         ) : (
           <SeatIcon />
         )}
         <p
-          className="whitespace-nowrap text-[20px] font-medium leading-[25px] tracking-[-0.04em] text-[#0b0b0b] text-center"
-          // Tighter only where the header has to fit a 56px orb and a
-          // third line; onboarding keeps its original rhythm.
-          style={{ marginTop: airport ? 14 : 20 }}
+          className={
+            airport
+              ? "text-center font-medium"
+              : "whitespace-nowrap text-[20px] font-medium leading-[25px] tracking-[-0.04em] text-[#0b0b0b] text-center"
+          }
+          // Airport wears the agent sheets' type: 18/25 at -0.72, over a
+          // 216 column, so it reads as one of them rather than as a
+          // borrowed onboarding screen.
+          style={
+            airport
+              ? {
+                  marginTop: 14,
+                  width: 216,
+                  fontSize: 18,
+                  lineHeight: "25px",
+                  letterSpacing: "-0.72px",
+                  color: "#0b0b0b",
+                }
+              : { marginTop: 20 }
+          }
         >
           {airport ? "Select your airport pickup" : "Select your arrival supercar"}
         </p>
         <p
-          className="mt-[10px] text-center text-[12px] font-semibold leading-[16px] tracking-[-0.01em] text-[#999]"
-          style={{ width: 360 }}
+          className={
+            airport
+              ? "text-center font-medium"
+              : "mt-[10px] text-center text-[12px] font-semibold leading-[16px] tracking-[-0.01em] text-[#999]"
+          }
+          style={
+            airport
+              ? {
+                  marginTop: 10,
+                  width: 310,
+                  fontSize: 12,
+                  lineHeight: "16px",
+                  letterSpacing: "-0.24px",
+                  color: "#8a8a90",
+                }
+              : { width: 360 }
+          }
         >
           Bypass standard taxi queues with an on-demand
           <br />
@@ -262,8 +328,15 @@ export default function Screen7({
         </p>
         {airport && (
           <p
-            className="mt-[10px] text-center text-[12px] font-semibold leading-[16px] tracking-[-0.01em] text-[#999]"
-            style={{ width: 360 }}
+            className="text-center font-medium"
+            style={{
+              marginTop: 10,
+              width: 310,
+              fontSize: 12,
+              lineHeight: "16px",
+              letterSpacing: "-0.24px",
+              color: "#8a8a90",
+            }}
           >
             Available only in eligible regions
           </p>
@@ -276,7 +349,10 @@ export default function Screen7({
       <div
         className="pointer-events-none absolute left-1/2 -translate-x-1/2"
         style={{
-          top: HALO_TOP, width: HALO_SIZE, height: HALO_SIZE }}
+          top: airport ? AIRPORT_HALO_TOP : HALO_TOP,
+          width: HALO_SIZE,
+          height: HALO_SIZE,
+        }}
       >
         {[0, 1, 2, 3, 4].map((i) => (
           <motion.div
@@ -323,9 +399,9 @@ export default function Screen7({
       <motion.div
         className="absolute left-0 cursor-grab active:cursor-grabbing"
         style={{
-          top: CAR_TOP,
+          top: airport ? AIRPORT_CAR_TOP : CAR_TOP,
           width: "100%",
-          height: CAR_H,
+          height: airport ? AIRPORT_CAR_H : CAR_H,
           touchAction: "pan-y",
         }}
         onPanStart={handlePanStart}
@@ -354,6 +430,7 @@ export default function Screen7({
           car={car}
           wrappedX={carXs[i]}
           dist={carDists[i]}
+          airport={airport}
         />
       ))}
 
@@ -368,7 +445,13 @@ export default function Screen7({
         className="absolute overflow-hidden rounded-full text-[14px] font-semibold tracking-[-0.01em] text-black"
         style={{
           top: 833,
-          left: 30,
+          // Centre-anchored rather than left:30. Identical on the 440
+          // canvas, but the airport sheet renders this canvas WIDER than
+          // 440 so the peek cars can reach the screen edges — and a
+          // left-anchored CTA would drift off with it. marginLeft rather
+          // than a translate, so it can't fight framer's own transform.
+          left: "50%",
+          marginLeft: -190,
           width: 380,
           height: 50,
           background:
@@ -434,13 +517,37 @@ function StagedView({ car, airport = false }: { car: Car; airport?: boolean }) {
       {/* Car drives forward — settle-back-and-launch: a small preview dip
           before it accelerates off the top of the phone. Ease-in curve gives
           a real "hitting the throttle" feel (slow start → whoosh). */}
-      <motion.div
+      {/* The dissolve frame. Fixed in SCREEN space and 200px taller than
+          the car, with the fade living in that headroom — so the car
+          starts fully solid and only dissolves as it RISES into the zone.
+          Masking the sprite itself put the fade on the car from the first
+          frame, which is why it arrived already faded.
+
+          A mask on a wrapper that contains nothing but the car leaves no
+          artifact: the gradient is uniform horizontally, so there are no
+          vertical edges to show — the failure mode a white band over the
+          top had. */}
+      <div
         className="pointer-events-none absolute left-1/2"
         style={{
-          top: CAR_TOP,
+          top: CAR_TOP - CAR_FADE_ZONE,
+          width: CAR_W,
+          height: CAR_H + CAR_FADE_ZONE,
+          transform: "translateX(-50%)",
+          ...(airport
+            ? {
+                maskImage: CAR_FADE_MASK,
+                WebkitMaskImage: CAR_FADE_MASK,
+              }
+            : null),
+        }}
+      >
+      <motion.div
+        className="pointer-events-none absolute left-0"
+        style={{
+          top: CAR_FADE_ZONE,
           width: CAR_W,
           height: CAR_H,
-          translateX: "-50%",
         }}
         initial={{ y: 0, scaleY: 1 }}
         animate={{
@@ -466,21 +573,10 @@ function StagedView({ car, airport = false }: { car: Car; airport?: boolean }) {
             objectPosition: "center",
             transform: car.imgScale ? `scale(${car.imgScale})` : undefined,
             transformOrigin: "center",
-            // The car dissolves as it drives up and off. Masking the
-            // SPRITE, not overlaying a white band: a band is a rectangle,
-            // and its vertical edges show against the car and the tracks.
-            // The mask travels with the car, so there is no box at all.
-            ...(airport
-              ? {
-                  maskImage:
-                    "linear-gradient(180deg, rgba(0,0,0,0) 0%, rgba(0,0,0,0.35) 26%, rgba(0,0,0,0.85) 54%, #000 76%)",
-                  WebkitMaskImage:
-                    "linear-gradient(180deg, rgba(0,0,0,0) 0%, rgba(0,0,0,0.35) 26%, rgba(0,0,0,0.85) 54%, #000 76%)",
-                }
-              : null),
           }}
         />
       </motion.div>
+      </div>
 
       {/* White wash over the departing car — the airport sheet's staged
           state (right frame of the reference). Transparent at the roof and
@@ -608,7 +704,12 @@ function TireTracks() {
     <motion.div
       className="pointer-events-none absolute overflow-hidden"
       style={{
-        left: 143,
+        // Centre-anchored, not left:143. That value assumed a 440-wide
+        // canvas; the airport sheet renders it wider so the cars can
+        // reach the edges, which slid the tracks away from the wheels.
+        // 143 + 157/2 = 221.5 against a 220 centre, hence the 1.5.
+        left: "50%",
+        marginLeft: -157 / 2 + 1.5,
         top: 207.6,
         width: 157,
         height: 258,
@@ -801,10 +902,14 @@ function InfoSlot({
   car,
   wrappedX,
   dist,
+  airport = false,
 }: {
   car: Car;
   wrappedX: import("framer-motion").MotionValue<number>;
   dist: import("framer-motion").MotionValue<number>;
+  /** 853:66675 carries the brand mark and the car's name only — no spec
+   *  line. Dropping it also gives the mark room under the car. */
+  airport?: boolean;
 }) {
   const absDist = useTransform(dist, (d) => Math.abs(d));
   // Aggressive fade — text is fully gone by 40% of the way to the next slot,
@@ -819,7 +924,7 @@ function InfoSlot({
       <motion.div
         className="pointer-events-none absolute top-0 left-1/2"
         style={{
-          top: 659.8,
+          top: 659.8 + (airport ? AIRPORT_INFO_SHIFT : 0),
           width: 50,
           height: 50,
           x: wrappedX,
@@ -833,7 +938,7 @@ function InfoSlot({
       <motion.p
         className="pointer-events-none absolute left-1/2 text-center font-serif text-[20px] leading-[25px] font-bold text-black whitespace-nowrap"
         style={{
-          top: 729.8,
+          top: 729.8 + (airport ? AIRPORT_INFO_SHIFT : 0),
           x: wrappedX,
           translateX: "-50%",
           opacity,
@@ -841,18 +946,21 @@ function InfoSlot({
       >
         {car.name}
       </motion.p>
-      {/* Tagline — Figma y 764.8 */}
-      <motion.p
-        className="pointer-events-none absolute left-1/2 text-center text-[12px] font-semibold leading-[16px] tracking-[-0.01em] text-[#999] whitespace-nowrap"
-        style={{
-          top: 764.8,
-          x: wrappedX,
-          translateX: "-50%",
-          opacity,
-        }}
-      >
-        {car.tagline}
-      </motion.p>
+      {/* Tagline — Figma y 764.8. Absent from 853:66675, so the airport
+          sheet drops it. */}
+      {!airport && (
+        <motion.p
+          className="pointer-events-none absolute left-1/2 text-center text-[12px] font-semibold leading-[16px] tracking-[-0.01em] text-[#999] whitespace-nowrap"
+          style={{
+            top: 764.8,
+            x: wrappedX,
+            translateX: "-50%",
+            opacity,
+          }}
+        >
+          {car.tagline}
+        </motion.p>
+      )}
     </>
   );
 }

@@ -141,8 +141,12 @@ const FLAME_MASK_STYLE = {
 /* Node 853:72593 verbatim. The 90deg layer is a specular stripe running
  * down the tube at 34.3% across — the single detail that turns a black
  * rectangle into the inside of a cylinder. */
-const WALL =
-  "linear-gradient(0deg, rgba(217,217,217,0) 0%, rgba(115,115,115,0.4) 100%), " +
+/* Figma's falloff only — the specular stripe is split out below so it can
+ * travel. Baked in at a fixed 34.322% it reads as a printed seam on the
+ * tube rather than as light on a curved surface. */
+const WALL_BASE =
+  "linear-gradient(0deg, rgba(217,217,217,0) 0%, rgba(115,115,115,0.4) 100%)";
+const WALL_SHEEN =
   "linear-gradient(90deg, rgba(0,0,0,0) 0%, rgba(195,187,187,0.2) 34.322%, rgba(102,102,102,0) 100%)";
 
 /* 1565 (853:74017). The Gmail orb slides right to x210, the Atlys plus
@@ -190,9 +194,6 @@ export default function ControlPanel({
   });
   const progress = useTransform(pulled, [0, BREAK_AT], [0, 1]);
   const iconScale = useTransform(progress, [0, 1], [1, 0.9]);
-  /* The fire rises to meet the icon — frame 1556 → 1557 is one scrub, not
-     two states. */
-  const fireLit = useTransform(progress, [0, 1], [0.85, 1]);
   const copyFade = useTransform(progress, [0, 0.55], [1, 0]);
 
   /* The icon never sits still — it floats, and the closer it gets to the
@@ -388,17 +389,42 @@ export default function ControlPanel({
               frame 1556 to the full 444 as you go down. */}
           <motion.div
             className="absolute left-1/2 -translate-x-1/2"
-            style={{ width: WALL_W, top: RIM_H / 2, background: WALL }}
+            style={{
+              width: WALL_W,
+              top: RIM_H / 2,
+              backgroundImage: WALL_BASE,
+              overflow: "hidden",
+            }}
             initial={false}
             animate={{ height: wallH }}
             transition={{ duration: 0.9, ease: IN_EASE }}
-          />
+          >
+            {/* The highlight, travelling. Wider than the shaft and slid
+                back and forth, so the bright band crosses the tube instead
+                of sitting at one column of pixels. */}
+            <motion.div
+              className="absolute inset-y-0"
+              style={{
+                left: "-45%",
+                width: "190%",
+                backgroundImage: WALL_SHEEN,
+              }}
+              animate={{ x: ["-8%", "8%", "-8%"] }}
+              transition={{ duration: 9.5, repeat: Infinity, ease: "easeInOut" }}
+            />
+          </motion.div>
 
           {/* Rim. Flat #D9D9D9 — a solid platform, and opaque, which is
-              why the shaft below it is only visible once you're through. */}
+              why the shaft below it is only visible once you're through.
+
+              Figma stacks the column OVER the rim, which hides the rim's
+              top arc — correct looking down into the mouth. Flipping the
+              group mirrors the geometry but NOT the paint order, so the
+              column ended up hiding the rim's BOTTOM arc instead and the
+              ellipse read as broken. The rim rises above it once flipped. */}
           <div
             className="absolute left-1/2 -translate-x-1/2"
-            style={{ width: RIM_W, height: RIM_H, top: 0 }}
+            style={{ width: RIM_W, height: RIM_H, top: 0, zIndex: flipped ? 4 : 2 }}
           >
             <Image
               src="/assets/profile/f1556-e18.svg"
@@ -410,7 +436,7 @@ export default function ControlPanel({
           </div>
           <div
             className="absolute left-1/2 -translate-x-1/2"
-            style={{ width: 274, height: 23, top: 3 }}
+            style={{ width: 274, height: 23, top: 3, zIndex: flipped ? 5 : 2 }}
           >
             <Image
               src="/assets/profile/f1556-e19.svg"
@@ -435,7 +461,12 @@ export default function ControlPanel({
               top: COL_OVERLAP - COL_H,
               isolation: "isolate",
               overflow: "hidden",
-              opacity: stage === "idle" ? fireLit : 1,
+              zIndex: 3,
+              // Full strength. 899:11351 is this exact asset — same path,
+              // same stops, same fill-opacity 0.6 — so the reference IS
+              // the file rendered plainly. Dimming it at rest, then adding
+              // light back with flames, is what made it read differently.
+              opacity: 1,
             }}
           >
             <Image
@@ -519,7 +550,7 @@ export default function ControlPanel({
               className="absolute inset-0"
               style={{
                 background:
-                  "linear-gradient(0deg, rgba(255,226,61,0.45) 0%, rgba(255,137,60,0.14) 38%, rgba(255,137,60,0) 70%)",
+                  "linear-gradient(0deg, rgba(255,226,61,0.3) 0%, rgba(255,137,60,0.09) 38%, rgba(255,137,60,0) 70%)",
                 mixBlendMode: "plus-lighter",
                 ...FLAME_MASK_STYLE,
               }}
@@ -528,7 +559,7 @@ export default function ControlPanel({
               animate={
                 stage === "done" || stage === "final"
                   ? { opacity: 0 }
-                  : { opacity: [0.3, 0.55, 0.36, 0.62, 0.32, 0.5, 0.3] }
+                  : { opacity: [0.08, 0.16, 0.1, 0.18, 0.09, 0.14, 0.08] }
               }
               transition={
                 stage === "done" || stage === "final"
@@ -623,9 +654,16 @@ export default function ControlPanel({
               open in the middle of the fall and close again on the way out.
               Same width at every depth is what keeps it one tunnel. */}
           <div
-            className="absolute left-1/2 -translate-x-1/2"
-            style={{ top: 0, bottom: 0, width: WALL_W, backgroundImage: WALL }}
-          />
+            className="absolute left-1/2 -translate-x-1/2 overflow-hidden"
+            style={{ top: 0, bottom: 0, width: WALL_W, backgroundImage: WALL_BASE }}
+          >
+            <motion.div
+              className="absolute inset-y-0"
+              style={{ left: "-45%", width: "190%", backgroundImage: WALL_SHEEN }}
+              animate={{ x: ["-8%", "8%", "-8%"] }}
+              transition={{ duration: 9.5, repeat: Infinity, ease: "easeInOut" }}
+            />
+          </div>
         </motion.div>
 
         {/* The far platform (853:73415). Rises out of the dark once you're
@@ -957,7 +995,10 @@ export default function ControlPanel({
 
 /* Flame layers. Slow and small — the brief is slow-motion, and fire that
  * moves fast at this scale reads as a glitching gradient. */
+/* Deliberately faint. The brief was fire, but the gradient itself is the
+ * design — so these carry motion without carrying brightness, and a still
+ * frame matches 899:11351. */
 const FLAMES = [
-  { opacity: 0.34, rise: 26, stretch: 1.1, lick: 1.03, dur: 5.2 },
-  { opacity: 0.22, rise: 44, stretch: 1.17, lick: 0.97, dur: 7.9 },
+  { opacity: 0.1, rise: 26, stretch: 1.08, lick: 1.02, dur: 5.2 },
+  { opacity: 0.07, rise: 44, stretch: 1.13, lick: 0.98, dur: 7.9 },
 ] as const;

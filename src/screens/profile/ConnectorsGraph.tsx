@@ -58,31 +58,62 @@ export default function ConnectorsGraph({ onPanel }: { onPanel?: () => void }) {
           its own lighting and shadow, so turning it would drag the
           highlight around and read as a printed ball being spun. It
           breathes instead. */}
-      <div
-        className="pointer-events-none absolute left-1/2 -translate-x-1/2 overflow-hidden"
-        style={{ top: 18, width: 320, height: 190 }}
+      {/* Globe (853:71571). Figma masks it to 319.854² and places that
+          mask at frame (62.24, -36) — element left -239.84 plus mask
+          position 302.082, and -188.52 plus 152.524. It is NOT clipped to
+          a short box: the white veil below does the fading, which is why
+          the sphere can sit this low without ending on a line. */}
+      <motion.div
+        className="pointer-events-none absolute"
+        style={{ left: 62.24, top: -36, width: 319.854, height: 319.854 }}
+        animate={{ scale: [1, 1.03, 1], y: [0, -4, 0] }}
+        transition={{
+          scale: { duration: 11, repeat: Infinity, ease: "easeInOut" },
+          y: { duration: 8, repeat: Infinity, ease: "easeInOut" },
+        }}
       >
-        <motion.div
-          // Less of the sphere pulled off the top, so more of it sits in
-          // frame — the arc reads lower on the screen.
-          style={{ width: 320, height: 320, marginTop: -104 }}
-          animate={{ scale: [1, 1.03, 1], y: [0, -4, 0] }}
-          transition={{
-            scale: { duration: 11, repeat: Infinity, ease: "easeInOut" },
-            y: { duration: 8, repeat: Infinity, ease: "easeInOut" },
-          }}
-        >
-          <Image
-            src="/assets/profile/conn-globe.png"
-            alt=""
-            width={320}
-            height={302}
-            unoptimized
-            priority
-            style={{ width: 320, height: 302, display: "block" }}
-          />
-        </motion.div>
-      </div>
+        <Image
+          src="/assets/profile/conn-globe.png"
+          alt=""
+          width={320}
+          height={320}
+          unoptimized
+          priority
+          style={{ width: 319.854, height: 319.854, display: "block", objectFit: "contain" }}
+        />
+      </motion.div>
+
+      {/* Orbit arcs (853:71572 / 853:71573). Faint, and turning on their
+          own long periods so the sphere reads as a system rather than a
+          picture. */}
+      <motion.div
+        className="pointer-events-none absolute flex items-center justify-center"
+        style={{ left: 51.86, top: 21.59, width: 311.917, height: 289.27 }}
+        animate={{ rotate: [-157.6, -151.6, -157.6] }}
+        transition={{ duration: 22, repeat: Infinity, ease: "easeInOut" }}
+      >
+        <Image
+          src="/assets/profile/cn-orbit1.svg"
+          alt=""
+          width={251}
+          height={209}
+          style={{ width: 251.067, height: 209.397, display: "block" }}
+        />
+      </motion.div>
+      <motion.div
+        className="pointer-events-none absolute flex items-center justify-center"
+        style={{ left: 183.47, top: -34, width: 181.007, height: 172.437 }}
+        animate={{ rotate: [30, 24, 30] }}
+        transition={{ duration: 27, repeat: Infinity, ease: "easeInOut" }}
+      >
+        <Image
+          src="/assets/profile/cn-orbit2.svg"
+          alt=""
+          width={141}
+          height={118}
+          style={{ width: 141.077, height: 117.662, display: "block" }}
+        />
+      </motion.div>
 
       {/* White veil over the globe's lower half (871:8021) — this is what
           fades the globe into the page rather than ending it on a line. */}
@@ -143,17 +174,21 @@ export default function ConnectorsGraph({ onPanel }: { onPanel?: () => void }) {
       {/* Trunk: 29 tall at centre, y 309. Draws itself in. */}
       <motion.div
         className="pointer-events-none absolute left-1/2 -translate-x-1/2 overflow-hidden"
-        style={{ top: 309, width: 8, height: 29 }}
+        // Natural 5.333×34.333, NOT squashed into 8×29 — that turned the
+        // round cap at each end into an oval. Figma's box is 29 with the
+        // art overflowing 9.2% each side (inset -9.2%), which is exactly
+        // this asset at full size centred on that box: 309 - 2.67.
+        style={{ top: 306.33, width: 5.333, height: 34.333 }}
         initial={{ height: 0 }}
-        animate={{ height: 29 }}
+        animate={{ height: 34.333 }}
         transition={{ delay: 0.15, duration: 0.45, ease: IN_EASE }}
       >
         <Image
           src="/assets/profile/cn-trunk.svg"
           alt=""
-          width={8}
-          height={29}
-          style={{ width: 8, height: 29, display: "block" }}
+          width={6}
+          height={35}
+          style={{ width: 5.333, height: 34.333, display: "block" }}
         />
       </motion.div>
 
