@@ -959,6 +959,43 @@ function WorldPassCard({
                 6190001
               </p>
             </div>
+
+            {/* Turn tab — 853:77298, an 11×93 Union on the card's left
+                edge at card-relative (0, 64).
+
+                INSIDE the face, as its last child. The face carries
+                overflow:hidden, which per spec forces transform-style to
+                flat — so its children paint by document order and this
+                lands perfectly coplanar with the card's surface. That is
+                what makes it attached: it inherits the face's idle wobble
+                and the flip exactly, with no z offset to swing on a wider
+                arc.
+
+                As a sibling of the faces it needed z ≥ 24 to clear the
+                content plane, and at the card's EDGE that offset read as
+                detached; dropping it to 1 let the face's own ±2.2° wobble
+                swing in front and swallow it. Inside, neither happens. */}
+            <div
+              className="pointer-events-none absolute"
+              style={{ left: 0, top: 64, width: 11, height: 93, zIndex: 6 }}
+            >
+              <motion.div
+                className="h-full w-full"
+                // Brightness rather than an outward stretch: the face
+                // clips at the card's edge, and Figma has the tab ON the
+                // card rather than past it.
+                animate={{ opacity: [0.72, 1, 0.72] }}
+                transition={{ duration: 3.4, repeat: Infinity, ease: "easeInOut" }}
+              >
+                <Image
+                  src="/assets/profile/pass-tab.svg"
+                  alt=""
+                  width={11}
+                  height={93}
+                  style={{ width: 11, height: 93, display: "block" }}
+                />
+              </motion.div>
+            </div>
           </motion.div>
 
           {/* Back face, pre-turned 180° so it faces away at rest and comes
@@ -975,98 +1012,38 @@ function WorldPassCard({
             }}
           >
             <CardBack onConnect={onConnect} />
+
+            {/* Same tab, on the back. It sits at the face's LOCAL right
+                edge, which the face's own 180° maps to the viewer's left;
+                the scaleX un-mirrors the shape so its bulge still points
+                outward. */}
+            <div
+              className="pointer-events-none absolute"
+              style={{
+                left: CARD_W - 11,
+                top: 64,
+                width: 11,
+                height: 93,
+                zIndex: 6,
+                transform: "scaleX(-1)",
+              }}
+            >
+              <motion.div
+                className="h-full w-full"
+                animate={{ opacity: [0.72, 1, 0.72] }}
+                transition={{ duration: 3.4, repeat: Infinity, ease: "easeInOut" }}
+              >
+                <Image
+                  src="/assets/profile/pass-tab.svg"
+                  alt=""
+                  width={11}
+                  height={93}
+                  style={{ width: 11, height: 93, display: "block" }}
+                />
+              </motion.div>
+            </div>
           </div>
 
-          {/* The turn tab — 853:77298, an 11×93 Union on the card's left
-              edge at card-relative (0, 64).
-
-              TWO copies, one per face, as the faces themselves are done: a
-              single tab inherits the card's 180° flip and lands on the
-              RIGHT once turned, and the cue has to stay left whichever way
-              the card faces. backfaceVisibility does the swap at 90° for
-              free.
-
-              `z` as a framer PROP, not a transform string. Framer composes
-              its own transform from x/y/z/scale/rotate and overwrites any
-              `transform` in style — so a raw translateZ silently became 0,
-              dropping the tab behind the card's parallax layer at
-              translateZ(22px), which is why it vanished.
-
-              Front sits at z +1, back at −1 — which after the card's 180°
-              maps to +1 in world space, just in front of the back face.
-              The scale lives on an inner element so the mirror and the
-              growth anchor can't fight — the back tab's own 180° and the
-              card's cancel, so both grow from their inner edge. */}
-          <motion.div
-            className="pointer-events-none absolute"
-            style={{
-              left: 0,
-              top: 64,
-              width: 11,
-              height: 93,
-              // Just 1px proud, not 24. It only has to win the coplanar
-              // tie against the face beneath it — the content plane above
-              // is transparent over this 11px strip, so it never occludes
-              // the tab. At 24 the tab swung on a visibly wider arc than
-              // the card during the flip and read as detached.
-              z: 1,
-              backfaceVisibility: "hidden",
-              WebkitBackfaceVisibility: "hidden",
-            }}
-          >
-            <motion.div
-              className="h-full w-full"
-              style={{ transformOrigin: "100% 50%" }}
-              animate={{ scaleX: [1, 1.5, 1, 1, 1] }}
-              transition={{
-                duration: 3.4,
-                times: [0, 0.16, 0.32, 0.66, 1],
-                repeat: Infinity,
-                ease: "easeInOut",
-              }}
-            >
-              <Image
-                src="/assets/profile/pass-tab.svg"
-                alt=""
-                width={11}
-                height={93}
-                style={{ width: 11, height: 93, display: "block" }}
-              />
-            </motion.div>
-          </motion.div>
-          <motion.div
-            className="pointer-events-none absolute"
-            style={{
-              left: CARD_W - 11,
-              top: 64,
-              width: 11,
-              height: 93,
-              rotateY: 180,
-              z: -1,
-              backfaceVisibility: "hidden",
-              WebkitBackfaceVisibility: "hidden",
-            }}
-          >
-            <motion.div
-              className="h-full w-full"
-              style={{ transformOrigin: "100% 50%" }}
-              animate={{ scaleX: [1, 1.5, 1, 1, 1] }}
-              transition={{
-                duration: 3.4,
-                times: [0, 0.16, 0.32, 0.66, 1],
-                repeat: Infinity,
-                ease: "easeInOut",
-              }}
-            >
-              <Image
-                src="/assets/profile/pass-tab.svg"
-                alt=""
-                width={11}
-                height={93}
-                style={{ width: 11, height: 93, display: "block" }}
-              />
-            </motion.div>
-          </motion.div>
         </motion.div>
         </motion.div>
       </motion.div>
