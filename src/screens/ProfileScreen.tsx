@@ -566,19 +566,20 @@ function WorldPassCard({
             }}
           >
             <motion.div
-              className="absolute overflow-hidden"
-              style={{
-                left: -35,
-                top: 60,
-                width: 24,
-                height: 93,
-                clipPath: "inset(0)",
-              }}
+              className="absolute"
+              style={{ left: -35, top: 60, width: 24, height: 93 }}
               initial={{ opacity: 0, x: 8 }}
               animate={{ opacity: 1, x: 0 }}
               transition={{ delay: delay + 1.1, duration: 0.6, ease: IN_EASE }}
             >
+              {/* The nudge moves the CROP BOX, not the asset inside it.
+                  Sliding the asset within a fixed box scrolled the tab's
+                  gradient in at the edge — the pink sliver that was
+                  showing outside the card. The window travels, so only
+                  ever the arrow is inside it. */}
               <motion.div
+                className="absolute inset-0 overflow-hidden"
+                style={{ clipPath: "inset(0)" }}
                 animate={{ x: [0, -5, 0, 0, 0] }}
                 transition={{
                   duration: 3.4,
@@ -593,7 +594,14 @@ function WorldPassCard({
                   width={56}
                   height={93}
                   // Arrow paths run x14→38, so this is the arrow alone.
-                  style={{ width: 55.9, height: 93, display: "block", marginLeft: -14 }}
+                  style={{
+                    position: "absolute",
+                    left: -14,
+                    top: 0,
+                    width: 55.9,
+                    height: 93,
+                    display: "block",
+                  }}
                 />
               </motion.div>
             </motion.div>
