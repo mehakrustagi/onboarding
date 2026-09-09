@@ -45,9 +45,13 @@ const CARD_W = 252.325;
 const CARD_H = 350;
 const CARD_X = 94;
 const CARD_Y = 152;
-/* Spacing between cards in the carousel — Figma puts the next card at
- * x 387 against this one at 94. */
-const CARD_GAP = 387 - CARD_X;
+/* Gap between passes. Figma's own peek puts the next card at x 387, a
+ * 40.675 gap — but the turn arrow lives in that gap, spanning card x
+ * −44.9 to −6.9, so at 40.675 it lands ON the previous card. Widened to
+ * clear it with real whitespace either side. */
+const CARD_PEEK_GAP = 76;
+/* Pitch: one card plus the gap. The carousel snaps and indexes by this. */
+const CARD_GAP = CARD_W + CARD_PEEK_GAP;
 /* Headroom in the carousel for the card's own shadow, which reaches about
  * 110px below it and only a little above. */
 const CARD_PAD_T = 24;
