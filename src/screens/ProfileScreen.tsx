@@ -47,6 +47,10 @@ const CARD_Y = 152;
 /* Spacing between cards in the carousel — Figma puts the next card at
  * x 387 against this one at 94. */
 const CARD_GAP = 387 - CARD_X;
+/* Headroom in the carousel for the card's own shadow, which reaches about
+ * 110px below it and only a little above. */
+const CARD_PAD_T = 24;
+const CARD_PAD_B = 120;
 
 /* Perimeter of the card's rounded rect, for the scan trace's dash maths:
  * two straight runs per axis plus one full circle of corner arc. */
@@ -291,9 +295,13 @@ export default function ProfileScreen() {
       <div
         className="absolute left-0 overflow-x-auto overflow-y-hidden [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
         style={{
-          top: CARD_Y,
+          // Padded well past the card, because overflow-y:hidden (which a
+          // horizontal scroller needs) clips at the container's edge — and
+          // the card's shadow falls ~110px below it. Sized to the card
+          // exactly, the shadow was being sliced off on a straight line.
+          top: CARD_Y - CARD_PAD_T,
           width: 440,
-          height: CARD_H,
+          height: CARD_H + CARD_PAD_T + CARD_PAD_B,
           zIndex: 2,
           scrollSnapType: "x mandatory",
           // Snaps to the design's x, so the pass in focus lands at 94
@@ -317,6 +325,8 @@ export default function ProfileScreen() {
             paddingLeft: CARD_X,
             // Lets the last card reach the snap position.
             paddingRight: 440 - CARD_X - CARD_W,
+            // Puts the cards back at their true y inside the padded box.
+            paddingTop: CARD_PAD_T,
             gap: CARD_GAP - CARD_W,
           }}
         >
