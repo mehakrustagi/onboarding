@@ -562,7 +562,10 @@ function WorldPassCard({
               x: dragX,
               rotateX: rxs,
               rotateY: rys,
-              transformStyle: "preserve-3d",
+              // Deliberately NOT preserve-3d: the arrow is a flat hint
+              // beside the card, and leaving it in the 3D context let it
+              // be depth-sorted against the faces.
+              zIndex: 6,
             }}
           >
             <motion.div
@@ -976,19 +979,26 @@ function WorldPassCard({
             <CardBack onConnect={onConnect} />
           </div>
 
-          {/* The turn tab — 853:77298, an 11×93 Union flush on the card's
-              left edge at card-relative (0, 64).
+          {/* The turn tab — 853:77298, an 11×93 Union on the card's left
+              edge at card-relative (0, 64).
 
-              TWO copies, one per face, exactly as the faces themselves are
-              done. A single tab inherits the card's 180° flip and lands on
-              the RIGHT once turned; the cue has to stay on the left
-              whichever way the card is facing. Each carries
-              backfaceVisibility hidden, so the swap happens at 90° for
-              free rather than needing the rotation watched.
+              TWO copies, one per face, as the faces themselves are done: a
+              single tab inherits the card's 180° flip and lands on the
+              RIGHT once turned, and the cue has to stay left whichever way
+              the card faces. backfaceVisibility does the swap at 90° for
+              free.
 
-              The back copy sits at the card's local RIGHT edge and is
-              pre-rotated 180° — which, after the card's own 180°, puts it
-              back on the viewer's left, facing out. */}
+              `z` as a framer PROP, not a transform string. Framer composes
+              its own transform from x/y/z/scale/rotate and overwrites any
+              `transform` in style — so a raw translateZ silently became 0,
+              dropping the tab behind the card's parallax layer at
+              translateZ(22px), which is why it vanished.
+
+              Front sits at z +24. Back sits at −24: after the card's 180°
+              that maps to +24 in world space, in front of the back face.
+              The scale lives on an inner element so the mirror and the
+              growth anchor can't fight — the back tab's own 180° and the
+              card's cancel, so both grow from their inner edge. */}
           <motion.div
             className="pointer-events-none absolute"
             style={{
@@ -996,28 +1006,30 @@ function WorldPassCard({
               top: 64,
               width: 11,
               height: 93,
-              // Anchored at its INNER edge, so it grows outward past the
-              // card rather than sliding across it — it stays fixed to the
-              // card and peeks, which is the cue.
-              transformOrigin: "100% 50%",
+              z: 24,
               backfaceVisibility: "hidden",
               WebkitBackfaceVisibility: "hidden",
             }}
-            animate={{ scaleX: [1, 1.5, 1, 1, 1] }}
-            transition={{
-              duration: 3.4,
-              times: [0, 0.16, 0.32, 0.66, 1],
-              repeat: Infinity,
-              ease: "easeInOut",
-            }}
           >
-            <Image
-              src="/assets/profile/pass-tab.svg"
-              alt=""
-              width={11}
-              height={93}
-              style={{ width: 11, height: 93, display: "block" }}
-            />
+            <motion.div
+              className="h-full w-full"
+              style={{ transformOrigin: "100% 50%" }}
+              animate={{ scaleX: [1, 1.5, 1, 1, 1] }}
+              transition={{
+                duration: 3.4,
+                times: [0, 0.16, 0.32, 0.66, 1],
+                repeat: Infinity,
+                ease: "easeInOut",
+              }}
+            >
+              <Image
+                src="/assets/profile/pass-tab.svg"
+                alt=""
+                width={11}
+                height={93}
+                style={{ width: 11, height: 93, display: "block" }}
+              />
+            </motion.div>
           </motion.div>
           <motion.div
             className="pointer-events-none absolute"
@@ -1027,28 +1039,30 @@ function WorldPassCard({
               width: 11,
               height: 93,
               rotateY: 180,
-              // Same anchor: the element's own 180 and the card's 180
-              // cancel, so its local +x still runs screen-right and the
-              // inner edge is still 100%.
-              transformOrigin: "100% 50%",
+              z: -24,
               backfaceVisibility: "hidden",
               WebkitBackfaceVisibility: "hidden",
             }}
-            animate={{ scaleX: [1, 1.5, 1, 1, 1] }}
-            transition={{
-              duration: 3.4,
-              times: [0, 0.16, 0.32, 0.66, 1],
-              repeat: Infinity,
-              ease: "easeInOut",
-            }}
           >
-            <Image
-              src="/assets/profile/pass-tab.svg"
-              alt=""
-              width={11}
-              height={93}
-              style={{ width: 11, height: 93, display: "block" }}
-            />
+            <motion.div
+              className="h-full w-full"
+              style={{ transformOrigin: "100% 50%" }}
+              animate={{ scaleX: [1, 1.5, 1, 1, 1] }}
+              transition={{
+                duration: 3.4,
+                times: [0, 0.16, 0.32, 0.66, 1],
+                repeat: Infinity,
+                ease: "easeInOut",
+              }}
+            >
+              <Image
+                src="/assets/profile/pass-tab.svg"
+                alt=""
+                width={11}
+                height={93}
+                style={{ width: 11, height: 93, display: "block" }}
+              />
+            </motion.div>
           </motion.div>
         </motion.div>
         </motion.div>
