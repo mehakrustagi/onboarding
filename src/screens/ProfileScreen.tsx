@@ -2,6 +2,7 @@
 
 import Image from "next/image";
 import {
+  AnimatePresence,
   motion,
   useMotionValue,
   useSpring,
@@ -539,26 +540,46 @@ export default function ProfileScreen() {
         className="relative"
         style={{ y: bodyHold, isolation: "isolate", zIndex: 0 }}
       >
-      <ProfileBody
-        top={BODY_TOP}
-        show={bodyIn}
-        onViewBenefits={() => setBenefitsOpen(true)}
-        onOpenBenefit={() => setVerifyOpen(true)}
-        onOpenAgent={(k) => {
-          // Airport logistics isn't a preference sheet — it opens the
-          // supercar sequence, so it routes elsewhere.
-          if (k === "airport") setAirportOpen(true);
-          else if (AGENT_SPECS[k]) setAgentKey(k);
-        }}
-        // Whichever card is at the front of the stack, not a fixed one.
-        onActivateBenefit={(card) =>
-          setCardDetail({
-            title: card.title,
-            terms: PROFILE_BENEFIT_TERMS,
-            art: card.art,
-          })
-        }
-      />
+      {/* Switching pass reloads the page under it. Keyed on the profile, so
+          the old body is torn down and a new one mounts — which replays
+          ProfileBody's own staggered reveal, and that stagger is what
+          reads as "loading" rather than as a crossfade. mode="wait" holds
+          the new one back until the old has gone, so the two never sit on
+          top of each other mid-fade.
+
+          initial={false} keeps the very first mount silent: the card's
+          scan lap already gates the body's arrival, and a fade on top of
+          that would double it. */}
+      <AnimatePresence mode="wait" initial={false}>
+        <motion.div
+          key={profileIdx}
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          exit={{ opacity: 0 }}
+          transition={{ duration: 0.19, ease: "easeOut" }}
+        >
+          <ProfileBody
+            top={BODY_TOP}
+            show={bodyIn}
+            onViewBenefits={() => setBenefitsOpen(true)}
+            onOpenBenefit={() => setVerifyOpen(true)}
+            onOpenAgent={(k) => {
+              // Airport logistics isn't a preference sheet — it opens the
+              // supercar sequence, so it routes elsewhere.
+              if (k === "airport") setAirportOpen(true);
+              else if (AGENT_SPECS[k]) setAgentKey(k);
+            }}
+            // Whichever card is at the front of the stack, not a fixed one.
+            onActivateBenefit={(card) =>
+              setCardDetail({
+                title: card.title,
+                terms: PROFILE_BENEFIT_TERMS,
+                art: card.art,
+              })
+            }
+          />
+        </motion.div>
+      </AnimatePresence>
       </motion.div>
 
       {/* Gives the scroll container the design's full height, so the
