@@ -1,13 +1,7 @@
 "use client";
 
 import Image from "next/image";
-import {
-  motion,
-  AnimatePresence,
-  useMotionValue,
-  useTransform,
-  type MotionValue,
-} from "framer-motion";
+import { motion, AnimatePresence } from "framer-motion";
 
 /* Programs connected — Figma node 853:74983.
  *
@@ -31,25 +25,13 @@ export const LP_H = 253;
 const LP_FIRST_Y = 445;
 const LP_PITCH = 273;
 
-/* Where a card is "in focus" — the slot the first card occupies at rest.
- * Everything above this recedes; everything below is on its way up to it. */
-const FOCUS_Y = LP_FIRST_Y;
+/* The list scrolls plainly: no wheel, no recede, no gather. The stack
+ * bunched outgoing cards against the top at 0.62 of scroll speed, which
+ * is what capped how far the list could actually travel — you ran out of
+ * page long before you ran out of programs. Straight one-to-one scrolling
+ * is what makes the run unlimited.
+ */
 
-/* The wheel. As a card passes the focus line it turns away from the
- * viewer and sinks into the background, while the one below rises to take
- * its place.
- *
- * The travel is deliberately compressed: a card that has gone past focus
- * moves UP less than the scroll would carry it (GATHER), so the outgoing
- * cards bunch together at the top like a stack being laid down rather
- * than sliding off the screen at full speed. That difference in rate is
- * what makes it read as a wheel rather than a list. */
-const RECEDE_Z = 420;
-const RECEDE_TILT = 16;
-const GATHER = 0.62;
-/* How far past focus a card stays fully opaque and sharp. It is still the
- * front card for most of this travel, so it should look like it. */
-const FRONT_HOLD = 0.55;
 /* Gap between slides in the horizontal track. */
 const LP_GAP = 14;
 /* How far the track hangs past the card on each side — the width of the
@@ -99,16 +81,6 @@ export default function ProgramsConnected({
   /** Tapping either face of a card opens its detail (853:75340). */
   onOpenProgram?: (index: number) => void;
 }) {
-  /* Scroll position, fed by the container's own onScroll rather than
-     useScroll({ container }).
-     
-     useScroll needs its container ref populated when the hook first runs,
-     and this whole screen mounts conditionally inside AnimatePresence — so
-     on the first render the ref is still null, the hook subscribes to
-     nothing, and the wheel never moves. Reading the event directly has no
-     such ordering problem. */
-  const scrollY = useMotionValue(0);
-
   return (
     <AnimatePresence>
       {open && (
@@ -287,15 +259,8 @@ export default function ProgramsConnected({
           </div>
 
           <div
-            onScroll={(e) => scrollY.set(e.currentTarget.scrollTop)}
             className="absolute inset-0 overflow-y-auto overflow-x-hidden [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
-            // Perspective on the SCROLLER, so every card shares one
-            // vanishing point. Per-card perspective would give each its
-            // own, and they'd recede along diverging axes instead of into
-            // a common distance.
             style={{
-              perspective: 1400,
-              perspectiveOrigin: "50% 34%",
               // Cards are masked out before they reach the summary text.
               // The chrome's white fade alone wasn't enough — it only held
               // full opacity to ~344 while the stats run to ~364, so a
@@ -313,12 +278,17 @@ export default function ProgramsConnected({
                 key={i}
                 program={p}
                 index={i}
-                scrollY={scrollY}
                 onTap={() => onOpenProgram?.(i)}
               />
             ))}
 
-            <div style={{ height: LP_FIRST_Y + PROGRAMS.length * LP_PITCH + 60 }} />
+            {/* The run itself. With the gather gone this is the real
+                height of the list — every card at its own pitch — so the
+                last one reaches the top of the screen instead of the
+                scroll ending under it. */}
+            <div
+              style={{ height: LP_FIRST_Y + PROGRAMS.length * LP_PITCH + 140 }}
+            />
           </div>
 
           {/* Footer, over a scrim so the last card fades under it. */}
@@ -401,50 +371,15 @@ export default function ProgramsConnected({
 function ProgramCard({
   program,
   index,
-  scrollY,
   onTap,
 }: {
   program: (typeof PROGRAMS)[number];
   index: number;
-  scrollY: MotionValue<number>;
   onTap: () => void;
 }) {
   const baseTop = LP_FIRST_Y + index * LP_PITCH;
 
-  /* How far this card has travelled past the focus line, in slots.
-     0 = sitting in focus, 1 = one card-height beyond it, negative = still
-     below and coming up. */
-  const p = useTransform(scrollY, (v) => (v + FOCUS_Y - baseTop) / LP_PITCH);
-
-  // Only cards at or past focus recede; the ones below stay flat.
-  const past = useTransform(p, (v) => Math.max(0, v));
-
-  const z = useTransform(past, (v) => -Math.min(v, 2.2) * RECEDE_Z);
-  const rotateX = useTransform(past, (v) => Math.min(v, 2.2) * RECEDE_TILT);
-  /* Held at full through the whole time the card is the front one, and
-     only fading once it has genuinely gone past. Fading from the instant
-     scrolling starts made the card you are actually looking at dim while
-     it was still the subject — the recede should read as a card leaving,
-     not as the front card dimming. */
-  const opacity = useTransform(past, [0, FRONT_HOLD, 1.35], [1, 1, 0]);
-  // Held back against the scroll, so outgoing cards gather at the top
-  // rather than sliding away at full speed.
-  const y = useTransform(past, (v) => v * LP_PITCH * GATHER);
-  // Softens as it goes, so it dissolves into the page rather than
-  // shrinking away still sharp.
-  const filter = useTransform(past, (v) => {
-    // Blur holds off for the same reason: the front card stays sharp for
-    // as long as it is the front card.
-    const t = Math.max(0, v - FRONT_HOLD) / (1.4 - FRONT_HOLD);
-    return `blur(${(Math.min(t, 1) * 5).toFixed(2)}px)`;
-  });
-
   return (
-    /* Two layers on purpose. The outer one owns the ENTRANCE, which is a
-       one-shot `animate`; the inner owns the SCROLL, which is a set of
-       live motion values. Putting both on one element makes the entrance's
-       animate={{ opacity: 1 }} overwrite the scroll-driven opacity the
-       moment it lands, and the card stops fading as it recedes. */
     <motion.div
       className="absolute left-1/2"
       style={{
@@ -462,22 +397,7 @@ function ProgramCard({
       animate={{ opacity: 1, y: 0 }}
       transition={{ delay: 0.3 + index * 0.08, duration: 0.65, ease: IN_EASE }}
     >
-    <motion.div
-      className="relative h-full w-full"
-      style={{
-        transformStyle: "preserve-3d",
-        // Pinned to the card's own top edge: a centre origin would make
-        // the card sink INTO the one above as it recedes, where a top
-        // origin keeps its lip in place and turns it away.
-        transformOrigin: "50% 0%",
-        z,
-        rotateX,
-        opacity,
-        y,
-        filter,
-        willChange: "transform, opacity, filter",
-      }}
-    >
+    <div className="relative h-full w-full">
       {/* Horizontal carousel (853:75825). The row is wider than the card
           and overflows the phone on both sides, so the neighbour peeks in
           at the edge — that peek is the whole affordance, which is why
@@ -527,7 +447,7 @@ function ProgramCard({
         ))}
       </div>
 
-    </motion.div>
+    </div>
     </motion.div>
   );
 }
