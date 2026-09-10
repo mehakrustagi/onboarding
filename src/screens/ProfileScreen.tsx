@@ -68,6 +68,13 @@ const CARD_PAD_B = 120;
  * clean off both sides of the screen. */
 const COLLAPSE_PERSPECTIVE = 1800;
 
+/* The opening beat. For this many pixels the page scrolls but the body
+ * below the stage does NOT move: the plinth fades and the pass starts to
+ * lift, and only once that has read does the content begin to rise. It is
+ * held by cancelling the scroll, so the same distance is added to the
+ * scroller's spacer or the last screen of content becomes unreachable. */
+const BODY_HOLD = 80;
+
 /* Perimeter of the card's rounded rect, for the scan trace's dash maths:
  * two straight runs per axis plus one full circle of corner arc. */
 const TRACE_PERIMETER =
@@ -203,9 +210,10 @@ export default function ProfileScreen() {
     const fit = P / (P + CARD_H * Math.sin(r));
     /* And then shrink further if the page has closed in. The body starts
        at 614 and the card's top is pinned at CARD_Y, so the clear height
-       is 614 − y − CARD_Y, less a breathing gap. Uniform, so the card
-       keeps its proportions on the way down rather than being squashed. */
-    const room = 614 - (y as number) - CARD_Y - 26;
+       is where the body has actually got to, less a breathing gap — and
+       through the opening beat it has not got anywhere. Uniform, so the
+       card keeps its proportions on the way down rather than squashed. */
+    const room = 614 - Math.max(0, (y as number) - BODY_HOLD) - CARD_Y - 26;
     const projected = CARD_H * Math.cos(r);
     const squeeze =
       projected > 1 ? Math.max(0, Math.min(1, room / projected)) : 1;
@@ -232,6 +240,11 @@ export default function ProfileScreen() {
      swing held back to 32, means they never share the frame while the card
      is off-plane. */
   const stageOpacity = useTransform(scrollS, [0, 30], [1, 0], { clamp: true });
+  /* Cancels the scroll one-for-one through the opening beat, then holds a
+     constant offset — so the body sits still, then moves with the page.
+     Off the RAW scroll, not the spring: it has to cancel the native scroll
+     exactly, and a smoothed version would drift against it. */
+  const bodyHold = useTransform(scrollY, (y) => Math.min(y, BODY_HOLD));
   const [collapsed, setCollapsed] = useState(false);
 
   /* The card leaves around y 500; the title arrives as it goes. */
@@ -293,7 +306,7 @@ export default function ProfileScreen() {
           and framer would drive the same value, cutting the scroll link. */}
       <motion.div
         className="pointer-events-none absolute inset-0"
-        style={{ opacity: stageOpacity, zIndex: 1 }}
+        style={{ opacity: stageOpacity, zIndex: 1, y: bodyHold }}
       >
       {/* Pedestal. Shadow first so the plinth sits on it.
           zIndex keeps both above the card's own drop shadow but below
@@ -405,6 +418,7 @@ export default function ProfileScreen() {
       </motion.div>
 
       {/* Everything below the pedestal (853:16315) — see ProfileBody. */}
+      <motion.div style={{ y: bodyHold }}>
       <ProfileBody
         show={bodyIn}
         onViewBenefits={() => setBenefitsOpen(true)}
@@ -424,10 +438,11 @@ export default function ProfileScreen() {
           })
         }
       />
+      </motion.div>
 
       {/* Gives the scroll container the design's full height, so the
           absolutely-positioned body has room to scroll into. */}
-        <div style={{ height: 1781 }} />
+        <div style={{ height: 1781 + BODY_HOLD }} />
       </div>
 
       {/* Card carousel — arrives AFTER the disk, and drops onto it. The
