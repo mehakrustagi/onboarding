@@ -82,6 +82,36 @@ const COLLAPSE_SHRINK = 0.3;
 const COLLAPSE_PERSPECTIVE =
   (CARD_H * (1 - COLLAPSE_SHRINK)) / COLLAPSE_TOP_NARROW - CARD_H;
 
+/* Where the swing stops. The pass does NOT go edge-on and vanish — it
+ * parks as a sliver under the header and stays there for the rest of the
+ * page, so the thing you were looking at is still on screen and still
+ * says which pass it is.
+ *
+ * Given as the height it should come to rest at, and the angle is solved
+ * from it: projected height is CARD_H·cos θ·(1 − SHRINK·sin θ), which has
+ * no clean inverse, so it's walked once at module load rather than
+ * hand-tuned to a degree figure that would silently drift the moment
+ * SHRINK changed. */
+const COLLAPSE_REST_H = 13;
+const COLLAPSE_MAX_DEG = (() => {
+  let lo = 0;
+  let hi = 90;
+  for (let i = 0; i < 40; i++) {
+    const mid = (lo + hi) / 2;
+    const r = (mid * Math.PI) / 180;
+    const h = CARD_H * Math.cos(r) * (1 - COLLAPSE_SHRINK * Math.sin(r));
+    if (h > COLLAPSE_REST_H) lo = mid;
+    else hi = mid;
+  }
+  return lo;
+})();
+/* The clamp measures against the UNSHRUNK projection, so it has to floor
+ * on the same quantity — floored on the rest height itself it kept biting
+ * past the rest point and walked the sliver down from 13px to 9 as you
+ * scrolled further. */
+const COLLAPSE_REST_PROJ =
+  CARD_H * Math.cos((COLLAPSE_MAX_DEG * Math.PI) / 180);
+
 /* The opening beat. For this many pixels the page scrolls but the body
  * below the stage does NOT move: the plinth fades and the pass starts to
  * lift, and only once that has read does the content begin to rise. It is
@@ -201,7 +231,9 @@ export default function ProfileScreen() {
     mass: 0.3,
     restDelta: 0.05,
   });
-  const collapseX = useTransform(scrollS, [32, 320], [0, 90], { clamp: true });
+  const collapseX = useTransform(scrollS, [32, 320], [0, COLLAPSE_MAX_DEG], {
+    clamp: true,
+  });
   /* Uniform scale that cancels the perspective's magnification.
      
      Hinged at the top, the bottom edge travels toward the camera as it
@@ -234,7 +266,10 @@ export default function ProfileScreen() {
        is where the body has actually got to, less a breathing gap — and
        through the opening beat it has not got anywhere. Uniform, so the
        card keeps its proportions on the way down rather than squashed. */
-    const room = 614 - Math.max(0, (y as number) - BODY_HOLD) - CARD_Y - 26;
+    const room = Math.max(
+      COLLAPSE_REST_PROJ,
+      614 - Math.max(0, (y as number) - BODY_HOLD) - CARD_Y - 26,
+    );
     const projected = CARD_H * Math.cos(r);
     const squeeze =
       projected > 1 ? Math.max(0, Math.min(1, room / projected)) : 1;
@@ -247,12 +282,6 @@ export default function ProfileScreen() {
      staccato. Nothing is laid out below the card — the track is absolutely
      positioned — so the box can stay 350 and let the transform do all of
      the visible work. */
-  /* The faces hold almost the whole way. Fading them early was doing the
-     compacting instead of the swing — the card just went transparent at
-     full size and the page showed straight through it. They only give way
-     at the very end, handing the identity to the sticky header, which is
-     where the design parks the name. */
-  const faceOpacity = useTransform(scrollS, [250, 320], [1, 0], { clamp: true });
   /* The strip shrinks with them — held at full height it would sit over
      the page and swallow taps meant for the content underneath. */
   /* The plinth leaves BEFORE the swing starts, not alongside it. It is a
@@ -554,7 +583,6 @@ export default function ProfileScreen() {
                 collapseScale={collapseScale}
                 collapseShrink={collapseShrink}
                 slot={i - profileIdx}
-                faceOpacity={faceOpacity}
                 collapsed={collapsed}
                 onSelect={() => {
                   trackRef.current?.scrollTo({
@@ -797,7 +825,6 @@ function WorldPassCard({
   collapseScale,
   collapseShrink,
   slot = 0,
-  faceOpacity,
   collapsed = false,
   onSelect,
   onConnect,
@@ -828,8 +855,6 @@ function WorldPassCard({
   collapseShrink?: MotionValue<number>;
   /** Passes away from the one in focus: −1, 0, +1. */
   slot?: number;
-  /** Fades the faces out ahead of the shape finishing its flatten. */
-  faceOpacity?: MotionValue<number>;
   /** True once the strip is reading as tabs rather than as cards. */
   collapsed?: boolean;
   /** Tap-to-select, which is what a tab is. */
@@ -1008,10 +1033,7 @@ function WorldPassCard({
             instead of behind it. */}
         <motion.div
           className="h-full w-full"
-          // The faces go before the shape does: content crushed into a
-          // 26px bar reads as a rendering fault, an empty bar reads as a
-          // tab. The bar itself is the face's own black, so it survives.
-          style={{ transformStyle: "preserve-3d", opacity: faceOpacity ?? 1 }}
+          style={{ transformStyle: "preserve-3d" }}
           animate={{ rotateY: turns * 180 }}
           transition={{ type: "spring", stiffness: 60, damping: 14, mass: 1.1 }}
           drag={interactive && !collapsed ? "x" : false}
