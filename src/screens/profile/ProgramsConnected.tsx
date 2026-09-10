@@ -94,24 +94,23 @@ export default function ProgramsConnected({
           exit={{ opacity: 0, scale: 0.96 }}
           transition={{ duration: 0.55, ease: IN_EASE }}
         >
-          {/* Fixed chrome. Deliberately OUTSIDE the scroller: the header
-              and the summary hold position while only the cards move, and
-              a receding card passes up BEHIND this rather than over it.
-              It carries an opaque white base for exactly that reason —
-              without it the cards would still be visible sliding under
-              the type. */}
+          {/* Fixed chrome, now only the back control and the title. The
+              summary used to live up here too and held position while the
+              cards moved past it — but it is page content, not chrome, so
+              it scrolls away with everything else and this shrinks to the
+              band it actually needs to seat. */}
           <div
             className="pointer-events-none absolute left-0 top-0 w-full"
-            style={{ height: 420, zIndex: 5 }}
+            style={{ height: 168, zIndex: 5 }}
           >
             <div
               className="absolute inset-0"
               style={{
-                // Lighter than before: the scroller's mask now stops cards
-                // reaching this band, so this only has to seat the type
-                // rather than hide anything.
+                // Solid past the title, then out. This is the only thing
+                // stopping content showing through the type now that the
+                // scroller's mask is gone.
                 background:
-                  "linear-gradient(180deg, #ffffff 0%, #ffffff 88%, rgba(255,255,255,0) 100%)",
+                  "linear-gradient(180deg, #ffffff 0%, #ffffff 72%, rgba(255,255,255,0) 100%)",
               }}
             />
             <div className="pointer-events-auto absolute inset-0">
@@ -153,6 +152,12 @@ export default function ProgramsConnected({
             mohak n.
           </p>
 
+            </div>
+          </div>
+
+          <div
+            className="absolute inset-0 overflow-y-auto overflow-x-hidden [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
+          >
           {/* The card's remaining edge. It is the SAME object that just
               lifted away — showing only its lip is what tells you the
               card is still there, above the screen rather than gone. */}
@@ -255,24 +260,7 @@ export default function ProgramsConnected({
             </div>
           </motion.div>
 
-            </div>
-          </div>
 
-          <div
-            className="absolute inset-0 overflow-y-auto overflow-x-hidden [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
-            style={{
-              // Cards are masked out before they reach the summary text.
-              // The chrome's white fade alone wasn't enough — it only held
-              // full opacity to ~344 while the stats run to ~364, so a
-              // receding card showed through underneath them. Masking the
-              // SCROLLER means the card simply isn't painted up there,
-              // rather than being painted and then covered.
-              maskImage:
-                "linear-gradient(to bottom, transparent 0px, transparent 372px, rgba(0,0,0,0.45) 400px, black 424px, black 100%)",
-              WebkitMaskImage:
-                "linear-gradient(to bottom, transparent 0px, transparent 372px, rgba(0,0,0,0.45) 400px, black 424px, black 100%)",
-            }}
-          >
             {PROGRAMS.map((p, i) => (
               <ProgramCard
                 key={i}
