@@ -68,6 +68,12 @@ const CARD_PAD_B = 120;
  * clean off both sides of the screen. */
 const COLLAPSE_PERSPECTIVE = 1800;
 
+/* How much smaller the passes get on the way up, on top of the
+ * perspective compensation. The compensation alone only cancels the
+ * magnification — it does not make the card any smaller, so the strip kept
+ * its full width while the whitespace between passes stayed fixed. */
+const COLLAPSE_SHRINK = 0.3;
+
 /* The opening beat. For this many pixels the page scrolls but the body
  * below the stage does NOT move: the plinth fades and the pass starts to
  * lift, and only once that has read does the content begin to rise. It is
@@ -203,6 +209,13 @@ export default function ProfileScreen() {
      trails it through the spring, so a lagging card kept catching the KYC
      line that had already come up to meet it. Taking the room unlagged
      means the card is never larger than the gap actually left for it. */
+  /* The real size reduction, separate from the perspective maths. Without
+     it the cards stayed near full width the whole way down while the gap
+     between them stayed a fixed 76px, so the neighbour read as merging
+     into the main pass. */
+  const collapseShrink = useTransform(collapseX, (d) => {
+    return 1 - COLLAPSE_SHRINK * Math.sin((d * Math.PI) / 180);
+  });
   const collapseScale = useTransform([collapseX, scrollY], ([d, y]) => {
     const P = COLLAPSE_PERSPECTIVE;
     const r = ((d as number) * Math.PI) / 180;
@@ -217,7 +230,8 @@ export default function ProfileScreen() {
     const projected = CARD_H * Math.cos(r);
     const squeeze =
       projected > 1 ? Math.max(0, Math.min(1, room / projected)) : 1;
-    return fit * squeeze;
+    const shrink = 1 - COLLAPSE_SHRINK * Math.sin(r);
+    return fit * squeeze * shrink;
   });
   /* The box the card occupies is deliberately NOT animated. Writing a
      height onto it and onto the track every scroll tick forced a layout of
@@ -530,6 +544,8 @@ export default function ProfileScreen() {
                 interactive={i === profileIdx}
                 collapseX={collapseX}
                 collapseScale={collapseScale}
+                collapseShrink={collapseShrink}
+                slot={i - profileIdx}
                 faceOpacity={faceOpacity}
                 collapsed={collapsed}
                 onSelect={() => {
@@ -771,6 +787,8 @@ function WorldPassCard({
   interactive = true,
   collapseX,
   collapseScale,
+  collapseShrink,
+  slot = 0,
   faceOpacity,
   collapsed = false,
   onSelect,
@@ -797,6 +815,11 @@ function WorldPassCard({
   collapseX?: MotionValue<number>;
   /** Cancels the perspective magnification so the swing stays on screen. */
   collapseScale?: MotionValue<number>;
+  /** The size reduction alone, without the perspective maths — the gap
+   *  between passes is closed by exactly this so the ratio holds. */
+  collapseShrink?: MotionValue<number>;
+  /** Passes away from the one in focus: −1, 0, +1. */
+  slot?: number;
   /** Fades the faces out ahead of the shape finishing its flatten. */
   faceOpacity?: MotionValue<number>;
   /** True once the strip is reading as tabs rather than as cards. */
@@ -834,6 +857,17 @@ function WorldPassCard({
     Math.min(1, Math.hypot(a as number, b as number) / 13),
   );
   const dispersion = useTransform(tiltAmount, [0, 1], [0.16, 0.85]);
+
+  /* Closing the gap by exactly the shrink is what keeps the whitespace
+     ratio constant. Scaling the passes alone leaves a fixed 76px between
+     them, so the gap grows relative to the cards; pulling each pass toward
+     the one in focus by (1 − shrink) × its distance reproduces scaling the
+     whole strip about that pass, without animating any layout. */
+  const shrinkFallback = useMotionValue(1);
+  const gapPull = useTransform(
+    collapseShrink ?? shrinkFallback,
+    (k) => -(1 - k) * slot * CARD_GAP,
+  );
 
   const onMove = (e: React.MouseEvent<HTMLDivElement>) => {
     if (!interactive) return;
@@ -945,6 +979,7 @@ function WorldPassCard({
         <motion.div
           className="h-full w-full"
           style={{
+            x: gapPull,
             rotateX: collapseX ?? 0,
             scale: collapseScale ?? 1,
             transformOrigin: "50% 0%",
