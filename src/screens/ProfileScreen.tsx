@@ -175,12 +175,12 @@ export default function ProfileScreen() {
      straight off it is what read as staccato. Stiff enough that it still
      tracks the finger rather than lagging behind it. */
   const scrollS = useSpring(scrollY, {
-    stiffness: 520,
-    damping: 60,
-    mass: 0.35,
+    stiffness: 700,
+    damping: 70,
+    mass: 0.3,
     restDelta: 0.05,
   });
-  const collapseX = useTransform(scrollS, [46, 330], [0, 90], { clamp: true });
+  const collapseX = useTransform(scrollS, [32, 320], [0, 90], { clamp: true });
   /* Uniform scale that cancels the perspective's magnification.
      
      Hinged at the top, the bottom edge travels toward the camera as it
@@ -191,9 +191,25 @@ export default function ProfileScreen() {
      Setting that equal to W solves to P/(P + H·sinθ), which holds the card
      at exactly its own width the whole way through the swing. Uniform, so
      the card keeps its proportions rather than being squeezed. */
-  const collapseScale = useTransform(collapseX, (d) => {
+  /* Reads the angle off the SMOOTHED scroll but the available room off the
+     RAW one. The body rises with the real scroll position while the swing
+     trails it through the spring, so a lagging card kept catching the KYC
+     line that had already come up to meet it. Taking the room unlagged
+     means the card is never larger than the gap actually left for it. */
+  const collapseScale = useTransform([collapseX, scrollY], ([d, y]) => {
     const P = COLLAPSE_PERSPECTIVE;
-    return P / (P + CARD_H * Math.sin((d * Math.PI) / 180));
+    const r = ((d as number) * Math.PI) / 180;
+    // Cancels the perspective magnification (see above).
+    const fit = P / (P + CARD_H * Math.sin(r));
+    /* And then shrink further if the page has closed in. The body starts
+       at 614 and the card's top is pinned at CARD_Y, so the clear height
+       is 614 − y − CARD_Y, less a breathing gap. Uniform, so the card
+       keeps its proportions on the way down rather than being squashed. */
+    const room = 614 - (y as number) - CARD_Y - 26;
+    const projected = CARD_H * Math.cos(r);
+    const squeeze =
+      projected > 1 ? Math.max(0, Math.min(1, room / projected)) : 1;
+    return fit * squeeze;
   });
   /* The box the card occupies is deliberately NOT animated. Writing a
      height onto it and onto the track every scroll tick forced a layout of
@@ -213,9 +229,9 @@ export default function ProfileScreen() {
      flat layer at z 0, and the swing brings the card's bottom edge toward
      the camera — so the moment the card tips, its near edge passes in
      front of the plinth and the two collide. Clearing it by 42, with the
-     swing held back to 46, means they never share the frame while the card
+     swing held back to 32, means they never share the frame while the card
      is off-plane. */
-  const stageOpacity = useTransform(scrollS, [0, 42], [1, 0], { clamp: true });
+  const stageOpacity = useTransform(scrollS, [0, 30], [1, 0], { clamp: true });
   const [collapsed, setCollapsed] = useState(false);
 
   /* The card leaves around y 500; the title arrives as it goes. */
