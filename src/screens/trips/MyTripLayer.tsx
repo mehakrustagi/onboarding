@@ -129,18 +129,10 @@ export default function MyTripLayer({
       }}
       aria-hidden={!revealing}
     >
-      {/* Silk ripple ground (Ripples GIF 1, 855×855 at −205.6, −344.1). */}
-      <div
-        className="pointer-events-none absolute"
-        style={{ left: -205.56, top: -344.09, width: 855, height: 855, opacity: 0.5 }}
-      >
-        <Image
-          src="/assets/payment/ripple-orb.png"
-          alt=""
-          fill
-          style={{ objectFit: "cover" }}
-        />
-      </div>
+      {/* Figma's "Ripples GIF 1" (855×855 at −205.6, −344.1) is deliberately
+          NOT here. It is a swirled bitmap standing in for moving water, and
+          with a live wave crossing the screen the two read as two different
+          bodies of water — a static texture the real one passes through. */}
 
       {/* ── Country chips ─────────────────────────────────────────────── */}
       <Surface sweep={sweep} at={104}>

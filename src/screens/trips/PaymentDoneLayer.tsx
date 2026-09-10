@@ -1,6 +1,5 @@
 "use client";
 
-import Image from "next/image";
 import { motion, type MotionValue } from "framer-motion";
 import PaymentSuccess from "../payment-v2/PaymentSuccess";
 import { applyMask, outgoingMask, useRippleStyle } from "./ripple";
@@ -29,8 +28,6 @@ import type { HandoffBeat } from "./beats";
  * top of that just softened the parts the wave had not reached — which is
  * precisely the content that should stay sharp until it does.
  */
-
-const IN_EASE = [0.22, 1, 0.36, 1] as const;
 
 export default function PaymentDoneLayer({
   beat,
@@ -67,33 +64,11 @@ export default function PaymentDoneLayer({
       }
       aria-hidden
     >
-      {/* Ripple field (947:41799) — 620×620, centred low-left.
-          Dropped from the lens copy. It is a 620px bitmap on a 440px
-          screen, so it has two hard edges inside the frame; magnified by
-          the lens those edges become a visible rectangle sliding through
-          the glass. The lens only needs the content worth refracting —
-          the card, the copy, the chips — and the background behind them is
-          handled by the rim's own backdrop-filter anyway. */}
-      {!bare && <motion.div
-        className="pointer-events-none absolute"
-        style={{ width: 620, height: 620, left: 73.72 - 310, top: 576 - 310 }}
-        initial={false}
-        animate={{
-          /* Draws down and in as the other device closes. Small enough that
-             you feel the pull rather than watch the image move. */
-          scale: beat === "idle" ? 1 : 1.045,
-          y: beat === "idle" ? 0 : 10,
-        }}
-        transition={{ duration: 0.9, ease: IN_EASE }}
-      >
-        <Image
-          src="/assets/payment/ripple-orb.png"
-          alt=""
-          fill
-          priority
-          style={{ objectFit: "cover", opacity: 0.95 }}
-        />
-      </motion.div>}
+      {/* Figma's ripple field (947:41799, 620×620 low-left) is deliberately
+          NOT here, on this route only — the payment flow's own screens still
+          carry it. It is a 620px bitmap on a 440px screen, so the
+          displacement bands were magnifying its corners into visible
+          rectangles sliding through the wave. */}
 
       <BackChip />
       <PaymentSuccess visible />

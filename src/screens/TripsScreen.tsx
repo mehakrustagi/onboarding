@@ -11,7 +11,7 @@ import {
 import { haptic } from "@/lib/haptics";
 import PaymentDoneLayer from "./trips/PaymentDoneLayer";
 import MyTripLayer from "./trips/MyTripLayer";
-import Bloom from "./trips/Bloom";
+import TripWash from "./trips/TripWash";
 import WaveSweep from "./trips/WaveSweep";
 import { BEAT_AT, SWEEP_S, type HandoffBeat } from "./trips/beats";
 import { ARRIVAL, BODY, RATTLE, useOscillator } from "./trips/wobble";
@@ -48,10 +48,10 @@ import { ARRIVAL, BODY, RATTLE, useOscillator } from "./trips/wobble";
  * is also how the Figma section reads: Ellipse 6988 climbs 1108 → 808
  * between frames 3 and 4.
  *
- * Prototype 971:6622 supplies the light itself, as one body that grows at
- * an edge and travels across (mirrored here). Bloom is that body. The
- * separate charge glow and the old ambient ellipse are both gone — they
- * were extra light sources competing with the one the reference has.
+ * The colour is Figma's Ellipse 6988 doing what Figma has it do, rendered
+ * with the payment overlay's own bloom fields — see TripWash. There is one
+ * light source and it comes up from the bottom edge, which is also where
+ * the contact happens.
  *
  * The rattle and the wobble are separate oscillators (see wobble.ts)
  * because they're separate physics: 19Hz dying in half a second reads as
@@ -70,26 +70,35 @@ import { ARRIVAL, BODY, RATTLE, useOscillator } from "./trips/wobble";
  * the same amount. Free-scaling both looks like a zoom; trading one
  * against the other is what makes it read as something being compressed.
  *
- * THE RIPPLE
+ * THE WAVE AND THE WASH
  *
- * The knock is the cause; the ripple is what it releases. A crest spreads
- * outward from a point just above the composer and floats upward as it
- * goes, displacing the screen it crosses and leaving MyTrip behind it. The
- * physics is the WebGL reference's, ported in ripple.ts — same expanding
- * front, same Gaussian ring, same exponential decay, same one-sided glint.
+ * Two separate things, and they were briefly conflated into one by mistake.
+ * The WAVE is the ripple — the crest, its displacement bands and its glint,
+ * ported from the WebGL reference in ripple.ts. The WASH is the background
+ * colour it travels through, and that is the payment overlay's own bloom,
+ * imported rather than re-tuned so the two beats share one source
+ * (components/BloomFields). Swapping the background does not mean removing
+ * the mechanic.
  *
- * Everything runs off the single `sweep` value below: the crest radius, the
- * rising origin, both screens’ masks, the displacement bands and the glint.
- * The moment any of them runs on its own timer they drift by a frame or two
- * under load, and a ripple whose glint does not sit on its own crest stops
- * reading as one object.
+ * THE WASH
+ *
+ * The knock is the cause; the wash is what it releases. Figma's section
+ * 947:48238 draws it as Ellipse 6988 swelling and climbing — and the colour
+ * itself is the payment overlay's, imported rather than re-tuned, so the
+ * two beats are the same background (components/BloomFields).
+ *
+ * What the wash does to the screens is in washline.ts, and it is softer
+ * than several earlier passes: no crest, no ring, no displacement bands.
+ * Frame 3 shows the payment card sharp, the copy below it blurred and
+ * dissolving, and the incoming screen faint underneath — a bottom-weighted
+ * cross-dissolve with the colour rising through it. An earlier version drew
+ * four displaced copies of the outgoing screen to bend its type per band,
+ * which was cost spent on an effect the design does not ask for.
  *
  * `sweep` is a MotionValue rather than React state on purpose. It changes
- * every frame for over a second; as state that is ~70 renders of two full
- * screen layouts during the busiest moment in the sequence, and the frames
- * it drops land exactly where the effect has to be smooth. The ripple's
- * masks are ~30-stop gradients, so they are written straight to element
- * styles from a subscription rather than through the render path at all.
+ * every frame for nearly two seconds; as state that is ~110 renders of two
+ * full screen layouts during the busiest moment in the sequence, and the
+ * frames it drops land exactly where the effect has to be smooth.
  */
 
 const IN_EASE = [0.22, 1, 0.36, 1] as const;
@@ -279,15 +288,16 @@ export default function TripsScreen() {
         >
           <MyTripLayer beat={beat} sweep={sweep} />
           <PaymentDoneLayer beat={beat} sweep={sweep} />
-          <Bloom beat={beat} sweep={sweep} />
+          <TripWash beat={beat} sweep={sweep} />
           <WaveSweep
             sweep={sweep}
+            /* Mounted a beat early so the cost of building four copies of
+               the outgoing screen lands during the flash rather than on the
+               first frame of the wave. */
             mounted={beat === "contact" || beat === "sweeping"}
             visible={beat === "sweeping"}
             /* Each displacement band draws its own copy of the outgoing
-               screen — real content, actually displaced, rather than a
-               blurred approximation of it. Mounted only while the ripple
-               is on screen. */
+               screen — real content, actually displaced. */
             lens={<PaymentDoneLayer beat={beat} sweep={sweep} bare />}
           />
 

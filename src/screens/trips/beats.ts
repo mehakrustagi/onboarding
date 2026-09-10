@@ -24,14 +24,23 @@ export type HandoffBeat = "idle" | "charging" | "contact" | "sweeping" | "settle
 
 /* How long the wave takes to cross, seconds.
  *
- * The brief originally called for 0.6–0.8s and this is now more than twice
- * that, deliberately. Every step slower has read better, and the reason is
- * what the wave has to do: it is not a wipe arriving somewhere, it is a body
- * of water dragging a screenful of type through four stages of displacement.
- * At 0.78s that was a flash; at 1.15 you could see it but not feel the text
- * being carried. 1.85 gives each line of copy time to lean, be thrown, be
- * pulled back and settle as the crest passes over it. */
-export const SWEEP_S = 6.0; // TEMP-CAPTURE
+ * Five seconds, which is many times the 0.6–0.8s the brief first asked for
+ * and is a deliberate, reviewed choice rather than drift.
+ *
+ * The ladder ran 0.78 → 1.15 → 1.85 and every step slower read better. The
+ * reason is what the wave actually has to do: it is not a wipe arriving
+ * somewhere, it is a body of water dragging a screenful of type through
+ * four stages of displacement while the incoming screen surfaces line by
+ * line behind it. At 0.78s that was a flash. At 1.85 you could see it but
+ * the reveal was still crowded.
+ *
+ * This value was originally a debug setting for capturing stills, and it
+ * was left in by mistake — but seen at this speed it was the one that got
+ * signed off, so it is the value now. It does mean the whole sequence runs
+ * ~7.8s from mount, which is a showcase pace, not a production one: if this
+ * ever ships inside a real flow rather than as a prototype route, this is
+ * the first number to revisit. */
+export const SWEEP_S = 5.0;
 
 /* Milliseconds from the start of the sequence to the START of each beat.
  * Absolute rather than per-beat durations so the schedule reads as a

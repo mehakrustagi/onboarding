@@ -124,6 +124,7 @@ function Band({
   return (
     <motion.div
       ref={ref}
+      data-ripple-band
       className="absolute inset-0"
       style={{
         scale,
