@@ -165,17 +165,18 @@ export default function ProfileScreen() {
      face foreshortens into a bar the way a real card tipping away from you
      does. 84° leaves a sliver rather than a true edge-on line, which would
      vanish. */
-  const collapseX = useTransform(scrollY, [40, 300], [0, 84], { clamp: true });
+  const collapseX = useTransform(scrollY, [30, 340], [0, 84], { clamp: true });
   /* The box it occupies follows the PROJECTION of that swing, not a linear
      ramp — cos is what the eye sees, and a linear box would crop the card
      mid-swing. */
   const cardH = useTransform(collapseX, (d) =>
     Math.max(26, CARD_H * Math.cos((d * Math.PI) / 180)),
   );
-  /* The faces fade well before the shape finishes flattening: content
-     squashed into a 26px bar reads as a rendering fault, where an empty
-     tab reads as a tab. */
-  const faceOpacity = useTransform(scrollY, [40, 170], [1, 0], { clamp: true });
+  /* The faces hold almost the whole way. Fading them early was doing the
+     compacting instead of the swing — the card just went transparent at
+     full size and the page showed straight through it. They only give way
+     once the swing is nearly edge-on and there is no face left to read. */
+  const faceOpacity = useTransform(scrollY, [255, 330], [1, 0], { clamp: true });
   /* The strip shrinks with them — held at full height it would sit over
      the page and swallow taps meant for the content underneath. */
   const trackH = useTransform(cardH, (h) =>
@@ -183,7 +184,7 @@ export default function ProfileScreen() {
   );
   /* The bar the faces hand off to. Starts a touch after they begin
      fading so the two never both read at full strength. */
-  const tabOpacity = useTransform(scrollY, [110, 210], [0, 1], { clamp: true });
+  const tabOpacity = useTransform(scrollY, [285, 345], [0, 1], { clamp: true });
   const [collapsed, setCollapsed] = useState(false);
 
   /* The card leaves around y 500; the title arrives as it goes. */
@@ -229,7 +230,7 @@ export default function ProfileScreen() {
           scrollY.set(y);
           // Past this the passes are tabs: tapping one selects it, and
           // the flip is off, since a 26px bar has no face to turn.
-          setCollapsed(y > 200);
+          setCollapsed(y > 300);
         }}
       >
       {/* Card carousel. The second card is deliberately cut off by the
