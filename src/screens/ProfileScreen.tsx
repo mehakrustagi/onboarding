@@ -170,7 +170,17 @@ export default function ProfileScreen() {
      face foreshortens into a bar the way a real card tipping away from you
      does. 84° leaves a sliver rather than a true edge-on line, which would
      vanish. */
-  const collapseX = useTransform(scrollY, [30, 330], [0, 90], { clamp: true });
+  /* Smoothed. onScroll fires at whatever rate the platform feels like and
+     the raw value arrives in uneven jumps — driving a 3D transform
+     straight off it is what read as staccato. Stiff enough that it still
+     tracks the finger rather than lagging behind it. */
+  const scrollS = useSpring(scrollY, {
+    stiffness: 520,
+    damping: 60,
+    mass: 0.35,
+    restDelta: 0.05,
+  });
+  const collapseX = useTransform(scrollS, [30, 330], [0, 90], { clamp: true });
   /* Uniform scale that cancels the perspective's magnification.
      
      Hinged at the top, the bottom edge travels toward the camera as it
@@ -185,30 +195,25 @@ export default function ProfileScreen() {
     const P = COLLAPSE_PERSPECTIVE;
     return P / (P + CARD_H * Math.sin((d * Math.PI) / 180));
   });
-  /* The box it occupies follows the PROJECTION of that swing, not a linear
-     ramp — cos is what the eye sees, and a linear box would crop the card
-     mid-swing. */
-  const cardH = useTransform(collapseX, (d) => {
-    const r = (d * Math.PI) / 180;
-    const P = COLLAPSE_PERSPECTIVE;
-    return (CARD_H * Math.cos(r) * P) / (P + CARD_H * Math.sin(r));
-  });
+  /* The box the card occupies is deliberately NOT animated. Writing a
+     height onto it and onto the track every scroll tick forced a layout of
+     the whole preserve-3d subtree each frame, which is what made the swing
+     staccato. Nothing is laid out below the card — the track is absolutely
+     positioned — so the box can stay 350 and let the transform do all of
+     the visible work. */
   /* The faces hold almost the whole way. Fading them early was doing the
      compacting instead of the swing — the card just went transparent at
      full size and the page showed straight through it. They only give way
      at the very end, handing the identity to the sticky header, which is
      where the design parks the name. */
-  const faceOpacity = useTransform(scrollY, [250, 320], [1, 0], { clamp: true });
+  const faceOpacity = useTransform(scrollS, [250, 320], [1, 0], { clamp: true });
   /* The strip shrinks with them — held at full height it would sit over
      the page and swallow taps meant for the content underneath. */
-  const trackH = useTransform(cardH, (h) =>
-    h > 300 ? h + CARD_PAD_T + CARD_PAD_B : h + CARD_PAD_T + 26,
-  );
   /* The plinth leaves as the pass lifts off it. It is stage furniture for
      a card standing up — once the card is tipping away there is nothing
      for it to be under, and the reference has it gone by the first
      collapsed state. */
-  const stageOpacity = useTransform(scrollY, [20, 120], [1, 0], { clamp: true });
+  const stageOpacity = useTransform(scrollS, [10, 130], [1, 0], { clamp: true });
   const [collapsed, setCollapsed] = useState(false);
 
   /* The card leaves around y 500; the title arrives as it goes. */
@@ -254,7 +259,11 @@ export default function ProfileScreen() {
           scrollY.set(y);
           // Past this the passes are tabs: tapping one selects it, and
           // the flip is off, since a 26px bar has no face to turn.
-          setCollapsed(y > 290);
+          // Lower than the swing's end on purpose: the track keeps its full
+          // 494px box now, so past this it would sit over content that has
+          // risen underneath. By here the card is well into the swing and
+          // there is nothing left to flip.
+          setCollapsed(y > 120);
         }}
       >
       {/* Card carousel. The second card is deliberately cut off by the
@@ -420,7 +429,7 @@ export default function ProfileScreen() {
           // exactly, the shadow was being sliced off on a straight line.
           top: CARD_Y - CARD_PAD_T,
           width: 440,
-          height: trackH,
+          height: CARD_H + CARD_PAD_T + CARD_PAD_B,
           zIndex: 14,
           scrollSnapType: "x mandatory",
           scrollBehavior: "smooth",
@@ -486,7 +495,6 @@ export default function ProfileScreen() {
                 // Only the pass in focus takes the cursor, so tilt never
                 // fights between two cards.
                 interactive={i === profileIdx}
-                height={cardH}
                 collapseX={collapseX}
                 collapseScale={collapseScale}
                 faceOpacity={faceOpacity}
@@ -728,7 +736,6 @@ function WorldPassCard({
   delay,
   lit,
   interactive = true,
-  height,
   collapseX,
   collapseScale,
   faceOpacity,
@@ -753,8 +760,6 @@ function WorldPassCard({
   /** The peeking card is scenery — it floats, but doesn't take the
    *  cursor, so tilt never fights between the two. */
   interactive?: boolean;
-  /** Driven by the page scroll: 350 open, 26 when it has become a tab. */
-  height?: MotionValue<number>;
   /** Degrees of the collapse swing: 0 face-on, 90 edge-on. */
   collapseX?: MotionValue<number>;
   /** Cancels the perspective magnification so the swing stays on screen. */
@@ -816,7 +821,7 @@ function WorldPassCard({
       // flex item places it. It still creates the positioning context its
       // own faces rely on.
       className="relative"
-      style={{ width: CARD_W, height: height ?? CARD_H }}
+      style={{ width: CARD_W, height: CARD_H }}
       onClick={collapsed ? onSelect : undefined}
       initial={{ opacity: 0, y: 26, scale: 0.96 }}
       animate={{ opacity: 1, y: 0, scale: 1 }}
@@ -912,6 +917,7 @@ function WorldPassCard({
             transformOrigin: "50% 0%",
             transformPerspective: COLLAPSE_PERSPECTIVE,
             transformStyle: "preserve-3d",
+            willChange: "transform",
           }}
         >
         {/* Flip plane. Drag horizontally to turn the card — unchanged, and
