@@ -29,19 +29,45 @@
 export type SourceChip = { label: string; faces: number };
 
 export type TripItem = {
-  title: string;
+  /* Optional: in forex, eSim and Safety the rail node and the heading are
+     the same row, so the group carries both and the item beneath is only a
+     status line and its body. Giving those items a title too would draw a
+     second node and repeat the heading. */
+  title?: string;
   /** "27th Jun • 11:30 AM - 2:00 PM (3 Adults)" — split as Figma has it. */
   when?: { date: string; time: string; party?: string };
+  /** The "05 more" pill under the title. */
+  more?: string;
   status?: string;
-  body?: string;
+  /** Prefixes the status line with the call glyph, as the visa row has. */
+  call?: boolean;
+  /** Agent orbs parked at the right of the status row. Figma attaches
+      these to rows an agent is actively working, and the eSim row carries
+      two stacked. */
+  agents?: number;
+  body?: string | string[];
+  /** Duration on the voice-note player, e.g. "1:23". */
+  audio?: string;
   sources?: SourceChip;
-  /** A checked node on the timeline rather than an open circle. */
+  /** Filled node on the rail — a black tile with a tick, not a circle. */
   done?: boolean;
+  /** The title IS the live status, so it takes the colour gradient the
+      status lines use. Rows with a separate `status` put the gradient
+      there instead; these have no status line of their own. */
+  live?: boolean;
 };
 
 export type TripGroup = {
   heading?: string;
   subtitle?: string;
+  /* Which marker the heading row carries.
+     "dot"  — the 14px ring-and-dot; items below carry their own nodes.
+              Transport, Accommodation and Activities work this way.
+     "done" — the heading IS the node row, a full 30px tile with a tick,
+              and the items below have none. Forex, eSim and Safety. */
+  marker?: "dot" | "done";
+  /* Chevron after the heading, as "Travel Card >" has. */
+  chevron?: boolean;
   items: TripItem[];
   link?: string;
   actions?: string[];
@@ -74,6 +100,10 @@ export const TRIP_SECTIONS: TripSection[] = [
         items: [
           {
             title: "Visa Delivery",
+            more: "05 more",
+            call: true,
+            agents: 1,
+            audio: "1:23",
             status: "Called customer care...",
             body: "Spoke with a consular officer (+91 7283763812). Confirmed that your application is on track. Follow-up scheduled for tomorrow",
             sources: { label: "3 Sources", faces: 2 },
@@ -104,6 +134,7 @@ export const TRIP_SECTIONS: TripSection[] = [
     groups: [
       {
         heading: "BLR ➔ SYD",
+        marker: "dot",
         subtitle: "24th Jun • 07:15 AM Departure",
         items: [
           {
@@ -123,6 +154,7 @@ export const TRIP_SECTIONS: TripSection[] = [
       },
       {
         heading: "SYD ➔ MEL",
+        marker: "dot",
         subtitle: "28th Jun • 02:30 PM Departure",
         items: [
           {
@@ -137,6 +169,7 @@ export const TRIP_SECTIONS: TripSection[] = [
       },
       {
         heading: "MEL ➔ BLR",
+        marker: "dot",
         subtitle: "1st Aug • 11:00 PM Departure",
         items: [
           {
@@ -159,6 +192,7 @@ export const TRIP_SECTIONS: TripSection[] = [
     groups: [
       {
         heading: "Sydney",
+        marker: "dot",
         subtitle: "24th Jun - 28th Jun • 4 Nights",
         items: [
           {
@@ -178,10 +212,12 @@ export const TRIP_SECTIONS: TripSection[] = [
       },
       {
         heading: "Melbourne",
+        marker: "dot",
         subtitle: "28th Jun - 01st Aug • 4 Nights",
         items: [
           {
             title: "Hotel booking",
+            agents: 1,
             status: "Watching lowest nightly rates...",
             body: "Found a top-rated 4-star stay near the Yarra River saving you ₹8,500 compared to average nightly rates.",
             sources: { label: "1 Sources", faces: 1 },
@@ -202,6 +238,7 @@ export const TRIP_SECTIONS: TripSection[] = [
     groups: [
       {
         heading: "Sydney",
+        marker: "dot",
         subtitle: "24th Jun - 28th Jun",
         items: [
           {
@@ -225,6 +262,7 @@ export const TRIP_SECTIONS: TripSection[] = [
       },
       {
         heading: "Melbourne",
+        marker: "dot",
         subtitle: "28th Jun - 1st Aug",
         items: [
           {
@@ -237,6 +275,7 @@ export const TRIP_SECTIONS: TripSection[] = [
           },
           {
             title: "Checking best activities & price drop for small group",
+            live: true,
             body: "Tracking price drops and complimentary add-ons for small-group tours matching your schedule.",
             sources: { label: "3 Sources", faces: 2 },
           },
@@ -257,12 +296,15 @@ export const TRIP_SECTIONS: TripSection[] = [
       {
         heading: "Travel Card",
         subtitle: "HDFC Infinia •••• 2424",
+        marker: "done",
+        chevron: true,
         items: [
           {
-            title: "Card Optimization Analyzed",
+            status: "Card Optimization Analyzed",
+            live: true,
+            agents: 1,
             body: "Your HDFC Infinia charges a 2% forex mark-up but earns 3.3% in rewards points, netting you a 1.3% net positive return on every international transaction.",
             sources: { label: "3 Sources", faces: 2 },
-            done: true,
           },
         ],
         actions: ["View Reward Breakdown", "Add Another Card"],
@@ -270,12 +312,14 @@ export const TRIP_SECTIONS: TripSection[] = [
       {
         heading: "Physical Currency",
         subtitle: "AUD 2,000 = ₹130434.26",
+        marker: "done",
         items: [
           {
-            title: "AUD 2,000 Order Dispatched",
+            status: "AUD 2,000 Order Dispatched",
+            live: true,
+            agents: 1,
             body: "Locked in the lowest exchange rate. Cash delivery is on its way via BookMyForex. Tracking details sent to your email.",
             sources: { label: "3 Sources", faces: 2 },
-            done: true,
           },
         ],
         link: "Track Order",
@@ -292,12 +336,15 @@ export const TRIP_SECTIONS: TripSection[] = [
     groups: [
       {
         heading: "eSim",
+        marker: "done",
         items: [
           {
-            title: "Complimentary Data Unlocked",
+            more: "05 more",
+            status: "Complimentary Data Unlocked",
+            live: true,
+            agents: 2,
             body: "Activated your complimentary 1GB starter data pass from Atlys. Tap below to install your eSIM before departure.",
             sources: { label: "3 Sources", faces: 2 },
-            done: true,
           },
         ],
         link: "Install eSim",
@@ -314,12 +361,18 @@ export const TRIP_SECTIONS: TripSection[] = [
     groups: [
       {
         heading: "Atlys Cover",
+        marker: "done",
         items: [
           {
-            title: "24/7 Global Travel Assistance Active",
-            body: "Medical: Instant doctor consultations & hospital placement support Passport Loss: Priority embassy connection & expedited replacement support",
-            sources: { label: "1 Source", faces: 1 },
+            status: "24/7 Global Travel Assistance Active",
             done: true,
+            /* Two labelled blocks, not one run-on sentence — Figma sets
+               them as separate paragraphs. */
+            body: [
+              "Medical:\nInstant doctor consultations & hospital placement support",
+              "Passport Loss:\nPriority embassy connection & expedited replacement support",
+            ],
+            sources: { label: "1 Source", faces: 1 },
           },
         ],
         actions: ["View Full Policy", "Contact 24/7 Helpline"],

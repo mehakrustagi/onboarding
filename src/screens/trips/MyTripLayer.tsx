@@ -141,6 +141,14 @@ export default function MyTripLayer({
            the charge — the one second of the sequence that has to stay
            perfectly smooth. */
         display: revealing ? "block" : "none",
+        /* #F9FAFB is the trip view's own ground, not the shell's. The shell
+           stays #ECEAEF because that is the payment screen's background
+           (Figma 947:41798) and it has to remain correct for the whole
+           charge and knock. Putting the new colour on this layer means the
+           ripple's mask reveals the new background along with the screen it
+           belongs to, rather than the page changing colour underneath a
+           transition that has not happened yet. */
+        background: "#f9fafb",
       }}
       aria-hidden={!revealing}
     >
@@ -162,6 +170,28 @@ export default function MyTripLayer({
         style={{ scrollbarWidth: "none" }}
       >
         <div className="relative">
+          {/* Rectangle 240648228 — the white panel everything from the tab
+              row down sits on. Full-bleed 440 wide, r30, starting at y506.5,
+              running to the end of the scroll, with the same shadow family
+              as the cards.
+
+              This is the layer I had inverted: the page ground is #F9FAFB
+              and the PANEL is white, with each section a #F9FAFB tile on
+              top of it. Rendering the sections white on a grey page put
+              white glass on white and the action pills lost their shape. */}
+          <div
+            className="absolute"
+            style={{
+              left: 0,
+              width: 440,
+              top: 506.5,
+              bottom: 0,
+              background: "#ffffff",
+              borderRadius: 30,
+              boxShadow: "0px 4px 30px -2px rgba(0,0,0,0.05)",
+            }}
+          />
+
           {/* Holds open the height the absolutely-positioned header needs;
               everything below it is in flow and sets the scroll length. */}
           <div style={{ height: 638 }} />
