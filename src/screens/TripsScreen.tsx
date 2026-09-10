@@ -12,8 +12,15 @@ import { haptic } from "@/lib/haptics";
 import PaymentDoneLayer from "./trips/PaymentDoneLayer";
 import MyTripLayer from "./trips/MyTripLayer";
 import TripWash from "./trips/TripWash";
+import AgentsOverlay from "./trips/AgentsOverlay";
 import WaveSweep from "./trips/WaveSweep";
-import { BEAT_AT, SWEEP_S, type HandoffBeat } from "./trips/beats";
+import {
+  AGENTS_AT,
+  BEAT_AT,
+  DISPERSE_AT,
+  SWEEP_S,
+  type HandoffBeat,
+} from "./trips/beats";
 import { ARRIVAL, BODY, RATTLE, useOscillator } from "./trips/wobble";
 
 /* Payment success → MyTrip, as one continuous move.
@@ -105,6 +112,13 @@ const IN_EASE = [0.22, 1, 0.36, 1] as const;
 
 export default function TripsScreen() {
   const [beat, setBeat] = useState<HandoffBeat>("idle");
+  /* Separate from `beat` on purpose: the agents scrim is a state of the
+     MyTrip screen, not a stage of the handoff, and folding it into the
+     beat enum would mean every consumer of `beat` had to care about a
+     phase that has nothing to do with the wave. */
+  const [agents, setAgents] = useState<"hidden" | "working" | "dispersing">(
+    "hidden",
+  );
   const reduceMotion = useReducedMotion();
 
   const rattle = useOscillator();
@@ -150,7 +164,10 @@ export default function TripsScreen() {
        in an effect body costs a second render pass before the first frame
        of the sequence — on a screen carrying two full layouts that shows
        up as a hitch right where the timing has to be exact. */
-    at(0, () => setBeat("idle"));
+    at(0, () => {
+      setBeat("idle");
+      setAgents("hidden");
+    });
 
     at(BEAT_AT.charging, () => setBeat("charging"));
 
@@ -207,7 +224,26 @@ export default function TripsScreen() {
     });
 
     at(BEAT_AT.settled, () => setBeat("settled"));
+
+    at(AGENTS_AT, () => setAgents("working"));
+    at(DISPERSE_AT, () => setAgents("dispersing"));
   }, [arrival, body, clearTimers, rattle, reduceMotion, sweep]);
+
+  /* Jump straight to the finished trip screen.
+     The whole sequence is ~9s and the scroll column is the thing most
+     worth reviewing, so it needs to be reachable without sitting through
+     the handoff every reload. Everything downstream reads `sweep` and
+     `beat`, so setting both to their end states is all this takes — no
+     separate "skipped" mode to keep in sync. */
+  const skip = useCallback(() => {
+    clearTimers();
+    rattle.stop();
+    body.stop();
+    arrival.stop();
+    sweep.set(1);
+    setBeat("settled");
+    setAgents("hidden");
+  }, [arrival, body, clearTimers, rattle, sweep]);
 
   useEffect(() => {
     run();
@@ -327,15 +363,39 @@ export default function TripsScreen() {
             }}
           />
         </motion.div>
+
+        {/* Outside the squash wrapper: the scrim arrives long after the
+            knock has decayed, and nesting it there would subject it to a
+            deformation that is over. */}
+        <AgentsOverlay phase={agents} />
       </motion.div>
 
-      <button
-        type="button"
-        onClick={run}
-        className="rounded-full bg-black/5 px-3.5 py-1.5 text-[13px] text-[#4b4b53] transition-colors hover:bg-black/10"
-      >
-        Replay handoff
-      </button>
+      <div className="flex items-center gap-2">
+        <button
+          type="button"
+          onClick={skip}
+          className="rounded-full bg-[#0b0b0b] px-3.5 py-1.5 text-[13px] text-white transition-colors hover:bg-[#26262c]"
+        >
+          Skip to trip
+        </button>
+        <button
+          type="button"
+          onClick={run}
+          className="rounded-full bg-black/5 px-3.5 py-1.5 text-[13px] text-[#4b4b53] transition-colors hover:bg-black/10"
+        >
+          Replay handoff
+        </button>
+        <button
+          type="button"
+          onClick={() => {
+            skip();
+            setAgents("working");
+          }}
+          className="rounded-full bg-black/5 px-3.5 py-1.5 text-[13px] text-[#4b4b53] transition-colors hover:bg-black/10"
+        >
+          Agents overlay
+        </button>
+      </div>
     </div>
   );
 }

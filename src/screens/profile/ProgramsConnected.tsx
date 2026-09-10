@@ -1,13 +1,8 @@
 "use client";
 
 import Image from "next/image";
-import {
-  motion,
-  AnimatePresence,
-  useMotionValue,
-  useTransform,
-  type MotionValue,
-} from "framer-motion";
+import { motion, AnimatePresence } from "framer-motion";
+import { useEffect, useState } from "react";
 
 /* Programs connected — Figma node 853:74983.
  *
@@ -31,25 +26,13 @@ export const LP_H = 253;
 const LP_FIRST_Y = 445;
 const LP_PITCH = 273;
 
-/* Where a card is "in focus" — the slot the first card occupies at rest.
- * Everything above this recedes; everything below is on its way up to it. */
-const FOCUS_Y = LP_FIRST_Y;
+/* The list scrolls plainly: no wheel, no recede, no gather. The stack
+ * bunched outgoing cards against the top at 0.62 of scroll speed, which
+ * is what capped how far the list could actually travel — you ran out of
+ * page long before you ran out of programs. Straight one-to-one scrolling
+ * is what makes the run unlimited.
+ */
 
-/* The wheel. As a card passes the focus line it turns away from the
- * viewer and sinks into the background, while the one below rises to take
- * its place.
- *
- * The travel is deliberately compressed: a card that has gone past focus
- * moves UP less than the scroll would carry it (GATHER), so the outgoing
- * cards bunch together at the top like a stack being laid down rather
- * than sliding off the screen at full speed. That difference in rate is
- * what makes it read as a wheel rather than a list. */
-const RECEDE_Z = 420;
-const RECEDE_TILT = 16;
-const GATHER = 0.62;
-/* How far past focus a card stays fully opaque and sharp. It is still the
- * front card for most of this travel, so it should look like it. */
-const FRONT_HOLD = 0.55;
 /* Gap between slides in the horizontal track. */
 const LP_GAP = 14;
 /* How far the track hangs past the card on each side — the width of the
@@ -99,16 +82,6 @@ export default function ProgramsConnected({
   /** Tapping either face of a card opens its detail (853:75340). */
   onOpenProgram?: (index: number) => void;
 }) {
-  /* Scroll position, fed by the container's own onScroll rather than
-     useScroll({ container }).
-     
-     useScroll needs its container ref populated when the hook first runs,
-     and this whole screen mounts conditionally inside AnimatePresence — so
-     on the first render the ref is still null, the hook subscribes to
-     nothing, and the wheel never moves. Reading the event directly has no
-     such ordering problem. */
-  const scrollY = useMotionValue(0);
-
   return (
     <AnimatePresence>
       {open && (
@@ -122,24 +95,23 @@ export default function ProgramsConnected({
           exit={{ opacity: 0, scale: 0.96 }}
           transition={{ duration: 0.55, ease: IN_EASE }}
         >
-          {/* Fixed chrome. Deliberately OUTSIDE the scroller: the header
-              and the summary hold position while only the cards move, and
-              a receding card passes up BEHIND this rather than over it.
-              It carries an opaque white base for exactly that reason —
-              without it the cards would still be visible sliding under
-              the type. */}
+          {/* Fixed chrome, now only the back control and the title. The
+              summary used to live up here too and held position while the
+              cards moved past it — but it is page content, not chrome, so
+              it scrolls away with everything else and this shrinks to the
+              band it actually needs to seat. */}
           <div
             className="pointer-events-none absolute left-0 top-0 w-full"
-            style={{ height: 420, zIndex: 5 }}
+            style={{ height: 168, zIndex: 5 }}
           >
             <div
               className="absolute inset-0"
               style={{
-                // Lighter than before: the scroller's mask now stops cards
-                // reaching this band, so this only has to seat the type
-                // rather than hide anything.
+                // Solid past the title, then out. This is the only thing
+                // stopping content showing through the type now that the
+                // scroller's mask is gone.
                 background:
-                  "linear-gradient(180deg, #ffffff 0%, #ffffff 88%, rgba(255,255,255,0) 100%)",
+                  "linear-gradient(180deg, #ffffff 0%, #ffffff 72%, rgba(255,255,255,0) 100%)",
               }}
             />
             <div className="pointer-events-auto absolute inset-0">
@@ -181,6 +153,12 @@ export default function ProgramsConnected({
             mohak n.
           </p>
 
+            </div>
+          </div>
+
+          <div
+            className="absolute inset-0 overflow-y-auto overflow-x-hidden [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
+          >
           {/* The card's remaining edge. It is the SAME object that just
               lifted away — showing only its lip is what tells you the
               card is still there, above the screen rather than gone. */}
@@ -283,42 +261,23 @@ export default function ProgramsConnected({
             </div>
           </motion.div>
 
-            </div>
-          </div>
 
-          <div
-            onScroll={(e) => scrollY.set(e.currentTarget.scrollTop)}
-            className="absolute inset-0 overflow-y-auto overflow-x-hidden [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
-            // Perspective on the SCROLLER, so every card shares one
-            // vanishing point. Per-card perspective would give each its
-            // own, and they'd recede along diverging axes instead of into
-            // a common distance.
-            style={{
-              perspective: 1400,
-              perspectiveOrigin: "50% 34%",
-              // Cards are masked out before they reach the summary text.
-              // The chrome's white fade alone wasn't enough — it only held
-              // full opacity to ~344 while the stats run to ~364, so a
-              // receding card showed through underneath them. Masking the
-              // SCROLLER means the card simply isn't painted up there,
-              // rather than being painted and then covered.
-              maskImage:
-                "linear-gradient(to bottom, transparent 0px, transparent 372px, rgba(0,0,0,0.45) 400px, black 424px, black 100%)",
-              WebkitMaskImage:
-                "linear-gradient(to bottom, transparent 0px, transparent 372px, rgba(0,0,0,0.45) 400px, black 424px, black 100%)",
-            }}
-          >
             {PROGRAMS.map((p, i) => (
               <ProgramCard
                 key={i}
                 program={p}
                 index={i}
-                scrollY={scrollY}
                 onTap={() => onOpenProgram?.(i)}
               />
             ))}
 
-            <div style={{ height: LP_FIRST_Y + PROGRAMS.length * LP_PITCH + 60 }} />
+            {/* The run itself. With the gather gone this is the real
+                height of the list — every card at its own pitch — so the
+                last one reaches the top of the screen instead of the
+                scroll ending under it. */}
+            <div
+              style={{ height: LP_FIRST_Y + PROGRAMS.length * LP_PITCH + 140 }}
+            />
           </div>
 
           {/* Footer, over a scrim so the last card fades under it. */}
@@ -401,50 +360,15 @@ export default function ProgramsConnected({
 function ProgramCard({
   program,
   index,
-  scrollY,
   onTap,
 }: {
   program: (typeof PROGRAMS)[number];
   index: number;
-  scrollY: MotionValue<number>;
   onTap: () => void;
 }) {
   const baseTop = LP_FIRST_Y + index * LP_PITCH;
 
-  /* How far this card has travelled past the focus line, in slots.
-     0 = sitting in focus, 1 = one card-height beyond it, negative = still
-     below and coming up. */
-  const p = useTransform(scrollY, (v) => (v + FOCUS_Y - baseTop) / LP_PITCH);
-
-  // Only cards at or past focus recede; the ones below stay flat.
-  const past = useTransform(p, (v) => Math.max(0, v));
-
-  const z = useTransform(past, (v) => -Math.min(v, 2.2) * RECEDE_Z);
-  const rotateX = useTransform(past, (v) => Math.min(v, 2.2) * RECEDE_TILT);
-  /* Held at full through the whole time the card is the front one, and
-     only fading once it has genuinely gone past. Fading from the instant
-     scrolling starts made the card you are actually looking at dim while
-     it was still the subject — the recede should read as a card leaving,
-     not as the front card dimming. */
-  const opacity = useTransform(past, [0, FRONT_HOLD, 1.35], [1, 1, 0]);
-  // Held back against the scroll, so outgoing cards gather at the top
-  // rather than sliding away at full speed.
-  const y = useTransform(past, (v) => v * LP_PITCH * GATHER);
-  // Softens as it goes, so it dissolves into the page rather than
-  // shrinking away still sharp.
-  const filter = useTransform(past, (v) => {
-    // Blur holds off for the same reason: the front card stays sharp for
-    // as long as it is the front card.
-    const t = Math.max(0, v - FRONT_HOLD) / (1.4 - FRONT_HOLD);
-    return `blur(${(Math.min(t, 1) * 5).toFixed(2)}px)`;
-  });
-
   return (
-    /* Two layers on purpose. The outer one owns the ENTRANCE, which is a
-       one-shot `animate`; the inner owns the SCROLL, which is a set of
-       live motion values. Putting both on one element makes the entrance's
-       animate={{ opacity: 1 }} overwrite the scroll-driven opacity the
-       moment it lands, and the card stops fading as it recedes. */
     <motion.div
       className="absolute left-1/2"
       style={{
@@ -462,22 +386,7 @@ function ProgramCard({
       animate={{ opacity: 1, y: 0 }}
       transition={{ delay: 0.3 + index * 0.08, duration: 0.65, ease: IN_EASE }}
     >
-    <motion.div
-      className="relative h-full w-full"
-      style={{
-        transformStyle: "preserve-3d",
-        // Pinned to the card's own top edge: a centre origin would make
-        // the card sink INTO the one above as it recedes, where a top
-        // origin keeps its lip in place and turns it away.
-        transformOrigin: "50% 0%",
-        z,
-        rotateX,
-        opacity,
-        y,
-        filter,
-        willChange: "transform, opacity, filter",
-      }}
-    >
+    <div className="relative h-full w-full">
       {/* Horizontal carousel (853:75825). The row is wider than the card
           and overflows the phone on both sides, so the neighbour peeks in
           at the edge — that peek is the whole affordance, which is why
@@ -522,12 +431,12 @@ function ProgramCard({
               height={LP_H}
               style={{ width: LP_W, height: LP_H, display: "block" }}
             />
-            <CardFace program={program} back={slide === 1} />
+            <CardFace program={program} index={index} />
           </div>
         ))}
       </div>
 
-    </motion.div>
+    </div>
     </motion.div>
   );
 }
@@ -588,18 +497,88 @@ function ViewFlightsPill() {
 /* Everything printed on the card. Lives inside each slide so it travels
  * with the art rather than floating over the track. */
 /** Exported so the detail page renders the identical card. */
+/* The dot cluster from 899:13486 — 166×49.645 at card (24, 193), sitting
+ * behind the View flights pill.
+ *
+ * Figma draws it flat; here a highlight runs along it, so it reads as the
+ * agent still working on the card rather than as ornament. The artwork is
+ * used as a MASK over a moving sweep rather than being drawn and animated:
+ * that way one travelling highlight lights the dots individually, in their
+ * real positions and sizes, with nothing to keep in sync. */
+function ThinkingDots({ working }: { working: boolean }) {
+  return (
+    <div
+      className="pointer-events-none absolute overflow-hidden"
+      style={{
+        left: 24,
+        top: 193,
+        width: 166,
+        height: 49.645,
+        maskImage: "url(/assets/profile/lp-dots.svg)",
+        WebkitMaskImage: "url(/assets/profile/lp-dots.svg)",
+        maskSize: "166px 49.645px",
+        WebkitMaskSize: "166px 49.645px",
+        maskRepeat: "no-repeat",
+        WebkitMaskRepeat: "no-repeat",
+      }}
+    >
+      {/* The dots at rest — what Figma draws. */}
+      <div
+        className="absolute inset-0"
+        style={{ background: "rgba(255,255,255,0.55)" }}
+      />
+      {/* The pass of light. Wider than a dot and much narrower than the
+          cluster, so it picks out a few at a time.
+
+          Two strengths rather than on and off. While the agent is working
+          it is bright and continuous — that is the card telling you it is
+          busy. Once the copy has landed it drops to a faint, slow pass
+          with a long rest between: the dots keep a little life without
+          claiming work is still happening. Cutting it dead made the whole
+          bottom-left corner of the card go flat the moment the text
+          arrived. */}
+      <motion.div
+        className="absolute inset-y-0"
+        style={{
+          width: working ? 64 : 88,
+          background: `linear-gradient(90deg, transparent, rgba(255,255,255,${
+            working ? 0.95 : 0.34
+          }), transparent)`,
+        }}
+        animate={{ x: working ? [-88, 166] : [-88, 166] }}
+        transition={{
+          duration: working ? 2.7 : 4.6,
+          repeat: Infinity,
+          ease: "easeInOut",
+          repeatDelay: working ? 0 : 2.4,
+        }}
+      />
+    </div>
+  );
+}
+
 export function CardFace({
   program,
-  back,
+  index = 0,
 }: {
   program: (typeof PROGRAMS)[number];
-  /* Figma ships the two faces as one card (853:75045 / 853:75832): the
-     insight and the CTA sit at opacity 0 on the front and become visible
-     on the back. Nothing moves — it is a horizontal scroll between two
-     states, not a reveal, so these render plainly rather than animating
-     in. */
-  back: boolean;
+  /** Staggers the beat down the list, so the cards resolve one after
+   *  another rather than all landing on the same frame. */
+  index?: number;
 }) {
+  /* The agent works, then speaks. Nothing on the card claims to know
+     anything until the dots have finished running. */
+  const [working, setWorking] = useState(true);
+  useEffect(() => {
+    const t = window.setTimeout(() => setWorking(false), 3000 + index * 1240);
+    return () => window.clearTimeout(t);
+  }, [index]);
+
+  /* Figma ships the two faces as one card (853:75045 / 853:75832) with the
+     insight and CTA at opacity 0 on the front. They are on BOTH faces
+     here: the insight is the reason the card exists, so it should not be
+     something you have to scroll sideways to discover. */
+
   return (
     <>
     {/* Brand mark. Drawn normally with a soft shadow rather than on
@@ -673,7 +652,11 @@ export function CardFace({
       points
     </p>
 
-    {/* Insight (853:75844): 275 wide at (22, 125). */}
+    {/* Insight (853:75844): 275 wide at (22, 125).
+
+        Arrives a word at a time rather than as a block. The dots said the
+        agent was working; a paragraph that appears whole contradicts that,
+        where copy landing word by word is the same act finishing. */}
     <p
       className="pointer-events-none absolute font-medium"
       style={{
@@ -683,16 +666,36 @@ export function CardFace({
         fontSize: 11,
         lineHeight: "16px",
         color: "rgba(255,255,255,0.85)",
-        opacity: back ? 1 : 0,
       }}
     >
-      {program.insight}
+      {!working &&
+        program.insight.split(" ").map((word, i) => (
+          <motion.span
+            key={i}
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            transition={{ delay: i * 0.052, duration: 0.48 }}
+          >
+            {word}{" "}
+          </motion.span>
+        ))}
     </p>
 
-    {/* "View flights" (853:75914) at (21, 193). */}
-    <div className="absolute" style={{ left: 21, top: 193, opacity: back ? 1 : 0 }}>
+    {/* The dots sit UNDER the pill, as Figma stacks them — they overlap it
+        by design, and the pill has to stay legible over them. */}
+    <ThinkingDots working={working} />
+
+    {/* "View flights" (853:75914) at (21, 193). Last, and only once the
+        copy has landed: there is nothing to act on before then. */}
+    <motion.div
+      className="absolute"
+      style={{ left: 21, top: 193 }}
+      initial={false}
+      animate={{ opacity: working ? 0 : 1, y: working ? 5 : 0 }}
+      transition={{ duration: 0.8, delay: working ? 0 : 0.9, ease: IN_EASE }}
+    >
       <ViewFlightsPill />
-    </div>
+    </motion.div>
 
     {/* Present on both faces — 36×36 at card (323, 195). */}
     <div

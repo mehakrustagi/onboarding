@@ -31,7 +31,10 @@ export default function AskBar({
   return (
     <motion.div
       className="absolute"
-      style={{ left: 30, top: 810, width: 380, height: 125, zIndex: 6 }}
+      /* Explicitly interactive: the reveal wrappers that carry this on the
+         trips screen are pointer-events:none so they cannot swallow the
+         page's scroll, and the composer has to opt back in. */
+      style={{ left: 30, top: 810, width: 380, height: 125, zIndex: 6, pointerEvents: "auto" }}
       initial={{ opacity: 0, y: 20 }}
       animate={{ opacity: 1, y: 0 }}
       transition={{ delay, duration: 0.7, ease: IN_EASE }}

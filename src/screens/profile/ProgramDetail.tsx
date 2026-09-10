@@ -64,7 +64,7 @@ export default function ProgramDetail({
               height={LP_H}
               style={{ width: LP_W, height: LP_H, display: "block" }}
             />
-            <CardFace program={program} back />
+            <CardFace program={program} />
           </div>
 
           {/* Body (853:75444). The offer itself is black inside grey

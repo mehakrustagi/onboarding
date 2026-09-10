@@ -63,4 +63,21 @@ export const BEAT_AT: Record<Exclude<HandoffBeat, "idle">, number> = {
   settled: 2760 + SWEEP_S * 1000,
 };
 
-export const SEQUENCE_END = BEAT_AT.settled;
+/* The agents overlay is not a beat of the handoff — it is what happens
+ * once the handoff is over. It waits for MyTrip's own content to finish
+ * surfacing (the last group lands about a second after settled) so the
+ * scrim never drops on a screen that is still assembling itself. */
+export const AGENTS_AT = BEAT_AT.settled + 750;
+
+/* How long the agents hold before they let go. Figma gives the two ends
+ * (frames 704 and 706) but not the timing.
+ *
+ * Every duration in the overlay is half what it first was — the whole beat
+ * runs at 2x. It is an interstitial: it has one line to read and one thing
+ * to show, and at the original pace it started to feel like a loading
+ * screen rather than a moment. */
+export const DISPERSE_AT = AGENTS_AT + 1300;
+
+/* Release (last orb out at ~1.35s) plus the scrim's own 0.7s fade behind
+ * it. */
+export const SEQUENCE_END = DISPERSE_AT + 2100;
