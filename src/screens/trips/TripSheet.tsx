@@ -1,7 +1,11 @@
 "use client";
 
+import { useState } from "react";
 import Image from "next/image";
+import { AnimatePresence, motion } from "framer-motion";
 import { TRIP_SECTIONS, type TripGroup, type TripItem, type TripSection } from "./tripSections";
+import type { TripOverlay } from "./TripOverlays";
+import { useDragScroll } from "./useDragScroll";
 
 /* The scrolling agent column — Figma 947:26137, measured off the node.
  *
@@ -41,18 +45,28 @@ const S = "/assets/trips/sheet";
 
 const CARD_SHADOW = "0px 4px 30px -2px rgba(0,0,0,0.05)";
 
-/* The glass both pill types are made of.
+/* The one material every pill in the column is made of.
  *
- * Figma specifies this exactly for the sources chip — r30, 1px white,
- * backdrop-blur 25, a 166° white ramp and the card shadow. It fills the
- * ACTION pills rgba(255,255,255,0.1) instead, which is invisible, so their
- * entire appearance lives in effects the export does not carry. Side by
- * side in the design they are plainly the same material, so they share one
- * recipe here rather than my guessing at a second. */
-const GLASS: React.CSSProperties = {
+ * Figma exports the action pills as rgba(255,255,255,0.1), which is
+ * invisible — their whole appearance is in effects the export does not
+ * carry, the same problem the sources chip has. So this is measured off
+ * the rendered node (947:27270) rather than copied from the export: the
+ * pill ramps from the near-grey of its top-left corner to nearly white at
+ * its bottom-right, crossing the #F9FAFB ground about halfway. Sampled
+ * along the diagonal it reads 244 / 246 / 250 / 251. The 255s that turn
+ * up within a few pixels of any edge are the 1px rim, not the fill, which
+ * is why the end stop is #FDFDFE and not pure white. Stop positions are
+ * Figma's own 10.5% and 72%. */
+export const PILL_FILL = "linear-gradient(135deg, #f4f5f6 10.5%, #fdfdfe 72%)";
+
+/* Applied to all four pill-shaped things: the action rows, the sources
+ * chip, a section's "+ Add …" and the category tabs. They were on three
+ * different recipes — a white-on-#ECEAEF outline for the tabs, a
+ * #F9FAFB-on-#ECEAEF one for the add row, the glass for the chip — which
+ * read as three unrelated controls that happened to share a shape. */
+const PILL: React.CSSProperties = {
   border: "1px solid #ffffff",
-  backgroundImage:
-    "linear-gradient(166deg, rgba(255,255,255,0.9) 10.513%, rgba(255,255,255,0.62) 72.053%)",
+  backgroundImage: PILL_FILL,
   boxShadow: CARD_SHADOW,
 };
 
@@ -61,15 +75,17 @@ const GLASS: React.CSSProperties = {
  * so it costs a compositor layer per button to blur a solid colour — and
  * two of them side by side produced a visible seam where their backdrop
  * regions met. */
-const GLASS_BLUR: React.CSSProperties = {
-  ...GLASS,
+const PILL_BLUR: React.CSSProperties = {
+  ...PILL,
   backdropFilter: "blur(25px)",
   WebkitBackdropFilter: "blur(25px)",
 };
 
-/* Figma's Gradient/text, already in globals.css as --gradient-text. */
-const GRAD_TEXT =
-  "linear-gradient(90deg, #000 0%, #5057ea 33%, #ef4646 66%, #edd758 99%)";
+/* Figma's Gradient/text is --gradient-text in globals.css, and live status
+ * lines now take it via the .gradient-text-shine class rather than an
+ * inline fill — the class carries the sweep animation with it, so there is
+ * no second copy of the gradient to keep in step. */
+
 const GRAD_GREEN = "linear-gradient(90deg, #0b0b0b 0%, #10b981 100%)";
 const GRAD_PILL = "linear-gradient(90deg, #000 0%, #666 100%)";
 const GRAD_STATE: Record<TripSection["state"], string> = {
@@ -130,7 +146,9 @@ const META: React.CSSProperties = {
  * Every node gets a rail. Where an item has sub-rows the rail branches to
  * them; where it has none it still drops a short stub, which is what
  * Figma's second connector (Group 1991427812, 15x22.9) is. */
-function Rail({ item, gid }: { item: TripItem; gid: string }) {
+/* Where an item's sub-rows sit, measured from the top of the item box —
+   the same margin stack Item lays out with. */
+function itemBranches(item: TripItem) {
   const branches: number[] = [];
   let y = 5 + 20; /* title top + title height */
   if (item.more) {
@@ -147,6 +165,10 @@ function Rail({ item, gid }: { item: TripItem; gid: string }) {
     branches.push(top + 8); /* status line centre */
     y = top + 16;
   }
+  return branches;
+}
+
+function Rail({ branches, gid }: { branches: number[]; gid: string }) {
   /* Relative to the node's bottom edge, where the rail starts. */
   const local = branches.map((b) => b - 30);
   /* No sub-rows to point at: a plain stub, Figma's 22.9. */
@@ -156,7 +178,14 @@ function Rail({ item, gid }: { item: TripItem; gid: string }) {
   return (
     <svg
       className="absolute"
-      style={{ left: 34.5, top: 30, width: 18.167, height, overflow: "visible" }}
+      style={{
+        left: 34.5,
+        top: 30,
+        width: 18.167,
+        height,
+        overflow: "visible",
+        pointerEvents: "none",
+      }}
       viewBox={`0 0 18.167 ${height}`}
       fill="none"
       aria-hidden
@@ -185,11 +214,27 @@ function Rail({ item, gid }: { item: TripItem; gid: string }) {
   );
 }
 
-function RailNode({ done }: { done?: boolean }) {
+function RailNode({
+  done,
+  label,
+  onToggle,
+}: {
+  done?: boolean;
+  label: string;
+  onToggle: () => void;
+}) {
   /* 30x30, r10.714, 1.5px #D6D9DC. When complete it carries a 22x22
-     #0B0B0B square at r8 with a white tick — not a green circle. */
+     #0B0B0B square at r8 with a white tick — not a green circle.
+     It is a real checkbox: every step in the column can be ticked off by
+     hand, which is the whole reason the design draws an empty box on the
+     rows that are not done yet. */
   return (
-    <div
+    <button
+      type="button"
+      role="checkbox"
+      aria-checked={Boolean(done)}
+      aria-label={label}
+      onClick={onToggle}
       className="absolute"
       style={{
         left: 20,
@@ -198,23 +243,37 @@ function RailNode({ done }: { done?: boolean }) {
         height: 30,
         borderRadius: 10.714,
         border: "1.5px solid #d6d9dc",
+        cursor: "pointer",
       }}
     >
-      {done && (
-        <div
-          className="absolute"
-          style={{ left: 2.5, top: 2.5, width: 22, height: 22, borderRadius: 8, background: "#0b0b0b" }}
-        >
-          <Image
-            src={`${S}/done.svg`}
-            alt=""
-            width={18}
-            height={18}
-            style={{ position: "absolute", left: 2, top: 2, width: 18, height: 18 }}
-          />
-        </div>
-      )}
-    </div>
+      <AnimatePresence initial={false}>
+        {done && (
+          <motion.div
+            className="absolute"
+            style={{
+              left: 2.5,
+              top: 2.5,
+              width: 22,
+              height: 22,
+              borderRadius: 8,
+              background: "#0b0b0b",
+            }}
+            initial={{ scale: 0.4, opacity: 0 }}
+            animate={{ scale: 1, opacity: 1 }}
+            exit={{ scale: 0.4, opacity: 0 }}
+            transition={{ type: "spring", visualDuration: 0.24, bounce: 0.42 }}
+          >
+            <Image
+              src={`${S}/done.svg`}
+              alt=""
+              width={18}
+              height={18}
+              style={{ position: "absolute", left: 2, top: 2, width: 18, height: 18 }}
+            />
+          </motion.div>
+        )}
+      </AnimatePresence>
+    </button>
   );
 }
 
@@ -253,7 +312,7 @@ function MorePill({ label }: { label: string }) {
   );
 }
 
-function AudioBar({ duration }: { duration: string }) {
+export function AudioBar({ duration }: { duration: string }) {
   /* 265x40 at x115: #F9FAFB, 1px #ECEAEF, r30. Play 24 at +8, waveform
      142.3x20 at +61.35, duration hard against x340. */
   return (
@@ -289,7 +348,7 @@ function AudioBar({ duration }: { duration: string }) {
   );
 }
 
-function SourcesChip({ label, faces }: { label: string; faces: number }) {
+export function SourcesChip({ label, faces }: { label: string; faces: number }) {
   /* Glass, not grey: r30, 1px white, backdrop-blur 25, a 166° white
      gradient and the same shadow as the header card. Height 30.171 is
      Figma's, and it is not a rounding error — it is what the group
@@ -302,7 +361,7 @@ function SourcesChip({ label, faces }: { label: string; faces: number }) {
   return (
     <div
       className="relative"
-      style={{ marginTop: 15, width, height: 30.171, borderRadius: 30, ...GLASS_BLUR }}
+      style={{ marginTop: 15, width, height: 30.171, borderRadius: 30, ...PILL_BLUR }}
     >
       {Array.from({ length: faces }).map((_, i) => (
         <div
@@ -340,33 +399,56 @@ function SourcesChip({ label, faces }: { label: string; faces: number }) {
   );
 }
 
-function Actions({ actions }: { actions: string[] }) {
+function Actions({ actions, onAct }: { actions: string[]; onAct: (a: string) => void }) {
   /* 40 tall, r49.5, rgba(255,255,255,0.1) — no border. The label is
      gradient text inset 20px. Figma reaches x444 against a card ending at
      410, so the row is meant to clip and scroll like the category tabs. */
+  const rail = useDragScroll<HTMLDivElement>();
+
   return (
     <div
+      ref={rail}
       className="flex overflow-x-auto overscroll-x-contain"
-      style={{ marginTop: 30, gap: 12, scrollbarWidth: "none" }}
+      /* touch-action pan-x keeps a horizontal finger drag on this row and
+         a vertical one on the column behind it, instead of the browser
+         guessing from the first few pixels. */
+      style={{
+        marginTop: 30,
+        gap: 12,
+        scrollbarWidth: "none",
+        touchAction: "pan-x",
+        cursor: "grab",
+      }}
     >
       {actions.map((a) => (
         <button
           key={a}
           type="button"
-          className="flex-none whitespace-nowrap"
+          onClick={() => onAct(a)}
+          className="flex flex-none items-center whitespace-nowrap"
           style={{
             height: 40,
             padding: "0 20px",
             borderRadius: 49.5,
-            ...GLASS,
-            fontSize: 12,
-            lineHeight: "16px",
-            letterSpacing: "-0.12px",
-            fontWeight: 600,
-            ...gradient(GRAD_PILL),
+            ...PILL,
           }}
         >
-          {a}
+          {/* The label carries the text gradient on its OWN element.
+              Spreading it onto the button set background-image a second
+              time and clipped it to the glyphs, which left the pill with
+              no fill at all — every one of these was an outline and a
+              shadow around bare tile. */}
+          <span
+            style={{
+              fontSize: 12,
+              lineHeight: "16px",
+              letterSpacing: "-0.12px",
+              fontWeight: 600,
+              ...gradient(GRAD_PILL),
+            }}
+          >
+            {a}
+          </span>
         </button>
       ))}
     </div>
@@ -381,6 +463,11 @@ function Actions({ actions }: { actions: string[] }) {
  * The change in treatment is doing work — dotted says "this heading covers
  * what follows", solid says "these two steps are one sequence". */
 const SPINE_X = 35;
+/* Figma's Line 228 / Line 232 — the same stroke wherever a rule appears:
+   black at 11%, dasharray "2 2". */
+export const DOTTED_RULE =
+  "repeating-linear-gradient(to right, rgba(0,0,0,0.11) 0 2px, transparent 2px 4px)";
+
 const DOTTED_SPINE =
   "repeating-linear-gradient(to bottom, #d6d9dc 0 2px, transparent 2px 5px)";
 
@@ -400,7 +487,53 @@ function GroupNode() {
   );
 }
 
-function Item({ item, last }: { item: TripItem; last: boolean }) {
+function Item({
+  item,
+  last,
+  index,
+  rowKey,
+  ticked,
+  onToggle,
+  onOpen,
+}: {
+  item: TripItem;
+  last: boolean;
+  index: number;
+  /** Stable id for this row's tick state, held above the section so it
+      survives a collapse. */
+  rowKey: string;
+  ticked: Record<string, boolean>;
+  onToggle: (key: string, next: boolean) => void;
+  onOpen: (o: TripOverlay) => void;
+}) {
+  /* The data seeds it; the user owns it from the first tap onward. */
+  const done = ticked[rowKey] ?? Boolean(item.done);
+
+  /* Body measure. 265 is Figma's, and on a row carrying agent orbs it
+     runs straight under them: the text box ends at x380 and the orbs are
+     parked at x358, so the last 22px of five paragraphs sat beneath a
+     disc. The orbs stack leftward at 12px intervals, so each one costs
+     another 12 of measure; 10 is the gutter between the two.
+
+     Narrowing the whole paragraph rather than flowing around the orb —
+     a float would only shorten the lines level with the disc, which is
+     tidier, but it needs the body's top offset to place the spacer and
+     that varies with whatever the row renders above it. A 233 measure
+     against 265 is a difference you have to be looking for. */
+  const orbs = item.agents ?? 0;
+  const bodyWidth = orbs > 0 ? 233 - (orbs - 1) * 12 : 265;
+  /* A row is WORKING when it has something live to say and has not
+     finished. Those get onboarding's two shine treatments — the coloured
+     sweep on the status line, the grey sweep on the body underneath —
+     which is what makes an agent look busy rather than merely described.
+     Finished rows are still: the green status and plain grey body.
+
+     Staggered per item. A shared CSS animation fires every line in unison,
+     which reads as one flash across the page instead of several agents
+     each doing their own work. Same reason AgentSheet staggers by section. */
+  const working = (Boolean(item.status) || Boolean(item.live)) && !done;
+  const shine = { animationDelay: `${(index % 5) * 0.55}s` };
+
   /* Gradient ids have to be unique per rail — SVG defs are document-global,
      so every rail referencing "railFade" resolves to whichever one rendered
      first, and they have different heights. */
@@ -413,8 +546,21 @@ function Item({ item, last }: { item: TripItem; last: boolean }) {
           carries the marker, so an item without a title draws neither a
           node nor a spine — it is a continuation of that heading, not a
           step of its own. */}
-      {item.title && <RailNode done={item.done} />}
-      {item.title && <Rail item={item} gid={railId} />}
+      {item.title && (
+        <RailNode
+          done={done}
+          label={item.title}
+          onToggle={() => {
+            onToggle(rowKey, !done);
+            /* Two rows answer back when you tick them. The sheet is the
+               row's own status panel, so it opens on either direction:
+               tick the visa and it confirms delivery is on track, untick
+               the flight and it asks you for the booking it just lost. */
+            if (item.sheet) onOpen({ kind: "info", id: item.sheet });
+          }}
+        />
+      )}
+      {item.title && <Rail branches={itemBranches(item)} gid={railId} />}
       {/* Solid spine down to the next item's node. It runs to this item's
           own bottom edge, which is exactly where the next node starts —
           the 40px gap between items is this element's padding, so it needs
@@ -422,19 +568,30 @@ function Item({ item, last }: { item: TripItem; last: boolean }) {
       {!last && item.title && (
         <div
           className="absolute"
-          style={{ left: SPINE_X, top: 30, bottom: 0, width: 1, background: "#e6e6ea" }}
+          style={{
+            left: SPINE_X,
+            top: 30,
+            bottom: 0,
+            width: 1,
+            background: "#e6e6ea",
+            /* Runs straight through the node's centre, and it is drawn
+               after it — without this it intercepts every tap aimed at
+               the node it connects to. */
+            pointerEvents: "none",
+          }}
         />
       )}
 
       {item.title && (
         <p
+          className={item.live ? "gradient-text-shine" : undefined}
           style={{
             marginTop: 5,
             fontSize: 16,
             lineHeight: "20px",
             letterSpacing: "-0.64px",
             fontWeight: 600,
-            color: "#090909",
+            ...(item.live ? shine : { color: "#090909" }),
           }}
         >
           {item.title}
@@ -505,7 +662,9 @@ function Item({ item, last }: { item: TripItem; last: boolean }) {
             />
           )}
           <span
-            className="absolute whitespace-nowrap"
+            className={
+              done ? "absolute whitespace-nowrap" : "absolute whitespace-nowrap gradient-text-shine"
+            }
             style={{
               left: item.call ? 20 : 0,
               top: 0,
@@ -513,7 +672,7 @@ function Item({ item, last }: { item: TripItem; last: boolean }) {
               lineHeight: "16px",
               letterSpacing: "-0.12px",
               fontWeight: 600,
-              ...gradient(item.done ? GRAD_GREEN : GRAD_TEXT),
+              ...(done ? gradient(GRAD_GREEN) : shine),
             }}
           >
             {item.status}
@@ -525,7 +684,14 @@ function Item({ item, last }: { item: TripItem; last: boolean }) {
         (Array.isArray(item.body) ? item.body : [item.body]).map((para, i) => (
           <p
             key={i}
-            style={{ marginTop: i === 0 ? 15 : 12, width: 265, whiteSpace: "pre-line", ...META }}
+            className={working ? "grey-shine-text" : undefined}
+            style={{
+              marginTop: i === 0 ? 15 : 12,
+              width: bodyWidth,
+              whiteSpace: "pre-line",
+              ...META,
+              ...(working ? { color: undefined, ...shine } : null),
+            }}
           >
             {para}
           </p>
@@ -537,7 +703,32 @@ function Item({ item, last }: { item: TripItem; last: boolean }) {
   );
 }
 
-function Group({ group, first, last }: { group: TripGroup; first: boolean; last: boolean }) {
+function Group({
+  group,
+  first,
+  last,
+  offset,
+  keyPrefix,
+  ticked,
+  onToggle,
+  onOpen,
+}: {
+  group: TripGroup;
+  first: boolean;
+  last: boolean;
+  keyPrefix: string;
+  ticked: Record<string, boolean>;
+  onToggle: (key: string, next: boolean) => void;
+  onOpen: (o: TripOverlay) => void;
+  /* Running item count before this group, so the shine stagger spreads
+     across the whole section rather than restarting at every heading —
+     most groups hold one item, so a per-group index left almost every row
+     firing on the same beat. */
+  offset: number;
+}) {
+  const headingKey = `${keyPrefix}:heading`;
+  const headingDone = ticked[headingKey] ?? true;
+
   return (
     <div style={{ marginTop: first ? 30 : 40 }}>
       {group.heading && (
@@ -550,7 +741,31 @@ function Group({ group, first, last }: { group: TripGroup; first: boolean; last:
               it, so drawing a second node there would invent a step the
               design does not have. */}
           {group.marker === "done" ? (
-            <RailNode done />
+            <>
+              {/* In these groups the heading IS the step, so its node is
+                  the checkbox — there is no titled row beneath to carry
+                  one. */}
+              <RailNode
+                done={headingDone}
+                label={group.heading ?? "Step"}
+                onToggle={() => onToggle(headingKey, !headingDone)}
+              />
+              {/* The heading IS the step here, so the run down to the status
+                  line has to come off the heading's node — Item only draws a
+                  rail for rows that carry a title, and these rows carry none,
+                  which left forex, eSim and Safety with a node pointing at
+                  nothing. Offsets are the heading block's own stack: heading
+                  20, subtitle 10+16, then the 30 that separates it from the
+                  first item, whose status line sits 8 below its own top.
+                  Margins collapse there — the item box has no top padding, so
+                  the status line's 20 is absorbed by the heading's 30. */}
+              {group.items[0]?.status && (
+                <Rail
+                  branches={[(group.subtitle ? 46 : 20) + 30 + 8]}
+                  gid={`rail-h-${group.heading?.replace(/[^a-z0-9]/gi, "").slice(0, 20)}`}
+                />
+              )}
+            </>
           ) : (
             <>
               <GroupNode />
@@ -563,6 +778,7 @@ function Group({ group, first, last }: { group: TripGroup; first: boolean; last:
                   height: 49,
                   width: 1,
                   backgroundImage: DOTTED_SPINE,
+                  pointerEvents: "none",
                 }}
               />
             </>
@@ -593,7 +809,16 @@ function Group({ group, first, last }: { group: TripGroup; first: boolean; last:
       )}
 
       {group.items.map((it, i) => (
-        <Item key={it.title ?? it.status ?? i} item={it} last={i === group.items.length - 1} />
+        <Item
+          key={it.title ?? it.status ?? i}
+          item={it}
+          index={offset + i}
+          last={i === group.items.length - 1}
+          rowKey={`${keyPrefix}:${it.title ?? it.status ?? i}`}
+          ticked={ticked}
+          onToggle={onToggle}
+          onOpen={onOpen}
+        />
       ))}
 
       {group.link && (
@@ -639,7 +864,17 @@ function Group({ group, first, last }: { group: TripGroup; first: boolean; last:
 
       {group.actions && (
         <div style={{ paddingLeft: 75 }}>
-          <Actions actions={group.actions} />
+          <Actions
+            actions={group.actions}
+            onAct={(a) =>
+              onOpen({
+                kind: "detail",
+                item: group.items[0],
+                action: a,
+                context: group.heading ?? group.items[0]?.title ?? "",
+              })
+            }
+          />
         </div>
       )}
 
@@ -656,7 +891,7 @@ function Group({ group, first, last }: { group: TripGroup; first: boolean; last:
             width: 265,
             height: 1,
             backgroundImage:
-              "repeating-linear-gradient(to right, rgba(0,0,0,0.11) 0 2px, transparent 2px 4px)",
+              DOTTED_RULE,
           }}
         />
       )}
@@ -664,7 +899,25 @@ function Group({ group, first, last }: { group: TripGroup; first: boolean; last:
   );
 }
 
-function Section({ section }: { section: TripSection }) {
+function Section({
+  section,
+  ticked,
+  onToggle,
+  onOpen,
+}: {
+  section: TripSection;
+  ticked: Record<string, boolean>;
+  onToggle: (key: string, next: boolean) => void;
+  onOpen: (o: TripOverlay) => void;
+}) {
+  /* The chevron collapses the section to just its header card. Figma draws
+     it pointing up, which is the expanded state — a chevron that only ever
+     points one way is a control that says it does something and doesn't.
+
+     Open by default: the column exists to show what the agents are doing,
+     so it should not open closed. */
+  const [open, setOpen] = useState(true);
+
   return (
     /* Rectangle 240648187: a #F9FAFB tile with a 1px #ECEAEF border, sat
        on the white panel behind it. Three levels, and getting them in the
@@ -686,9 +939,15 @@ function Section({ section }: { section: TripSection }) {
            after the last action row (last pill ends 1506, tile ends 1546).
            Without the top inset the card sat flush against the tile edge,
            so the grey frame only showed on three sides and every bit of
-           breathing room fell to the bottom. */
+           breathing room fell to the bottom.
+
+           The bottom inset is 10 here and the remaining 30 lives INSIDE
+           the collapsible block, so closing a section leaves the tile
+           hugging its card with the same 10 all round instead of a band
+           of empty grey underneath — and the collapse animation carries
+           that padding away with the content rather than snapping it. */
         paddingTop: 10,
-        paddingBottom: 40,
+        paddingBottom: 10,
       }}
     >
       {/* Header card — 360x124 at a 10px inset. */}
@@ -766,29 +1025,61 @@ function Section({ section }: { section: TripSection }) {
           {section.state}
         </span>
 
-        <Image
-          src={`${S}/next.svg`}
-          alt=""
-          width={20}
-          height={20}
-          style={{
-            position: "absolute",
-            left: 320,
-            top: 52,
-            width: 20,
-            height: 20,
-            transform: "rotate(-90deg)",
-          }}
-        />
+        <button
+          type="button"
+          onClick={() => setOpen((v) => !v)}
+          aria-expanded={open}
+          aria-label={`${open ? "Collapse" : "Expand"} ${section.name}`}
+          className="absolute"
+          /* The tap target is 44 square around Figma's 20px glyph — the
+             glyph is the icon, not the button. */
+          style={{ left: 308, top: 40, width: 44, height: 44 }}
+        >
+          <motion.span
+            className="absolute block"
+            style={{ left: 12, top: 12, width: 20, height: 20 }}
+            initial={false}
+            animate={{ rotate: open ? -90 : 90 }}
+            transition={{ duration: 0.28, ease: [0.22, 1, 0.36, 1] }}
+          >
+            <Image
+              src={`${S}/next.svg`}
+              alt=""
+              width={20}
+              height={20}
+              style={{ width: 20, height: 20 }}
+            />
+          </motion.span>
+        </button>
       </div>
 
-      <div style={{ paddingLeft: 9 }}>
+      <AnimatePresence initial={false}>
+        {open && (
+          <motion.div
+            style={{ paddingLeft: 9, overflow: "hidden" }}
+            initial={{ height: 0, opacity: 0 }}
+            animate={{ height: "auto", opacity: 1 }}
+            exit={{ height: 0, opacity: 0 }}
+            /* Opacity leads on the way in and trails on the way out, so the
+               content is never legible at a height that would clip it. */
+            transition={{
+              height: { duration: 0.34, ease: [0.22, 1, 0.36, 1] },
+              opacity: { duration: 0.2, delay: open ? 0.08 : 0 },
+            }}
+          >
         {section.groups.map((g, i) => (
           <Group
             key={g.heading ?? i}
             group={g}
             first={i === 0}
             last={i === section.groups.length - 1}
+            offset={section.groups
+              .slice(0, i)
+              .reduce((n, g2) => n + g2.items.length, 0)}
+            keyPrefix={`${section.key}:${i}`}
+            ticked={ticked}
+            onToggle={onToggle}
+            onOpen={onOpen}
           />
         ))}
 
@@ -805,8 +1096,7 @@ function Section({ section }: { section: TripSection }) {
               width: 265,
               height: 40,
               borderRadius: 30,
-              background: "#f9fafb",
-              border: "1px solid #eceaef",
+              ...PILL,
               fontSize: 12,
               lineHeight: "16px",
               letterSpacing: "-0.12px",
@@ -817,19 +1107,32 @@ function Section({ section }: { section: TripSection }) {
             {section.add}
           </div>
         )}
-      </div>
+
+            {/* The other 30 of Figma's 40 bottom inset. */}
+            <div style={{ height: 30 }} />
+          </motion.div>
+        )}
+      </AnimatePresence>
     </div>
   );
 }
 
-export default function TripSheet() {
+export default function TripSheet({ onOpen }: { onOpen: (o: TripOverlay) => void }) {
+  /* Overrides only — a row absent from this map falls back to whatever the
+     data seeded it with. Held at the root rather than per section so a
+     section can collapse and unmount its rows without losing their ticks. */
+  const [ticked, setTicked] = useState<Record<string, boolean>>({});
+  const onToggle = (key: string, next: boolean) =>
+    setTicked((t) => ({ ...t, [key]: next }));
+
   return (
     <div className="flex flex-col" style={{ gap: 20 }}>
       {TRIP_SECTIONS.map((s) => (
-        <Section key={s.key} section={s} />
+        <Section key={s.key} section={s} ticked={ticked} onToggle={onToggle} onOpen={onOpen} />
       ))}
-      {/* Clears the composer, which floats over the bottom of the scroll. */}
-      <div style={{ height: 150 }} />
+      {/* Tail padding so the last section can clear the bottom of the
+          scroll rather than ending flush against it. */}
+      <div style={{ height: 40 }} />
     </div>
   );
 }
