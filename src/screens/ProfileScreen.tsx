@@ -477,7 +477,19 @@ export default function ProfileScreen() {
       </motion.div>
 
       {/* Everything below the pedestal (853:16315) — see ProfileBody. */}
-      <motion.div style={{ y: bodyHold }}>
+      {/* isolation: isolate is doing real work here, not tidying.
+          The scroller is position:absolute with z-index auto, so it is NOT
+          a stacking context — any positively z-indexed descendant escapes
+          into the root one and competes with the chrome directly. The
+          benefit deck stacks its cards with zIndex: cards.length - pos,
+          which reaches 18 and beat the sticky header's 15, so the deck was
+          painting over the header on a long scroll. Isolating keeps the
+          body's internal ordering internal and lands the whole block at
+          z 0, under the pass strip and the header both. */}
+      <motion.div
+        className="relative"
+        style={{ y: bodyHold, isolation: "isolate", zIndex: 0 }}
+      >
       <ProfileBody
         show={bodyIn}
         onViewBenefits={() => setBenefitsOpen(true)}
