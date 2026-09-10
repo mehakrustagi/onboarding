@@ -175,16 +175,19 @@ export default function ProfileScreen() {
   /* The faces hold almost the whole way. Fading them early was doing the
      compacting instead of the swing — the card just went transparent at
      full size and the page showed straight through it. They only give way
-     once the swing is nearly edge-on and there is no face left to read. */
-  const faceOpacity = useTransform(scrollY, [255, 330], [1, 0], { clamp: true });
+     at the very end, handing the identity to the sticky header, which is
+     where the design parks the name. */
+  const faceOpacity = useTransform(scrollY, [265, 345], [1, 0], { clamp: true });
   /* The strip shrinks with them — held at full height it would sit over
      the page and swallow taps meant for the content underneath. */
   const trackH = useTransform(cardH, (h) =>
     h > 300 ? h + CARD_PAD_T + CARD_PAD_B : h + CARD_PAD_T + 26,
   );
-  /* The bar the faces hand off to. Starts a touch after they begin
-     fading so the two never both read at full strength. */
-  const tabOpacity = useTransform(scrollY, [285, 345], [0, 1], { clamp: true });
+  /* The plinth leaves as the pass lifts off it. It is stage furniture for
+     a card standing up — once the card is tipping away there is nothing
+     for it to be under, and the reference has it gone by the first
+     collapsed state. */
+  const stageOpacity = useTransform(scrollY, [20, 120], [1, 0], { clamp: true });
   const [collapsed, setCollapsed] = useState(false);
 
   /* The card leaves around y 500; the title arrives as it goes. */
@@ -237,6 +240,13 @@ export default function ProfileScreen() {
           screen edge — that's the affordance telling you there are more,
           so it isn't centred or scaled down. */}
 
+      {/* Wrapper carries the scroll fade. It cannot go on the plinth and
+          its shadow directly — both animate their own opacity on entrance,
+          and framer would drive the same value, cutting the scroll link. */}
+      <motion.div
+        className="pointer-events-none absolute inset-0"
+        style={{ opacity: stageOpacity, zIndex: 1 }}
+      >
       {/* Pedestal. Shadow first so the plinth sits on it.
           zIndex keeps both above the card's own drop shadow but below
           nothing else — the plinth must read as solid, not as a smudge. */}
@@ -343,6 +353,7 @@ export default function ProfileScreen() {
           unoptimized
           style={{ width: 354, height: 88, display: "block" }}
         />
+      </motion.div>
       </motion.div>
 
       {/* Everything below the pedestal (853:16315) — see ProfileBody. */}
@@ -452,7 +463,6 @@ export default function ProfileScreen() {
                 height={cardH}
                 collapseX={collapseX}
                 faceOpacity={faceOpacity}
-                tabOpacity={tabOpacity}
                 collapsed={collapsed}
                 onSelect={() => {
                   trackRef.current?.scrollTo({
@@ -694,7 +704,6 @@ function WorldPassCard({
   height,
   collapseX,
   faceOpacity,
-  tabOpacity,
   collapsed = false,
   onSelect,
   onConnect,
@@ -722,8 +731,6 @@ function WorldPassCard({
   collapseX?: MotionValue<number>;
   /** Fades the faces out ahead of the shape finishing its flatten. */
   faceOpacity?: MotionValue<number>;
-  /** Fades the tab bar in as the faces leave. */
-  tabOpacity?: MotionValue<number>;
   /** True once the strip is reading as tabs rather than as cards. */
   collapsed?: boolean;
   /** Tap-to-select, which is what a tab is. */
@@ -860,40 +867,6 @@ function WorldPassCard({
             </motion.div>
           </motion.div>
         )}
-
-        {/* The tab the pass becomes. A separate layer rather than the
-            collapsed face, because fading the faces out has to leave
-            SOMETHING behind — fade the plane alone and the strip
-            disappears along with the content on it. */}
-        <motion.div
-          className="pointer-events-none absolute left-0 top-0 flex w-full items-center justify-center overflow-hidden"
-          style={{
-            // Closes WITH the swing, not with the float wrapper — that one
-            // is pinned at the card's full height so the face has room to
-            // rotate, and a bar matching it would be 350 tall.
-            height: height ?? CARD_H,
-            opacity: tabOpacity ?? 0,
-            borderRadius: 13,
-            background: lit
-              ? "linear-gradient(140deg, #17171b 0%, #0b0b0d 100%)"
-              : "#111114",
-            border: "1px solid rgba(255,255,255,0.08)",
-            zIndex: 1,
-          }}
-        >
-          <span
-            className="whitespace-nowrap font-bold uppercase"
-            style={{
-              fontSize: 9,
-              letterSpacing: "0.9px",
-              // Only the selected tab is fully lit; the neighbour reads as
-              // available rather than active.
-              color: interactive ? "#ffffff" : "rgba(255,255,255,0.42)",
-            }}
-          >
-            {profile.name}
-          </span>
-        </motion.div>
 
         {/* The swing. Its own perspective rather than the float wrapper's,
             because the vanishing point has to sit ON the hinge — with the
