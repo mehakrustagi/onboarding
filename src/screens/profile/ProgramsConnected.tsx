@@ -2,6 +2,7 @@
 
 import Image from "next/image";
 import { motion, AnimatePresence } from "framer-motion";
+import { useEffect, useState } from "react";
 
 /* Programs connected — Figma node 853:74983.
  *
@@ -430,7 +431,7 @@ function ProgramCard({
               height={LP_H}
               style={{ width: LP_W, height: LP_H, display: "block" }}
             />
-            <CardFace program={program} />
+            <CardFace program={program} index={index} />
           </div>
         ))}
       </div>
@@ -504,7 +505,7 @@ function ViewFlightsPill() {
  * used as a MASK over a moving sweep rather than being drawn and animated:
  * that way one travelling highlight lights the dots individually, in their
  * real positions and sizes, with nothing to keep in sync. */
-function ThinkingDots() {
+function ThinkingDots({ working }: { working: boolean }) {
   return (
     <div
       className="pointer-events-none absolute overflow-hidden"
@@ -527,31 +528,44 @@ function ThinkingDots() {
         style={{ background: "rgba(255,255,255,0.55)" }}
       />
       {/* The pass of light. Wider than a dot and much narrower than the
-          cluster, so it picks out a few at a time. */}
-      <motion.div
-        className="absolute inset-y-0"
-        style={{
-          width: 64,
-          background:
-            "linear-gradient(90deg, transparent, rgba(255,255,255,0.95), transparent)",
-        }}
-        animate={{ x: [-64, 166] }}
-        transition={{
-          duration: 1.6,
-          repeat: Infinity,
-          ease: "easeInOut",
-          repeatDelay: 0.5,
-        }}
-      />
+          cluster, so it picks out a few at a time.
+
+          It runs only while the agent is working. Left running under
+          finished copy it stops meaning anything — it has to stop for the
+          arrival of the text to read as the thing it was waiting for. */}
+      {working && (
+        <motion.div
+          className="absolute inset-y-0"
+          style={{
+            width: 64,
+            background:
+              "linear-gradient(90deg, transparent, rgba(255,255,255,0.95), transparent)",
+          }}
+          animate={{ x: [-64, 166] }}
+          transition={{ duration: 1.35, repeat: Infinity, ease: "easeInOut" }}
+        />
+      )}
     </div>
   );
 }
 
 export function CardFace({
   program,
+  index = 0,
 }: {
   program: (typeof PROGRAMS)[number];
+  /** Staggers the beat down the list, so the cards resolve one after
+   *  another rather than all landing on the same frame. */
+  index?: number;
 }) {
+  /* The agent works, then speaks. Nothing on the card claims to know
+     anything until the dots have finished running. */
+  const [working, setWorking] = useState(true);
+  useEffect(() => {
+    const t = window.setTimeout(() => setWorking(false), 1500 + index * 620);
+    return () => window.clearTimeout(t);
+  }, [index]);
+
   /* Figma ships the two faces as one card (853:75045 / 853:75832) with the
      insight and CTA at opacity 0 on the front. They are on BOTH faces
      here: the insight is the reason the card exists, so it should not be
@@ -630,7 +644,11 @@ export function CardFace({
       points
     </p>
 
-    {/* Insight (853:75844): 275 wide at (22, 125). */}
+    {/* Insight (853:75844): 275 wide at (22, 125).
+
+        Arrives a word at a time rather than as a block. The dots said the
+        agent was working; a paragraph that appears whole contradicts that,
+        where copy landing word by word is the same act finishing. */}
     <p
       className="pointer-events-none absolute font-medium"
       style={{
@@ -642,17 +660,34 @@ export function CardFace({
         color: "rgba(255,255,255,0.85)",
       }}
     >
-      {program.insight}
+      {!working &&
+        program.insight.split(" ").map((word, i) => (
+          <motion.span
+            key={i}
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            transition={{ delay: i * 0.026, duration: 0.24 }}
+          >
+            {word}{" "}
+          </motion.span>
+        ))}
     </p>
 
     {/* The dots sit UNDER the pill, as Figma stacks them — they overlap it
         by design, and the pill has to stay legible over them. */}
-    <ThinkingDots />
+    <ThinkingDots working={working} />
 
-    {/* "View flights" (853:75914) at (21, 193). */}
-    <div className="absolute" style={{ left: 21, top: 193 }}>
+    {/* "View flights" (853:75914) at (21, 193). Last, and only once the
+        copy has landed: there is nothing to act on before then. */}
+    <motion.div
+      className="absolute"
+      style={{ left: 21, top: 193 }}
+      initial={false}
+      animate={{ opacity: working ? 0 : 1, y: working ? 5 : 0 }}
+      transition={{ duration: 0.4, delay: working ? 0 : 0.45, ease: IN_EASE }}
+    >
       <ViewFlightsPill />
-    </div>
+    </motion.div>
 
     {/* Present on both faces — 36×36 at card (323, 195). */}
     <div
