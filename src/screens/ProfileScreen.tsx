@@ -323,6 +323,7 @@ export default function ProfileScreen() {
     return BODY_HOLD * (1 - back);
   });
   const [collapsed, setCollapsed] = useState(false);
+  const [parked, setParked] = useState(false);
 
   /* The card leaves around y 500; the title arrives as it goes. */
   const headerIn = useTransform(scrollY, [300, 420], [0, 1], { clamp: true });
@@ -404,6 +405,12 @@ export default function ProfileScreen() {
           // risen underneath. By here the card is well into the swing and
           // there is nothing left to flip.
           setCollapsed(y > 120);
+          // Past this the plank is opaque. Everything under it — two
+          // faces, the globe, the trace, the gloss and dispersion layers —
+          // is still being re-rasterised every frame inside a preserve-3d
+          // subtree at a changing angle, for no visible result. That is
+          // the cost that was showing up as lag.
+          setParked(y > 300);
         }}
       >
       {/* Card carousel. The second card is deliberately cut off by the
@@ -674,6 +681,7 @@ export default function ProfileScreen() {
                 collapseScale={collapseScale}
                 slot={i - profileIdx}
                 collapsed={collapsed}
+                parked={parked}
                 onSelect={() => {
                   trackRef.current?.scrollTo({
                     left: i * CARD_GAP,
@@ -923,6 +931,7 @@ function WorldPassCard({
   collapseScale,
   slot = 0,
   collapsed = false,
+  parked = false,
   onSelect,
   onConnect,
   onAddProgram,
@@ -951,6 +960,8 @@ function WorldPassCard({
   slot?: number;
   /** True once the strip is reading as tabs rather than as cards. */
   collapsed?: boolean;
+  /** True once the grey plank fully covers the faces. */
+  parked?: boolean;
   /** Tap-to-select, which is what a tab is. */
   onSelect?: () => void;
   /** Whose pass this is. */
@@ -1000,7 +1011,10 @@ function WorldPassCard({
      but all of it is visibly in motion. A plank has nothing to animate. */
   const parkFill = useTransform(
     collapseX ?? zero,
-    [COLLAPSE_MAX_DEG * 0.3, COLLAPSE_MAX_DEG * 0.85],
+    // Late. At a third of the swing the card is still 250px tall and
+    // plainly a card, so greying it there read as a bug rather than as a
+    // state change. It only turns once it is nearly down.
+    [COLLAPSE_MAX_DEG * 0.72, COLLAPSE_MAX_DEG * 0.96],
     [0, 1],
     { clamp: true },
   );
@@ -1163,7 +1177,10 @@ function WorldPassCard({
             instead of behind it. */}
         <motion.div
           className="h-full w-full"
-          style={{ transformStyle: "preserve-3d" }}
+          style={{
+            transformStyle: "preserve-3d",
+            visibility: parked ? "hidden" : "visible",
+          }}
           animate={{ rotateY: turns * 180 }}
           transition={{ type: "spring", stiffness: 60, damping: 14, mass: 1.1 }}
           drag={interactive && !collapsed ? "x" : false}
@@ -1632,14 +1649,18 @@ function WorldPassCard({
             siblings sort by DEPTH, not by z-index, so a flat sibling would
             be interleaved with the faces rather than laid over them.
 
-            Grey for the pass in focus, light grey for the one beside it,
-            which is the whole active/inactive read at this size. */}
+            One grey for all of them — see below. */}
         <motion.div
           className="pointer-events-none absolute inset-0"
           style={{
             opacity: parkFill,
             borderRadius: 30,
-            background: interactive ? "#2f2f34" : "#d0d0d5",
+            // Same grey for every pass. Giving the neighbour a lighter
+            // one made the two planks read as different objects — and
+            // against the black face a dark grey is invisible while a
+            // light one is not, so mid-swing they did not even look like
+            // the same effect.
+            background: "#2f2f34",
             z: 2,
           }}
         />
