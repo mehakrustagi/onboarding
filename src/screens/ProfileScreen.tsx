@@ -971,6 +971,19 @@ function WorldPassCard({
      never drops below ~62px, but each card throws a 50px blur either side,
      so two of them met in the middle and filled that gap with grey. A card
      lying nearly flat has nothing to cast anyway. */
+  /* What the pass becomes once it is parked: a flat grey plank.
+     
+     Fading a solid over the face is what stops the card reading as "still
+     moving" down there. Everything on it — the globe, the trace, the idle
+     wobble — is running against a 13px sliver where none of it is legible
+     but all of it is visibly in motion. A plank has nothing to animate. */
+  const parkFill = useTransform(
+    collapseX ?? zero,
+    [COLLAPSE_MAX_DEG * 0.3, COLLAPSE_MAX_DEG * 0.85],
+    [0, 1],
+    { clamp: true },
+  );
+
   const cardShadow = useTransform(collapseX ?? zero, (d) => {
     // Floors at 0.3 rather than 0. Fully off, the parked sliver sat on
     // the page with nothing under it; the reference keeps a soft one. The
@@ -1592,6 +1605,23 @@ function WorldPassCard({
 
         </motion.div>
         </motion.div>
+
+        {/* The parked plank. Inside the swing so it takes the same tilt and
+            taper, and lifted 2px on z — within a preserve-3d context
+            siblings sort by DEPTH, not by z-index, so a flat sibling would
+            be interleaved with the faces rather than laid over them.
+
+            Grey for the pass in focus, light grey for the one beside it,
+            which is the whole active/inactive read at this size. */}
+        <motion.div
+          className="pointer-events-none absolute inset-0"
+          style={{
+            opacity: parkFill,
+            borderRadius: 30,
+            background: interactive ? "#2f2f34" : "#d0d0d5",
+            z: 2,
+          }}
+        />
         </motion.div>
       </motion.div>
     </motion.div>
