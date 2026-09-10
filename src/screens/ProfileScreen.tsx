@@ -1,7 +1,13 @@
 "use client";
 
 import Image from "next/image";
-import { motion, useMotionValue, useSpring, useTransform } from "framer-motion";
+import {
+  motion,
+  useMotionValue,
+  useSpring,
+  useTransform,
+  type MotionValue,
+} from "framer-motion";
 import { useEffect, useRef, useState } from "react";
 import { haptic } from "@/lib/haptics";
 import ProfileBody from "./profile/ProfileBody";
@@ -147,6 +153,31 @@ export default function ProfileScreen() {
      the container ref is null on the first render, and useScroll captures
      that null instead of re-reading it. */
   const scrollY = useMotionValue(0);
+  /* The horizontal scroller, so a tap on a collapsed tab can scroll it
+     into place — when the passes are 26px bars there is nothing left to
+     drag, so selecting has to be a tap. */
+  const trackRef = useRef<HTMLDivElement | null>(null);
+  /* Collapse. The passes stay put as the page scrolls under them and
+     flatten into a tab strip — so the screen never loses the control that
+     says which profile you are looking at. */
+  const cardH = useTransform(scrollY, [40, 300], [CARD_H, 26], { clamp: true });
+  /* The faces fade well before the shape finishes flattening: content
+     squashed into a 26px bar reads as a rendering fault, where an empty
+     tab reads as a tab. */
+  const faceOpacity = useTransform(scrollY, [40, 170], [1, 0], { clamp: true });
+  /* The strip shrinks with them — held at full height it would sit over
+     the page and swallow taps meant for the content underneath. */
+  const trackH = useTransform(
+    scrollY,
+    [40, 300],
+    [CARD_H + CARD_PAD_T + CARD_PAD_B, 26 + CARD_PAD_T + 26],
+    { clamp: true },
+  );
+  /* The bar the faces hand off to. Starts a touch after they begin
+     fading so the two never both read at full strength. */
+  const tabOpacity = useTransform(scrollY, [110, 210], [0, 1], { clamp: true });
+  const [collapsed, setCollapsed] = useState(false);
+
   /* The card leaves around y 500; the title arrives as it goes. */
   const headerIn = useTransform(scrollY, [300, 420], [0, 1], { clamp: true });
   const titleY = useTransform(scrollY, [300, 420], [10, 0], { clamp: true });
@@ -185,7 +216,13 @@ export default function ProfileScreen() {
         // card stage stays put and the content below it moves, which is
         // the behaviour the design implies rather than a shrunken fit.
         className="absolute inset-0 overflow-y-auto overflow-x-hidden [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
-        onScroll={(e) => scrollY.set(e.currentTarget.scrollTop)}
+        onScroll={(e) => {
+          const y = e.currentTarget.scrollTop;
+          scrollY.set(y);
+          // Past this the passes are tabs: tapping one selects it, and
+          // the flip is off, since a 26px bar has no face to turn.
+          setCollapsed(y > 200);
+        }}
       >
       {/* Card carousel. The second card is deliberately cut off by the
           screen edge — that's the affordance telling you there are more,
@@ -299,6 +336,32 @@ export default function ProfileScreen() {
         />
       </motion.div>
 
+      {/* Everything below the pedestal (853:16315) — see ProfileBody. */}
+      <ProfileBody
+        show={bodyIn}
+        onViewBenefits={() => setBenefitsOpen(true)}
+        onOpenBenefit={() => setVerifyOpen(true)}
+        onOpenAgent={(k) => {
+          // Airport logistics isn't a preference sheet — it opens the
+          // supercar sequence, so it routes elsewhere.
+          if (k === "airport") setAirportOpen(true);
+          else if (AGENT_SPECS[k]) setAgentKey(k);
+        }}
+        // Whichever card is at the front of the stack, not a fixed one.
+        onActivateBenefit={(card) =>
+          setCardDetail({
+            title: card.title,
+            terms: PROFILE_BENEFIT_TERMS,
+            art: card.art,
+          })
+        }
+      />
+
+      {/* Gives the scroll container the design's full height, so the
+          absolutely-positioned body has room to scroll into. */}
+        <div style={{ height: 1781 }} />
+      </div>
+
       {/* Card carousel — arrives AFTER the disk, and drops onto it. The
           second card is deliberately cut off by the screen edge: that's
           the affordance telling you there are more, so swiping simply
@@ -306,7 +369,8 @@ export default function ProfileScreen() {
 
           The track is only as tall as the cards. Spanning the whole frame
           would swallow drags meant for the page beneath it. */}
-      <div
+      <motion.div
+        ref={trackRef}
         className="absolute left-0 overflow-x-auto overflow-y-hidden [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
         style={{
           // Padded well past the card, because overflow-y:hidden (which a
@@ -315,8 +379,8 @@ export default function ProfileScreen() {
           // exactly, the shadow was being sliced off on a straight line.
           top: CARD_Y - CARD_PAD_T,
           width: 440,
-          height: CARD_H + CARD_PAD_T + CARD_PAD_B,
-          zIndex: 2,
+          height: trackH,
+          zIndex: 14,
           scrollSnapType: "x mandatory",
           scrollBehavior: "smooth",
           // Snaps to the design's x, so the pass in focus lands at 94
@@ -324,7 +388,12 @@ export default function ProfileScreen() {
           scrollPaddingLeft: CARD_X,
           // pan-y leaves vertical touch scrolling with the PAGE; only the
           // horizontal axis belongs to this strip.
-          touchAction: "pan-y",
+          //
+          // Collapsed, x has to go BACK to the browser: the flip drag that
+          // was consuming it is off, and swiping between tabs is now the
+          // strip's own native scroll. Left on pan-y a touch swipe would
+          // land on nothing.
+          touchAction: collapsed ? "pan-x pan-y" : "pan-y",
         }}
         onScroll={(e) => {
           const el = e.currentTarget;
@@ -371,6 +440,16 @@ export default function ProfileScreen() {
                 // Only the pass in focus takes the cursor, so tilt never
                 // fights between two cards.
                 interactive={i === profileIdx}
+                height={cardH}
+                faceOpacity={faceOpacity}
+                tabOpacity={tabOpacity}
+                collapsed={collapsed}
+                onSelect={() => {
+                  trackRef.current?.scrollTo({
+                    left: i * CARD_GAP,
+                    behavior: "smooth",
+                  });
+                }}
                 onConnect={() => setScanOpen(true)}
                 onAddProgram={() => setLoyaltyOpen(true)}
                 onOpenPrograms={() => setProgramsOpen(true)}
@@ -386,33 +465,7 @@ export default function ProfileScreen() {
             style={{ flex: "0 0 auto", width: 440 - CARD_X - CARD_W }}
           />
         </div>
-      </div>
-
-      {/* Everything below the pedestal (853:16315) — see ProfileBody. */}
-      <ProfileBody
-        show={bodyIn}
-        onViewBenefits={() => setBenefitsOpen(true)}
-        onOpenBenefit={() => setVerifyOpen(true)}
-        onOpenAgent={(k) => {
-          // Airport logistics isn't a preference sheet — it opens the
-          // supercar sequence, so it routes elsewhere.
-          if (k === "airport") setAirportOpen(true);
-          else if (AGENT_SPECS[k]) setAgentKey(k);
-        }}
-        // Whichever card is at the front of the stack, not a fixed one.
-        onActivateBenefit={(card) =>
-          setCardDetail({
-            title: card.title,
-            terms: PROFILE_BENEFIT_TERMS,
-            art: card.art,
-          })
-        }
-      />
-
-      {/* Gives the scroll container the design's full height, so the
-          absolutely-positioned body has room to scroll into. */}
-        <div style={{ height: 1781 }} />
-      </div>
+      </motion.div>
 
       {/* Sticky header. Fades in as the card scrolls away, so the screen
           keeps a title once the card that WAS the title is gone. It sits
@@ -628,6 +681,11 @@ function WorldPassCard({
   delay,
   lit,
   interactive = true,
+  height,
+  faceOpacity,
+  tabOpacity,
+  collapsed = false,
+  onSelect,
   onConnect,
   onAddProgram,
   onOpenPrograms,
@@ -647,6 +705,16 @@ function WorldPassCard({
   /** The peeking card is scenery — it floats, but doesn't take the
    *  cursor, so tilt never fights between the two. */
   interactive?: boolean;
+  /** Driven by the page scroll: 350 open, 26 when it has become a tab. */
+  height?: MotionValue<number>;
+  /** Fades the faces out ahead of the shape finishing its flatten. */
+  faceOpacity?: MotionValue<number>;
+  /** Fades the tab bar in as the faces leave. */
+  tabOpacity?: MotionValue<number>;
+  /** True once the strip is reading as tabs rather than as cards. */
+  collapsed?: boolean;
+  /** Tap-to-select, which is what a tab is. */
+  onSelect?: () => void;
   /** Whose pass this is. */
   profile: (typeof PROFILES)[number];
 }) {
@@ -698,7 +766,8 @@ function WorldPassCard({
       // flex item places it. It still creates the positioning context its
       // own faces rely on.
       className="relative"
-      style={{ width: CARD_W, height: CARD_H }}
+      style={{ width: CARD_W, height: height ?? CARD_H }}
+      onClick={collapsed ? onSelect : undefined}
       initial={{ opacity: 0, y: 26, scale: 0.96 }}
       animate={{ opacity: 1, y: 0, scale: 1 }}
       transition={{ delay, duration: 0.8, ease: IN_EASE }}
@@ -709,7 +778,11 @@ function WorldPassCard({
       <motion.div
         className="h-full w-full"
         style={{ perspective: 1200 }}
-        animate={{ y: [0, -7, 0, -3, 0], x: [0, 2.5, 0, -2.5, 0] }}
+        animate={
+          collapsed
+            ? { y: 0, x: 0 }
+            : { y: [0, -7, 0, -3, 0], x: [0, 2.5, 0, -2.5, 0] }
+        }
         transition={{
           y: { duration: 6.4, repeat: Infinity, ease: "easeInOut" },
           x: { duration: 8.9, repeat: Infinity, ease: "easeInOut" },
@@ -730,7 +803,7 @@ function WorldPassCard({
             Outside the flip plane, since it points AT the card and must
             not mirror when the card turns; it keeps the tilt and drag so
             it still travels along. */}
-        {interactive && (
+        {interactive && !collapsed && (
           <motion.div
             className="pointer-events-none absolute inset-0"
             style={{
@@ -772,6 +845,36 @@ function WorldPassCard({
           </motion.div>
         )}
 
+        {/* The tab the pass becomes. A separate layer rather than the
+            collapsed face, because fading the faces out has to leave
+            SOMETHING behind — fade the plane alone and the strip
+            disappears along with the content on it. */}
+        <motion.div
+          className="pointer-events-none absolute left-0 top-0 flex h-full w-full items-center justify-center overflow-hidden"
+          style={{
+            opacity: tabOpacity ?? 0,
+            borderRadius: 13,
+            background: lit
+              ? "linear-gradient(140deg, #17171b 0%, #0b0b0d 100%)"
+              : "#111114",
+            border: "1px solid rgba(255,255,255,0.08)",
+            zIndex: 1,
+          }}
+        >
+          <span
+            className="whitespace-nowrap font-bold uppercase"
+            style={{
+              fontSize: 9,
+              letterSpacing: "0.9px",
+              // Only the selected tab is fully lit; the neighbour reads as
+              // available rather than active.
+              color: interactive ? "#ffffff" : "rgba(255,255,255,0.42)",
+            }}
+          >
+            {profile.name}
+          </span>
+        </motion.div>
+
         {/* Flip plane. Drag horizontally to turn the card — unchanged, and
             it does not fight the carousel: that is a native SCROLL
             container, and scrolling (wheel / trackpad) is a different
@@ -784,10 +887,13 @@ function WorldPassCard({
             instead of behind it. */}
         <motion.div
           className="h-full w-full"
-          style={{ transformStyle: "preserve-3d" }}
+          // The faces go before the shape does: content crushed into a
+          // 26px bar reads as a rendering fault, an empty bar reads as a
+          // tab. The bar itself is the face's own black, so it survives.
+          style={{ transformStyle: "preserve-3d", opacity: faceOpacity ?? 1 }}
           animate={{ rotateY: turns * 180 }}
           transition={{ type: "spring", stiffness: 60, damping: 14, mass: 1.1 }}
-          drag={interactive ? "x" : false}
+          drag={interactive && !collapsed ? "x" : false}
           dragSnapToOrigin
           dragElastic={0.16}
           dragConstraints={{ left: 0, right: 0 }}
