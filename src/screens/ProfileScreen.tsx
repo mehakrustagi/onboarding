@@ -63,16 +63,24 @@ const CARD_GAP = CARD_W + CARD_PEEK_GAP;
 const CARD_PAD_T = 24;
 const CARD_PAD_B = 120;
 
-/* Perspective for the scroll swing. Deliberately long: at 900 the bottom
- * edge magnified ~50% on its way toward the camera and the card flared
- * clean off both sides of the screen. */
-const COLLAPSE_PERSPECTIVE = 1800;
-
-/* How much smaller the passes get on the way up, on top of the
- * perspective compensation. The compensation alone only cancels the
- * magnification — it does not make the card any smaller, so the strip kept
- * its full width while the whitespace between passes stayed fixed. */
+/* The swing's shape, specified by what it should LOOK like rather than by
+ * an arbitrary camera distance.
+ *
+ * A trapezium is the one thing an affine transform cannot make — parallel
+ * edges stay parallel under scale and rotate alike — so the taper has to
+ * come from perspective. Hinged at its top edge, the card's bottom travels
+ * toward the camera and is drawn larger, which leaves the top narrower:
+ * the trapezium, for free, out of the same rotation that does the swing.
+ *
+ * So the two numbers below are the design, and the camera is solved from
+ * them. At full swing the top edge reads NARROW smaller than the bottom,
+ * and the card has lost SHRINK of its size overall. Working the projection
+ * backwards from that gives the perspective distance — which is why this
+ * is derived and not typed in. */
+const COLLAPSE_TOP_NARROW = 0.1;
 const COLLAPSE_SHRINK = 0.3;
+const COLLAPSE_PERSPECTIVE =
+  (CARD_H * (1 - COLLAPSE_SHRINK)) / COLLAPSE_TOP_NARROW - CARD_H;
 
 /* The opening beat. For this many pixels the page scrolls but the body
  * below the stage does NOT move: the plinth fades and the pass starts to
