@@ -253,20 +253,6 @@ export default function ProfileScreen() {
      trails it through the spring, so a lagging card kept catching the KYC
      line that had already come up to meet it. Taking the room unlagged
      means the card is never larger than the gap actually left for it. */
-  /* Each pass shrinks about its own centre, which walks the NEIGHBOUR's
-     visible edge off the right of the screen: its centre sits at 548 and
-     only its left sliver was ever on screen, so shrinking toward that
-     centre takes the sliver with it — at rest just 11px of it was left.
-     So the strip is pulled in toward the pass in focus by the shrink,
-     which is the same thing as scaling the whole strip about that pass and
-     keeps roughly 74px of the neighbour showing.
-
-     This was removed once as the cause of the two passes colliding. It was
-     not: the gap under it runs 62–66px the whole way down. What filled
-     that gap was the two cards' drop shadows, which is handled below. */
-  const collapseShrink = useTransform(collapseX, (d) =>
-    1 - COLLAPSE_SHRINK * Math.sin((d * Math.PI) / 180),
-  );
   const collapseScale = useTransform([collapseX, scrollY], ([d, y]) => {
     const P = COLLAPSE_PERSPECTIVE;
     const r = ((d as number) * Math.PI) / 180;
@@ -634,7 +620,6 @@ export default function ProfileScreen() {
                 interactive={i === profileIdx}
                 collapseX={collapseX}
                 collapseScale={collapseScale}
-                collapseShrink={collapseShrink}
                 slot={i - profileIdx}
                 collapsed={collapsed}
                 onSelect={() => {
@@ -879,7 +864,6 @@ function WorldPassCard({
   interactive = true,
   collapseX,
   collapseScale,
-  collapseShrink,
   slot = 0,
   collapsed = false,
   onSelect,
@@ -906,8 +890,6 @@ function WorldPassCard({
   collapseX?: MotionValue<number>;
   /** Cancels the perspective magnification so the swing stays on screen. */
   collapseScale?: MotionValue<number>;
-  /** The size reduction alone, without the perspective maths. */
-  collapseShrink?: MotionValue<number>;
   /** Passes away from the one in focus: −1, 0, +1. */
   slot?: number;
   /** True once the strip is reading as tabs rather than as cards. */
@@ -946,12 +928,7 @@ function WorldPassCard({
   );
   const dispersion = useTransform(tiltAmount, [0, 1], [0.16, 0.85]);
 
-  const one = useMotionValue(1);
   const zero = useMotionValue(0);
-  const gapPull = useTransform(
-    collapseShrink ?? one,
-    (k) => -(1 - k) * slot * CARD_GAP,
-  );
   /* The passes' own elevation, faded out with the swing.
      
      This is what read as the two cards colliding. The gap between them
@@ -1077,10 +1054,21 @@ function WorldPassCard({
         <motion.div
           className="h-full w-full"
           style={{
-            x: gapPull,
             rotateX: collapseX ?? 0,
             scale: collapseScale ?? 1,
-            transformOrigin: "50% 0%",
+            /* Every pass turns on its OWN wheel — same axis height, no
+               lateral travel, so none of them slides across the screen on
+               the way down. What differs is only WHERE along its width
+               each one shrinks toward: the pass in focus contracts about
+               its own centre and stays centred, while a neighbour
+               contracts toward the focused side, so the sliver of it that
+               was peeking stays exactly where it was peeking rather than
+               being pulled off the edge with the rest of the card.
+
+               An earlier version got this by translating the neighbours
+               inward, which is the same end position but reads as the
+               strip sliding — not as each card turning in place. */
+            transformOrigin: `${50 - Math.sign(slot) * 50}% 0%`,
             transformPerspective: COLLAPSE_PERSPECTIVE,
             transformStyle: "preserve-3d",
             willChange: "transform",
