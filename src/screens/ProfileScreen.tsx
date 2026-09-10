@@ -63,6 +63,11 @@ const CARD_GAP = CARD_W + CARD_PEEK_GAP;
 const CARD_PAD_T = 24;
 const CARD_PAD_B = 120;
 
+/* Perspective for the scroll swing. Deliberately long: at 900 the bottom
+ * edge magnified ~50% on its way toward the camera and the card flared
+ * clean off both sides of the screen. */
+const COLLAPSE_PERSPECTIVE = 1800;
+
 /* Perimeter of the card's rounded rect, for the scan trace's dash maths:
  * two straight runs per axis plus one full circle of corner arc. */
 const TRACE_PERIMETER =
@@ -165,19 +170,35 @@ export default function ProfileScreen() {
      face foreshortens into a bar the way a real card tipping away from you
      does. 84° leaves a sliver rather than a true edge-on line, which would
      vanish. */
-  const collapseX = useTransform(scrollY, [30, 340], [0, 84], { clamp: true });
+  const collapseX = useTransform(scrollY, [30, 330], [0, 90], { clamp: true });
+  /* Uniform scale that cancels the perspective's magnification.
+     
+     Hinged at the top, the bottom edge travels toward the camera as it
+     swings, and near things are drawn bigger — so the card was flaring out
+     past both screen edges on its way down. framer emits
+     perspective() OUTSIDE scale(), so a uniform s shrinks z along with
+     everything else: the widest point ends up at s·W·P/(P − s·H·sinθ).
+     Setting that equal to W solves to P/(P + H·sinθ), which holds the card
+     at exactly its own width the whole way through the swing. Uniform, so
+     the card keeps its proportions rather than being squeezed. */
+  const collapseScale = useTransform(collapseX, (d) => {
+    const P = COLLAPSE_PERSPECTIVE;
+    return P / (P + CARD_H * Math.sin((d * Math.PI) / 180));
+  });
   /* The box it occupies follows the PROJECTION of that swing, not a linear
      ramp — cos is what the eye sees, and a linear box would crop the card
      mid-swing. */
-  const cardH = useTransform(collapseX, (d) =>
-    Math.max(26, CARD_H * Math.cos((d * Math.PI) / 180)),
-  );
+  const cardH = useTransform(collapseX, (d) => {
+    const r = (d * Math.PI) / 180;
+    const P = COLLAPSE_PERSPECTIVE;
+    return (CARD_H * Math.cos(r) * P) / (P + CARD_H * Math.sin(r));
+  });
   /* The faces hold almost the whole way. Fading them early was doing the
      compacting instead of the swing — the card just went transparent at
      full size and the page showed straight through it. They only give way
      at the very end, handing the identity to the sticky header, which is
      where the design parks the name. */
-  const faceOpacity = useTransform(scrollY, [265, 345], [1, 0], { clamp: true });
+  const faceOpacity = useTransform(scrollY, [250, 320], [1, 0], { clamp: true });
   /* The strip shrinks with them — held at full height it would sit over
      the page and swallow taps meant for the content underneath. */
   const trackH = useTransform(cardH, (h) =>
@@ -233,7 +254,7 @@ export default function ProfileScreen() {
           scrollY.set(y);
           // Past this the passes are tabs: tapping one selects it, and
           // the flip is off, since a 26px bar has no face to turn.
-          setCollapsed(y > 300);
+          setCollapsed(y > 290);
         }}
       >
       {/* Card carousel. The second card is deliberately cut off by the
@@ -467,6 +488,7 @@ export default function ProfileScreen() {
                 interactive={i === profileIdx}
                 height={cardH}
                 collapseX={collapseX}
+                collapseScale={collapseScale}
                 faceOpacity={faceOpacity}
                 collapsed={collapsed}
                 onSelect={() => {
@@ -708,6 +730,7 @@ function WorldPassCard({
   interactive = true,
   height,
   collapseX,
+  collapseScale,
   faceOpacity,
   collapsed = false,
   onSelect,
@@ -732,8 +755,10 @@ function WorldPassCard({
   interactive?: boolean;
   /** Driven by the page scroll: 350 open, 26 when it has become a tab. */
   height?: MotionValue<number>;
-  /** Degrees of the collapse swing: 0 face-on, 84 nearly edge-on. */
+  /** Degrees of the collapse swing: 0 face-on, 90 edge-on. */
   collapseX?: MotionValue<number>;
+  /** Cancels the perspective magnification so the swing stays on screen. */
+  collapseScale?: MotionValue<number>;
   /** Fades the faces out ahead of the shape finishing its flatten. */
   faceOpacity?: MotionValue<number>;
   /** True once the strip is reading as tabs rather than as cards. */
@@ -883,8 +908,9 @@ function WorldPassCard({
           className="h-full w-full"
           style={{
             rotateX: collapseX ?? 0,
+            scale: collapseScale ?? 1,
             transformOrigin: "50% 0%",
-            transformPerspective: 900,
+            transformPerspective: COLLAPSE_PERSPECTIVE,
             transformStyle: "preserve-3d",
           }}
         >
