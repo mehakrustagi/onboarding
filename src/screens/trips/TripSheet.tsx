@@ -474,6 +474,20 @@ function Item({
 }) {
   /* The data seeds it; the user owns it from the first tap onward. */
   const done = ticked[rowKey] ?? Boolean(item.done);
+
+  /* Body measure. 265 is Figma's, and on a row carrying agent orbs it
+     runs straight under them: the text box ends at x380 and the orbs are
+     parked at x358, so the last 22px of five paragraphs sat beneath a
+     disc. The orbs stack leftward at 12px intervals, so each one costs
+     another 12 of measure; 10 is the gutter between the two.
+
+     Narrowing the whole paragraph rather than flowing around the orb —
+     a float would only shorten the lines level with the disc, which is
+     tidier, but it needs the body's top offset to place the spacer and
+     that varies with whatever the row renders above it. A 233 measure
+     against 265 is a difference you have to be looking for. */
+  const orbs = item.agents ?? 0;
+  const bodyWidth = orbs > 0 ? 233 - (orbs - 1) * 12 : 265;
   /* A row is WORKING when it has something live to say and has not
      finished. Those get onboarding's two shine treatments — the coloured
      sweep on the status line, the grey sweep on the body underneath —
@@ -639,7 +653,7 @@ function Item({
             className={working ? "grey-shine-text" : undefined}
             style={{
               marginTop: i === 0 ? 15 : 12,
-              width: 265,
+              width: bodyWidth,
               whiteSpace: "pre-line",
               ...META,
               ...(working ? { color: undefined, ...shine } : null),
