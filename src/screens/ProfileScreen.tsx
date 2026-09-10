@@ -180,7 +180,7 @@ export default function ProfileScreen() {
     mass: 0.35,
     restDelta: 0.05,
   });
-  const collapseX = useTransform(scrollS, [30, 330], [0, 90], { clamp: true });
+  const collapseX = useTransform(scrollS, [46, 330], [0, 90], { clamp: true });
   /* Uniform scale that cancels the perspective's magnification.
      
      Hinged at the top, the bottom edge travels toward the camera as it
@@ -209,11 +209,13 @@ export default function ProfileScreen() {
   const faceOpacity = useTransform(scrollS, [250, 320], [1, 0], { clamp: true });
   /* The strip shrinks with them — held at full height it would sit over
      the page and swallow taps meant for the content underneath. */
-  /* The plinth leaves as the pass lifts off it. It is stage furniture for
-     a card standing up — once the card is tipping away there is nothing
-     for it to be under, and the reference has it gone by the first
-     collapsed state. */
-  const stageOpacity = useTransform(scrollS, [10, 130], [1, 0], { clamp: true });
+  /* The plinth leaves BEFORE the swing starts, not alongside it. It is a
+     flat layer at z 0, and the swing brings the card's bottom edge toward
+     the camera — so the moment the card tips, its near edge passes in
+     front of the plinth and the two collide. Clearing it by 42, with the
+     swing held back to 46, means they never share the frame while the card
+     is off-plane. */
+  const stageOpacity = useTransform(scrollS, [0, 42], [1, 0], { clamp: true });
   const [collapsed, setCollapsed] = useState(false);
 
   /* The card leaves around y 500; the title arrives as it goes. */
