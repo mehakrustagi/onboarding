@@ -67,9 +67,10 @@ const GLASS_BLUR: React.CSSProperties = {
   WebkitBackdropFilter: "blur(25px)",
 };
 
-/* Figma's Gradient/text, already in globals.css as --gradient-text. */
-const GRAD_TEXT =
-  "linear-gradient(90deg, #000 0%, #5057ea 33%, #ef4646 66%, #edd758 99%)";
+/* Figma's Gradient/text is --gradient-text in globals.css, and live status
+ * lines now take it via the .gradient-text-shine class rather than an
+ * inline fill — the class carries the sweep animation with it, so there is
+ * no second copy of the gradient to keep in step. */
 const GRAD_GREEN = "linear-gradient(90deg, #0b0b0b 0%, #10b981 100%)";
 const GRAD_PILL = "linear-gradient(90deg, #000 0%, #666 100%)";
 const GRAD_STATE: Record<TripSection["state"], string> = {
@@ -400,7 +401,19 @@ function GroupNode() {
   );
 }
 
-function Item({ item, last }: { item: TripItem; last: boolean }) {
+function Item({ item, last, index }: { item: TripItem; last: boolean; index: number }) {
+  /* A row is WORKING when it has something live to say and has not
+     finished. Those get onboarding's two shine treatments — the coloured
+     sweep on the status line, the grey sweep on the body underneath —
+     which is what makes an agent look busy rather than merely described.
+     Finished rows are still: the green status and plain grey body.
+
+     Staggered per item. A shared CSS animation fires every line in unison,
+     which reads as one flash across the page instead of several agents
+     each doing their own work. Same reason AgentSheet staggers by section. */
+  const working = (Boolean(item.status) || Boolean(item.live)) && !item.done;
+  const shine = { animationDelay: `${(index % 5) * 0.55}s` };
+
   /* Gradient ids have to be unique per rail — SVG defs are document-global,
      so every rail referencing "railFade" resolves to whichever one rendered
      first, and they have different heights. */
@@ -428,13 +441,14 @@ function Item({ item, last }: { item: TripItem; last: boolean }) {
 
       {item.title && (
         <p
+          className={item.live ? "gradient-text-shine" : undefined}
           style={{
             marginTop: 5,
             fontSize: 16,
             lineHeight: "20px",
             letterSpacing: "-0.64px",
             fontWeight: 600,
-            color: "#090909",
+            ...(item.live ? shine : { color: "#090909" }),
           }}
         >
           {item.title}
@@ -505,7 +519,9 @@ function Item({ item, last }: { item: TripItem; last: boolean }) {
             />
           )}
           <span
-            className="absolute whitespace-nowrap"
+            className={
+              item.done ? "absolute whitespace-nowrap" : "absolute whitespace-nowrap gradient-text-shine"
+            }
             style={{
               left: item.call ? 20 : 0,
               top: 0,
@@ -513,7 +529,7 @@ function Item({ item, last }: { item: TripItem; last: boolean }) {
               lineHeight: "16px",
               letterSpacing: "-0.12px",
               fontWeight: 600,
-              ...gradient(item.done ? GRAD_GREEN : GRAD_TEXT),
+              ...(item.done ? gradient(GRAD_GREEN) : shine),
             }}
           >
             {item.status}
@@ -525,7 +541,14 @@ function Item({ item, last }: { item: TripItem; last: boolean }) {
         (Array.isArray(item.body) ? item.body : [item.body]).map((para, i) => (
           <p
             key={i}
-            style={{ marginTop: i === 0 ? 15 : 12, width: 265, whiteSpace: "pre-line", ...META }}
+            className={working ? "grey-shine-text" : undefined}
+            style={{
+              marginTop: i === 0 ? 15 : 12,
+              width: 265,
+              whiteSpace: "pre-line",
+              ...META,
+              ...(working ? { color: undefined, ...shine } : null),
+            }}
           >
             {para}
           </p>
@@ -537,7 +560,21 @@ function Item({ item, last }: { item: TripItem; last: boolean }) {
   );
 }
 
-function Group({ group, first, last }: { group: TripGroup; first: boolean; last: boolean }) {
+function Group({
+  group,
+  first,
+  last,
+  offset,
+}: {
+  group: TripGroup;
+  first: boolean;
+  last: boolean;
+  /* Running item count before this group, so the shine stagger spreads
+     across the whole section rather than restarting at every heading —
+     most groups hold one item, so a per-group index left almost every row
+     firing on the same beat. */
+  offset: number;
+}) {
   return (
     <div style={{ marginTop: first ? 30 : 40 }}>
       {group.heading && (
@@ -593,7 +630,12 @@ function Group({ group, first, last }: { group: TripGroup; first: boolean; last:
       )}
 
       {group.items.map((it, i) => (
-        <Item key={it.title ?? it.status ?? i} item={it} last={i === group.items.length - 1} />
+        <Item
+          key={it.title ?? it.status ?? i}
+          item={it}
+          index={offset + i}
+          last={i === group.items.length - 1}
+        />
       ))}
 
       {group.link && (
@@ -789,6 +831,9 @@ function Section({ section }: { section: TripSection }) {
             group={g}
             first={i === 0}
             last={i === section.groups.length - 1}
+            offset={section.groups
+              .slice(0, i)
+              .reduce((n, g2) => n + g2.items.length, 0)}
           />
         ))}
 
