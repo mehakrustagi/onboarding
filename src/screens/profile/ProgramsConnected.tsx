@@ -542,7 +542,7 @@ function ThinkingDots({ working }: { working: boolean }) {
               "linear-gradient(90deg, transparent, rgba(255,255,255,0.95), transparent)",
           }}
           animate={{ x: [-64, 166] }}
-          transition={{ duration: 1.35, repeat: Infinity, ease: "easeInOut" }}
+          transition={{ duration: 2.7, repeat: Infinity, ease: "easeInOut" }}
         />
       )}
     </div>
@@ -562,7 +562,7 @@ export function CardFace({
      anything until the dots have finished running. */
   const [working, setWorking] = useState(true);
   useEffect(() => {
-    const t = window.setTimeout(() => setWorking(false), 1500 + index * 620);
+    const t = window.setTimeout(() => setWorking(false), 3000 + index * 1240);
     return () => window.clearTimeout(t);
   }, [index]);
 
@@ -666,7 +666,7 @@ export function CardFace({
             key={i}
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
-            transition={{ delay: i * 0.026, duration: 0.24 }}
+            transition={{ delay: i * 0.052, duration: 0.48 }}
           >
             {word}{" "}
           </motion.span>
@@ -684,7 +684,7 @@ export function CardFace({
       style={{ left: 21, top: 193 }}
       initial={false}
       animate={{ opacity: working ? 0 : 1, y: working ? 5 : 0 }}
-      transition={{ duration: 0.4, delay: working ? 0 : 0.45, ease: IN_EASE }}
+      transition={{ duration: 0.8, delay: working ? 0 : 0.9, ease: IN_EASE }}
     >
       <ViewFlightsPill />
     </motion.div>
