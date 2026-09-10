@@ -2,7 +2,6 @@
 
 import Image from "next/image";
 import { motion, AnimatePresence } from "framer-motion";
-import { useEffect, useState } from "react";
 
 /* Programs connected — Figma node 853:74983.
  *
@@ -431,7 +430,7 @@ function ProgramCard({
               height={LP_H}
               style={{ width: LP_W, height: LP_H, display: "block" }}
             />
-            <CardFace program={program} index={index} />
+            <CardFace program={program} />
           </div>
         ))}
       </div>
@@ -497,82 +496,66 @@ function ViewFlightsPill() {
 /* Everything printed on the card. Lives inside each slide so it travels
  * with the art rather than floating over the track. */
 /** Exported so the detail page renders the identical card. */
-/* Dot mask for the loading lines. The dots are cut OUT of a solid rather
- * than drawn: a mask means the sweep underneath only shows where a dot is,
- * so one moving highlight lights the whole row dot by dot. Painting dots
- * and animating each one's opacity would need a timer per dot and would
- * still not read as a single pass of light travelling along the line. */
-const DOT_MASK =
-  "radial-gradient(circle at 1.6px 3px, #000 1.4px, transparent 1.7px)";
-
-/* Rows of dots with a highlight running along them — the card thinking.
- * Widths are the ragged line lengths of the copy that replaces them, so
- * the block has the shape of the paragraph before the paragraph is there
- * and nothing jumps when it arrives. */
-function ThinkingLines({ widths }: { widths: number[] }) {
+/* The dot cluster from 899:13486 — 166×49.645 at card (24, 193), sitting
+ * behind the View flights pill.
+ *
+ * Figma draws it flat; here a highlight runs along it, so it reads as the
+ * agent still working on the card rather than as ornament. The artwork is
+ * used as a MASK over a moving sweep rather than being drawn and animated:
+ * that way one travelling highlight lights the dots individually, in their
+ * real positions and sizes, with nothing to keep in sync. */
+function ThinkingDots() {
   return (
-    <>
-      {widths.map((w, i) => (
-        <div
-          key={i}
-          className="absolute overflow-hidden"
-          style={{
-            left: 0,
-            top: i * 16,
-            width: w,
-            height: 6,
-            maskImage: DOT_MASK,
-            WebkitMaskImage: DOT_MASK,
-            maskSize: "7px 6px",
-            WebkitMaskSize: "7px 6px",
-          }}
-        >
-          <div
-            className="absolute inset-0"
-            style={{ background: "rgba(255,255,255,0.3)" }}
-          />
-          <motion.div
-            className="absolute inset-y-0"
-            style={{
-              width: 90,
-              background:
-                "linear-gradient(90deg, transparent, rgba(255,255,255,0.95), transparent)",
-            }}
-            // Each row starts a beat after the one above, so the light
-            // reads as running down the block rather than three rows
-            // flashing together.
-            animate={{ x: [-90, w] }}
-            transition={{
-              duration: 1.05,
-              repeat: Infinity,
-              ease: "linear",
-              delay: i * 0.13,
-            }}
-          />
-        </div>
-      ))}
-    </>
+    <div
+      className="pointer-events-none absolute overflow-hidden"
+      style={{
+        left: 24,
+        top: 193,
+        width: 166,
+        height: 49.645,
+        maskImage: "url(/assets/profile/lp-dots.svg)",
+        WebkitMaskImage: "url(/assets/profile/lp-dots.svg)",
+        maskSize: "166px 49.645px",
+        WebkitMaskSize: "166px 49.645px",
+        maskRepeat: "no-repeat",
+        WebkitMaskRepeat: "no-repeat",
+      }}
+    >
+      {/* The dots at rest — what Figma draws. */}
+      <div
+        className="absolute inset-0"
+        style={{ background: "rgba(255,255,255,0.55)" }}
+      />
+      {/* The pass of light. Wider than a dot and much narrower than the
+          cluster, so it picks out a few at a time. */}
+      <motion.div
+        className="absolute inset-y-0"
+        style={{
+          width: 64,
+          background:
+            "linear-gradient(90deg, transparent, rgba(255,255,255,0.95), transparent)",
+        }}
+        animate={{ x: [-64, 166] }}
+        transition={{
+          duration: 1.6,
+          repeat: Infinity,
+          ease: "easeInOut",
+          repeatDelay: 0.5,
+        }}
+      />
+    </div>
   );
 }
 
 export function CardFace({
   program,
-  index = 0,
 }: {
   program: (typeof PROGRAMS)[number];
-  /* Staggers the thinking beat down the list, so the cards resolve one
-     after another rather than all landing on the same frame. */
-  index?: number;
 }) {
   /* Figma ships the two faces as one card (853:75045 / 853:75832) with the
-     insight and CTA at opacity 0 on the front. They are on BOTH faces now:
-     the insight is the reason the card is here, so it should not be
+     insight and CTA at opacity 0 on the front. They are on BOTH faces
+     here: the insight is the reason the card exists, so it should not be
      something you have to scroll sideways to discover. */
-  const [ready, setReady] = useState(false);
-  useEffect(() => {
-    const t = window.setTimeout(() => setReady(true), 900 + index * 420);
-    return () => window.clearTimeout(t);
-  }, [index]);
 
   return (
     <>
@@ -647,53 +630,29 @@ export function CardFace({
       points
     </p>
 
-    {/* Insight (853:75844): 275 wide at (22, 125). The dots hold its place
-        while the card is thinking, then hand over to the copy. */}
-    <div
-      className="pointer-events-none absolute"
-      style={{ left: 22, top: 125, width: 275, height: 54 }}
+    {/* Insight (853:75844): 275 wide at (22, 125). */}
+    <p
+      className="pointer-events-none absolute font-medium"
+      style={{
+        left: 22,
+        top: 125,
+        width: 275,
+        fontSize: 11,
+        lineHeight: "16px",
+        color: "rgba(255,255,255,0.85)",
+      }}
     >
-      <AnimatePresence mode="wait" initial={false}>
-        {ready ? (
-          <motion.p
-            key="copy"
-            className="absolute inset-x-0 top-0 font-medium"
-            style={{
-              fontSize: 11,
-              lineHeight: "16px",
-              color: "rgba(255,255,255,0.85)",
-            }}
-            initial={{ opacity: 0, y: 4 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.4, ease: IN_EASE }}
-          >
-            {program.insight}
-          </motion.p>
-        ) : (
-          <motion.div
-            key="dots"
-            className="absolute inset-0"
-            initial={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            transition={{ duration: 0.22 }}
-          >
-            <ThinkingLines widths={[275, 262, 104]} />
-          </motion.div>
-        )}
-      </AnimatePresence>
-    </div>
+      {program.insight}
+    </p>
 
-    {/* "View flights" (853:75914) at (21, 193). Arrives with the copy —
-        there is nothing to act on until the card has said something. */}
-    <motion.div
-      className="absolute"
-      style={{ left: 21, top: 193 }}
-      initial={false}
-      animate={{ opacity: ready ? 1 : 0, y: ready ? 0 : 6 }}
-      transition={{ duration: 0.4, delay: ready ? 0.12 : 0, ease: IN_EASE }}
-    >
+    {/* The dots sit UNDER the pill, as Figma stacks them — they overlap it
+        by design, and the pill has to stay legible over them. */}
+    <ThinkingDots />
+
+    {/* "View flights" (853:75914) at (21, 193). */}
+    <div className="absolute" style={{ left: 21, top: 193 }}>
       <ViewFlightsPill />
-    </motion.div>
+    </div>
 
     {/* Present on both faces — 36×36 at card (323, 195). */}
     <div
