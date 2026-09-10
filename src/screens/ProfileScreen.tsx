@@ -160,18 +160,26 @@ export default function ProfileScreen() {
   /* Collapse. The passes stay put as the page scrolls under them and
      flatten into a tab strip — so the screen never loses the control that
      says which profile you are looking at. */
-  const cardH = useTransform(scrollY, [40, 300], [CARD_H, 26], { clamp: true });
+  /* The card doesn't shrink — it SWINGS. The bottom edge lifts out of the
+     viewport toward the camera while the top edge stays pinned, so the
+     face foreshortens into a bar the way a real card tipping away from you
+     does. 84° leaves a sliver rather than a true edge-on line, which would
+     vanish. */
+  const collapseX = useTransform(scrollY, [40, 300], [0, 84], { clamp: true });
+  /* The box it occupies follows the PROJECTION of that swing, not a linear
+     ramp — cos is what the eye sees, and a linear box would crop the card
+     mid-swing. */
+  const cardH = useTransform(collapseX, (d) =>
+    Math.max(26, CARD_H * Math.cos((d * Math.PI) / 180)),
+  );
   /* The faces fade well before the shape finishes flattening: content
      squashed into a 26px bar reads as a rendering fault, where an empty
      tab reads as a tab. */
   const faceOpacity = useTransform(scrollY, [40, 170], [1, 0], { clamp: true });
   /* The strip shrinks with them — held at full height it would sit over
      the page and swallow taps meant for the content underneath. */
-  const trackH = useTransform(
-    scrollY,
-    [40, 300],
-    [CARD_H + CARD_PAD_T + CARD_PAD_B, 26 + CARD_PAD_T + 26],
-    { clamp: true },
+  const trackH = useTransform(cardH, (h) =>
+    h > 300 ? h + CARD_PAD_T + CARD_PAD_B : h + CARD_PAD_T + 26,
   );
   /* The bar the faces hand off to. Starts a touch after they begin
      fading so the two never both read at full strength. */
@@ -441,6 +449,7 @@ export default function ProfileScreen() {
                 // fights between two cards.
                 interactive={i === profileIdx}
                 height={cardH}
+                collapseX={collapseX}
                 faceOpacity={faceOpacity}
                 tabOpacity={tabOpacity}
                 collapsed={collapsed}
@@ -682,6 +691,7 @@ function WorldPassCard({
   lit,
   interactive = true,
   height,
+  collapseX,
   faceOpacity,
   tabOpacity,
   collapsed = false,
@@ -707,6 +717,8 @@ function WorldPassCard({
   interactive?: boolean;
   /** Driven by the page scroll: 350 open, 26 when it has become a tab. */
   height?: MotionValue<number>;
+  /** Degrees of the collapse swing: 0 face-on, 84 nearly edge-on. */
+  collapseX?: MotionValue<number>;
   /** Fades the faces out ahead of the shape finishing its flatten. */
   faceOpacity?: MotionValue<number>;
   /** Fades the tab bar in as the faces leave. */
@@ -776,8 +788,11 @@ function WorldPassCard({
           the sway never line up into an obvious loop — the card wanders
           instead of ticking. */}
       <motion.div
-        className="h-full w-full"
-        style={{ perspective: 1200 }}
+        className="absolute left-0 top-0"
+        // Fixed at the card's real height. If this followed the shrinking
+        // box the faces would be scaled flat as well as rotated, and the
+        // two together read as a squash rather than a swing.
+        style={{ width: CARD_W, height: CARD_H, perspective: 1200 }}
         animate={
           collapsed
             ? { y: 0, x: 0 }
@@ -850,8 +865,12 @@ function WorldPassCard({
             SOMETHING behind — fade the plane alone and the strip
             disappears along with the content on it. */}
         <motion.div
-          className="pointer-events-none absolute left-0 top-0 flex h-full w-full items-center justify-center overflow-hidden"
+          className="pointer-events-none absolute left-0 top-0 flex w-full items-center justify-center overflow-hidden"
           style={{
+            // Closes WITH the swing, not with the float wrapper — that one
+            // is pinned at the card's full height so the face has room to
+            // rotate, and a bar matching it would be 350 tall.
+            height: height ?? CARD_H,
             opacity: tabOpacity ?? 0,
             borderRadius: 13,
             background: lit
@@ -875,6 +894,21 @@ function WorldPassCard({
           </span>
         </motion.div>
 
+        {/* The swing. Its own perspective rather than the float wrapper's,
+            because the vanishing point has to sit ON the hinge — with the
+            default centre origin the near bottom edge projects downward
+            and outward as it comes at you, so the card got TALLER on its
+            way to becoming a bar. transformPerspective puts the vanishing
+            point at transformOrigin, and that origin is the top edge. */}
+        <motion.div
+          className="h-full w-full"
+          style={{
+            rotateX: collapseX ?? 0,
+            transformOrigin: "50% 0%",
+            transformPerspective: 900,
+            transformStyle: "preserve-3d",
+          }}
+        >
         {/* Flip plane. Drag horizontally to turn the card — unchanged, and
             it does not fight the carousel: that is a native SCROLL
             container, and scrolling (wheel / trackpad) is a different
@@ -1353,6 +1387,7 @@ function WorldPassCard({
             </div>
           </div>
 
+        </motion.div>
         </motion.div>
         </motion.div>
       </motion.div>
