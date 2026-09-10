@@ -28,6 +28,9 @@
 
 export type SourceChip = { label: string; faces: number };
 
+/** The two rows that open a bottom sheet when their node is tapped. */
+export type InfoSheetKey = "visa-delivery" | "flight-booking";
+
 export type TripItem = {
   /* Optional: in forex, eSim and Safety the rail node and the heading are
      the same row, so the group carries both and the item beneath is only a
@@ -51,6 +54,19 @@ export type TripItem = {
   sources?: SourceChip;
   /** Filled node on the rail — a black tile with a tick, not a circle. */
   done?: boolean;
+  /** Tapping this row's rail node opens the matching bottom sheet
+      (Figma 947:38726 and 947:40652). Only the two rows the design gives a
+      sheet to carry it — the node is inert everywhere else, which is what
+      keeps it from promising a panel that does not exist. */
+  sheet?: InfoSheetKey;
+  /** Expanded copy for the detail view (947:43798). Figma writes the call
+      log out in full there and abbreviates it in the column, so the two are
+      different strings rather than the same one truncated. Falls back to
+      `body`. */
+  detail?: string;
+  /** Substrings of `detail` the design sets in black against the #808080
+      run. Matched literally, in order. */
+  emphasis?: string[];
   /** The title IS the live status, so it takes the colour gradient the
       status lines use. Rows with a separate `status` put the gradient
       there instead; these have no status line of their own. */
@@ -100,12 +116,16 @@ export const TRIP_SECTIONS: TripSection[] = [
         items: [
           {
             title: "Visa Delivery",
+            sheet: "visa-delivery",
             more: "05 more",
             call: true,
             agents: 1,
             audio: "1:23",
             status: "Called customer care...",
             body: "Spoke with a consular officer (+91 7283763812). Confirmed that your application is on track. Follow-up scheduled for tomorrow",
+            detail:
+              "Spoke with embassy agent on +91 7283763812 and confirmed that everything is on track with your visa. Will follow up again tomorrow.",
+            emphasis: ["+91 7283763812", "Will follow up again tomorrow."],
             sources: { label: "3 Sources", faces: 2 },
           },
         ],
@@ -139,6 +159,7 @@ export const TRIP_SECTIONS: TripSection[] = [
         items: [
           {
             title: "Flight Booked",
+            sheet: "flight-booking",
             body: "QF81 • Qantas Airways (Economy)",
             sources: { label: "1 Sources", faces: 1 },
             done: true,

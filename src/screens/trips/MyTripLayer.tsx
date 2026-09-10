@@ -1,10 +1,10 @@
 "use client";
 
 import Image from "next/image";
-import type { ReactNode } from "react";
+import { useState, type ReactNode } from "react";
 import { motion, useTransform, type MotionValue } from "framer-motion";
-import AskBar from "@/components/AskBar";
 import TripSheet from "./TripSheet";
+import TripOverlays, { type TripOverlay } from "./TripOverlays";
 import type { HandoffBeat } from "./beats";
 import { applyMask, incomingMask, rippleAt, submergence, useRippleStyle } from "./ripple";
 
@@ -82,8 +82,13 @@ function Surface({
          sits OUTSIDE the scroll container and after it in DOM order. That
          one was swallowing every wheel and touch event on the screen, so
          the column could be scrolled programmatically but not by hand.
-         The bar itself re-enables pointer events on its own box. */
-      style={{ opacity, y, filter: blur, pointerEvents: "none" }}
+
+         A flow surface is a different shape: it is sized to its content
+         and sits inside the scroller, so it covers nothing it should not.
+         It has to stay interactive — the agent column's rail nodes and
+         action pills live under it, and blanking pointer events there let
+         every tap fall through to the white panel behind. */
+      style={{ opacity, y, filter: blur, pointerEvents: flow ? "auto" : "none" }}
     >
       {children}
     </motion.div>
@@ -124,6 +129,11 @@ export default function MyTripLayer({
   sweep: MotionValue<number>;
 }) {
   const revealing = beat === "sweeping" || beat === "settled";
+  /* Which panel the column has opened, if any — the rail nodes and the
+     action pills both raise one. Held here rather than in TripSheet
+     because the sheets have to escape the scroller and cover the whole
+     shell, and TripSheet lives inside it. */
+  const [overlay, setOverlay] = useState<TripOverlay | null>(null);
   const maskRef = useRippleStyle<HTMLDivElement>(sweep, incomingMask, applyMask);
 
   return (
@@ -476,16 +486,18 @@ export default function MyTripLayer({
           {/* ── Agent activity sheet ──────────────────────────────────── */}
           <Surface sweep={sweep} at={770} flow>
             <div style={{ marginLeft: 30, width: 380 }}>
-              <TripSheet />
+              <TripSheet onOpen={setOverlay} />
             </div>
           </Surface>
         </div>
       </div>
 
-      {/* Pinned: the composer floats over the scroll, as in Figma. */}
-      <Surface sweep={sweep} at={872}>
-        <AskBar sendFilled delay={0} />
-      </Surface>
+      {/* No composer on this screen. It belongs to the detail view, where
+          it opens already carrying the tapped action and the row it came
+          from — an empty "Ask anything" bar pinned over the column was the
+          same control with nothing attached to it. */}
+
+      <TripOverlays overlay={overlay} onClose={() => setOverlay(null)} />
     </motion.div>
   );
 }

@@ -1,7 +1,10 @@
 "use client";
 
+import { useState } from "react";
 import Image from "next/image";
+import { AnimatePresence, motion } from "framer-motion";
 import { TRIP_SECTIONS, type TripGroup, type TripItem, type TripSection } from "./tripSections";
+import type { TripOverlay } from "./TripOverlays";
 
 /* The scrolling agent column — Figma 947:26137, measured off the node.
  *
@@ -131,7 +134,9 @@ const META: React.CSSProperties = {
  * Every node gets a rail. Where an item has sub-rows the rail branches to
  * them; where it has none it still drops a short stub, which is what
  * Figma's second connector (Group 1991427812, 15x22.9) is. */
-function Rail({ item, gid }: { item: TripItem; gid: string }) {
+/* Where an item's sub-rows sit, measured from the top of the item box —
+   the same margin stack Item lays out with. */
+function itemBranches(item: TripItem) {
   const branches: number[] = [];
   let y = 5 + 20; /* title top + title height */
   if (item.more) {
@@ -148,6 +153,10 @@ function Rail({ item, gid }: { item: TripItem; gid: string }) {
     branches.push(top + 8); /* status line centre */
     y = top + 16;
   }
+  return branches;
+}
+
+function Rail({ branches, gid }: { branches: number[]; gid: string }) {
   /* Relative to the node's bottom edge, where the rail starts. */
   const local = branches.map((b) => b - 30);
   /* No sub-rows to point at: a plain stub, Figma's 22.9. */
@@ -157,7 +166,14 @@ function Rail({ item, gid }: { item: TripItem; gid: string }) {
   return (
     <svg
       className="absolute"
-      style={{ left: 34.5, top: 30, width: 18.167, height, overflow: "visible" }}
+      style={{
+        left: 34.5,
+        top: 30,
+        width: 18.167,
+        height,
+        overflow: "visible",
+        pointerEvents: "none",
+      }}
       viewBox={`0 0 18.167 ${height}`}
       fill="none"
       aria-hidden
@@ -186,11 +202,18 @@ function Rail({ item, gid }: { item: TripItem; gid: string }) {
   );
 }
 
-function RailNode({ done }: { done?: boolean }) {
+function RailNode({ done, onOpen }: { done?: boolean; onOpen?: () => void }) {
   /* 30x30, r10.714, 1.5px #D6D9DC. When complete it carries a 22x22
      #0B0B0B square at r8 with a white tick — not a green circle. */
+  /* A button only where a sheet exists behind it. Making every node
+     tappable would advertise a panel on twenty rows that have none, and a
+     control that does nothing is worse than no control. */
+  const Tag = onOpen ? "button" : "div";
   return (
-    <div
+    <Tag
+      type={onOpen ? "button" : undefined}
+      onClick={onOpen}
+      aria-label={onOpen ? "Open details" : undefined}
       className="absolute"
       style={{
         left: 20,
@@ -199,6 +222,7 @@ function RailNode({ done }: { done?: boolean }) {
         height: 30,
         borderRadius: 10.714,
         border: "1.5px solid #d6d9dc",
+        cursor: onOpen ? "pointer" : undefined,
       }}
     >
       {done && (
@@ -215,7 +239,7 @@ function RailNode({ done }: { done?: boolean }) {
           />
         </div>
       )}
-    </div>
+    </Tag>
   );
 }
 
@@ -254,7 +278,7 @@ function MorePill({ label }: { label: string }) {
   );
 }
 
-function AudioBar({ duration }: { duration: string }) {
+export function AudioBar({ duration }: { duration: string }) {
   /* 265x40 at x115: #F9FAFB, 1px #ECEAEF, r30. Play 24 at +8, waveform
      142.3x20 at +61.35, duration hard against x340. */
   return (
@@ -290,7 +314,7 @@ function AudioBar({ duration }: { duration: string }) {
   );
 }
 
-function SourcesChip({ label, faces }: { label: string; faces: number }) {
+export function SourcesChip({ label, faces }: { label: string; faces: number }) {
   /* Glass, not grey: r30, 1px white, backdrop-blur 25, a 166° white
      gradient and the same shadow as the header card. Height 30.171 is
      Figma's, and it is not a rounding error — it is what the group
@@ -341,7 +365,7 @@ function SourcesChip({ label, faces }: { label: string; faces: number }) {
   );
 }
 
-function Actions({ actions }: { actions: string[] }) {
+function Actions({ actions, onAct }: { actions: string[]; onAct: (a: string) => void }) {
   /* 40 tall, r49.5, rgba(255,255,255,0.1) — no border. The label is
      gradient text inset 20px. Figma reaches x444 against a card ending at
      410, so the row is meant to clip and scroll like the category tabs. */
@@ -354,6 +378,7 @@ function Actions({ actions }: { actions: string[] }) {
         <button
           key={a}
           type="button"
+          onClick={() => onAct(a)}
           className="flex-none whitespace-nowrap"
           style={{
             height: 40,
@@ -382,6 +407,11 @@ function Actions({ actions }: { actions: string[] }) {
  * The change in treatment is doing work — dotted says "this heading covers
  * what follows", solid says "these two steps are one sequence". */
 const SPINE_X = 35;
+/* Figma's Line 228 / Line 232 — the same stroke wherever a rule appears:
+   black at 11%, dasharray "2 2". */
+export const DOTTED_RULE =
+  "repeating-linear-gradient(to right, rgba(0,0,0,0.11) 0 2px, transparent 2px 4px)";
+
 const DOTTED_SPINE =
   "repeating-linear-gradient(to bottom, #d6d9dc 0 2px, transparent 2px 5px)";
 
@@ -401,7 +431,17 @@ function GroupNode() {
   );
 }
 
-function Item({ item, last, index }: { item: TripItem; last: boolean; index: number }) {
+function Item({
+  item,
+  last,
+  index,
+  onOpen,
+}: {
+  item: TripItem;
+  last: boolean;
+  index: number;
+  onOpen: (o: TripOverlay) => void;
+}) {
   /* A row is WORKING when it has something live to say and has not
      finished. Those get onboarding's two shine treatments — the coloured
      sweep on the status line, the grey sweep on the body underneath —
@@ -426,8 +466,13 @@ function Item({ item, last, index }: { item: TripItem; last: boolean; index: num
           carries the marker, so an item without a title draws neither a
           node nor a spine — it is a continuation of that heading, not a
           step of its own. */}
-      {item.title && <RailNode done={item.done} />}
-      {item.title && <Rail item={item} gid={railId} />}
+      {item.title && (
+        <RailNode
+          done={item.done}
+          onOpen={item.sheet ? () => onOpen({ kind: "info", id: item.sheet! }) : undefined}
+        />
+      )}
+      {item.title && <Rail branches={itemBranches(item)} gid={railId} />}
       {/* Solid spine down to the next item's node. It runs to this item's
           own bottom edge, which is exactly where the next node starts —
           the 40px gap between items is this element's padding, so it needs
@@ -435,7 +480,17 @@ function Item({ item, last, index }: { item: TripItem; last: boolean; index: num
       {!last && item.title && (
         <div
           className="absolute"
-          style={{ left: SPINE_X, top: 30, bottom: 0, width: 1, background: "#e6e6ea" }}
+          style={{
+            left: SPINE_X,
+            top: 30,
+            bottom: 0,
+            width: 1,
+            background: "#e6e6ea",
+            /* Runs straight through the node's centre, and it is drawn
+               after it — without this it intercepts every tap aimed at
+               the node it connects to. */
+            pointerEvents: "none",
+          }}
         />
       )}
 
@@ -565,10 +620,12 @@ function Group({
   first,
   last,
   offset,
+  onOpen,
 }: {
   group: TripGroup;
   first: boolean;
   last: boolean;
+  onOpen: (o: TripOverlay) => void;
   /* Running item count before this group, so the shine stagger spreads
      across the whole section rather than restarting at every heading —
      most groups hold one item, so a per-group index left almost every row
@@ -587,7 +644,24 @@ function Group({
               it, so drawing a second node there would invent a step the
               design does not have. */}
           {group.marker === "done" ? (
-            <RailNode done />
+            <>
+              <RailNode done />
+              {/* The heading IS the step here, so the run down to the status
+                  line has to come off the heading's node — Item only draws a
+                  rail for rows that carry a title, and these rows carry none,
+                  which left forex, eSim and Safety with a node pointing at
+                  nothing. Offsets are the heading block's own stack: heading
+                  20, subtitle 10+16, then the 30 that separates it from the
+                  first item, whose status line sits 8 below its own top.
+                  Margins collapse there — the item box has no top padding, so
+                  the status line's 20 is absorbed by the heading's 30. */}
+              {group.items[0]?.status && (
+                <Rail
+                  branches={[(group.subtitle ? 46 : 20) + 30 + 8]}
+                  gid={`rail-h-${group.heading?.replace(/[^a-z0-9]/gi, "").slice(0, 20)}`}
+                />
+              )}
+            </>
           ) : (
             <>
               <GroupNode />
@@ -600,6 +674,7 @@ function Group({
                   height: 49,
                   width: 1,
                   backgroundImage: DOTTED_SPINE,
+                  pointerEvents: "none",
                 }}
               />
             </>
@@ -635,6 +710,7 @@ function Group({
           item={it}
           index={offset + i}
           last={i === group.items.length - 1}
+          onOpen={onOpen}
         />
       ))}
 
@@ -681,7 +757,17 @@ function Group({
 
       {group.actions && (
         <div style={{ paddingLeft: 75 }}>
-          <Actions actions={group.actions} />
+          <Actions
+            actions={group.actions}
+            onAct={(a) =>
+              onOpen({
+                kind: "detail",
+                item: group.items[0],
+                action: a,
+                context: group.heading ?? group.items[0]?.title ?? "",
+              })
+            }
+          />
         </div>
       )}
 
@@ -698,7 +784,7 @@ function Group({
             width: 265,
             height: 1,
             backgroundImage:
-              "repeating-linear-gradient(to right, rgba(0,0,0,0.11) 0 2px, transparent 2px 4px)",
+              DOTTED_RULE,
           }}
         />
       )}
@@ -706,7 +792,21 @@ function Group({
   );
 }
 
-function Section({ section }: { section: TripSection }) {
+function Section({
+  section,
+  onOpen,
+}: {
+  section: TripSection;
+  onOpen: (o: TripOverlay) => void;
+}) {
+  /* The chevron collapses the section to just its header card. Figma draws
+     it pointing up, which is the expanded state — a chevron that only ever
+     points one way is a control that says it does something and doesn't.
+
+     Open by default: the column exists to show what the agents are doing,
+     so it should not open closed. */
+  const [open, setOpen] = useState(true);
+
   return (
     /* Rectangle 240648187: a #F9FAFB tile with a 1px #ECEAEF border, sat
        on the white panel behind it. Three levels, and getting them in the
@@ -808,23 +908,48 @@ function Section({ section }: { section: TripSection }) {
           {section.state}
         </span>
 
-        <Image
-          src={`${S}/next.svg`}
-          alt=""
-          width={20}
-          height={20}
-          style={{
-            position: "absolute",
-            left: 320,
-            top: 52,
-            width: 20,
-            height: 20,
-            transform: "rotate(-90deg)",
-          }}
-        />
+        <button
+          type="button"
+          onClick={() => setOpen((v) => !v)}
+          aria-expanded={open}
+          aria-label={`${open ? "Collapse" : "Expand"} ${section.name}`}
+          className="absolute"
+          /* The tap target is 44 square around Figma's 20px glyph — the
+             glyph is the icon, not the button. */
+          style={{ left: 308, top: 40, width: 44, height: 44 }}
+        >
+          <motion.span
+            className="absolute block"
+            style={{ left: 12, top: 12, width: 20, height: 20 }}
+            initial={false}
+            animate={{ rotate: open ? -90 : 90 }}
+            transition={{ duration: 0.28, ease: [0.22, 1, 0.36, 1] }}
+          >
+            <Image
+              src={`${S}/next.svg`}
+              alt=""
+              width={20}
+              height={20}
+              style={{ width: 20, height: 20 }}
+            />
+          </motion.span>
+        </button>
       </div>
 
-      <div style={{ paddingLeft: 9 }}>
+      <AnimatePresence initial={false}>
+        {open && (
+          <motion.div
+            style={{ paddingLeft: 9, overflow: "hidden" }}
+            initial={{ height: 0, opacity: 0 }}
+            animate={{ height: "auto", opacity: 1 }}
+            exit={{ height: 0, opacity: 0 }}
+            /* Opacity leads on the way in and trails on the way out, so the
+               content is never legible at a height that would clip it. */
+            transition={{
+              height: { duration: 0.34, ease: [0.22, 1, 0.36, 1] },
+              opacity: { duration: 0.2, delay: open ? 0.08 : 0 },
+            }}
+          >
         {section.groups.map((g, i) => (
           <Group
             key={g.heading ?? i}
@@ -834,6 +959,7 @@ function Section({ section }: { section: TripSection }) {
             offset={section.groups
               .slice(0, i)
               .reduce((n, g2) => n + g2.items.length, 0)}
+            onOpen={onOpen}
           />
         ))}
 
@@ -862,19 +988,22 @@ function Section({ section }: { section: TripSection }) {
             {section.add}
           </div>
         )}
-      </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
     </div>
   );
 }
 
-export default function TripSheet() {
+export default function TripSheet({ onOpen }: { onOpen: (o: TripOverlay) => void }) {
   return (
     <div className="flex flex-col" style={{ gap: 20 }}>
       {TRIP_SECTIONS.map((s) => (
-        <Section key={s.key} section={s} />
+        <Section key={s.key} section={s} onOpen={onOpen} />
       ))}
-      {/* Clears the composer, which floats over the bottom of the scroll. */}
-      <div style={{ height: 150 }} />
+      {/* Tail padding so the last section can clear the bottom of the
+          scroll rather than ending flush against it. */}
+      <div style={{ height: 40 }} />
     </div>
   );
 }
