@@ -114,10 +114,14 @@ const COLLAPSE_REST_PROJ =
 
 /* The opening beat. For this many pixels the page scrolls but the body
  * below the stage does NOT move: the plinth fades and the pass starts to
- * lift, and only once that has read does the content begin to rise. It is
- * held by cancelling the scroll, so the same distance is added to the
- * scroller's spacer or the last screen of content becomes unreachable. */
+ * lift, and only once that has read does the content begin to rise.
+ *
+ * The hold is then GIVEN BACK over the next stretch, at which point the
+ * body is exactly where the scroll says it should be. Keeping the offset
+ * left the body parked 80px low for the entire rest of the page — dead
+ * white space above the first line that no amount of scrolling closed. */
 const BODY_HOLD = 80;
+const BODY_CATCHUP = 260;
 
 /* Perimeter of the card's rounded rect, for the scan trace's dash maths:
  * two straight runs per axis plus one full circle of corner arc. */
@@ -249,13 +253,11 @@ export default function ProfileScreen() {
      trails it through the spring, so a lagging card kept catching the KYC
      line that had already come up to meet it. Taking the room unlagged
      means the card is never larger than the gap actually left for it. */
-  /* The real size reduction, separate from the perspective maths. Without
-     it the cards stayed near full width the whole way down while the gap
-     between them stayed a fixed 76px, so the neighbour read as merging
-     into the main pass. */
-  const collapseShrink = useTransform(collapseX, (d) => {
-    return 1 - COLLAPSE_SHRINK * Math.sin((d * Math.PI) / 180);
-  });
+  /* Each pass shrinks about its OWN centre and the 76px pitch between them
+     is left alone, so the whitespace opens as they get smaller. An earlier
+     version pulled them together by exactly the shrink, to hold the gap
+     ratio constant — but that is the direction that makes them touch, and
+     two passes colliding is a worse read than a gap that grows. */
   const collapseScale = useTransform([collapseX, scrollY], ([d, y]) => {
     const P = COLLAPSE_PERSPECTIVE;
     const r = ((d as number) * Math.PI) / 180;
@@ -266,10 +268,12 @@ export default function ProfileScreen() {
        is where the body has actually got to, less a breathing gap — and
        through the opening beat it has not got anywhere. Uniform, so the
        card keeps its proportions on the way down rather than squashed. */
-    const room = Math.max(
-      COLLAPSE_REST_PROJ,
-      614 - Math.max(0, (y as number) - BODY_HOLD) - CARD_Y - 26,
-    );
+    const yy = y as number;
+    const held =
+      yy <= BODY_HOLD
+        ? yy
+        : BODY_HOLD * (1 - Math.min(1, (yy - BODY_HOLD) / BODY_CATCHUP));
+    const room = Math.max(COLLAPSE_REST_PROJ, 614 - yy + held - CARD_Y - 26);
     const projected = CARD_H * Math.cos(r);
     const squeeze =
       projected > 1 ? Math.max(0, Math.min(1, room / projected)) : 1;
@@ -291,11 +295,15 @@ export default function ProfileScreen() {
      swing held back to 32, means they never share the frame while the card
      is off-plane. */
   const stageOpacity = useTransform(scrollS, [0, 30], [1, 0], { clamp: true });
-  /* Cancels the scroll one-for-one through the opening beat, then holds a
-     constant offset — so the body sits still, then moves with the page.
-     Off the RAW scroll, not the spring: it has to cancel the native scroll
+  /* Cancels the scroll one-for-one through the opening beat, then pays the
+     offset back so the body ends up exactly where the scroll says. Off the
+     RAW scroll, not the spring: it has to cancel the native scroll
      exactly, and a smoothed version would drift against it. */
-  const bodyHold = useTransform(scrollY, (y) => Math.min(y, BODY_HOLD));
+  const bodyHold = useTransform(scrollY, (y) => {
+    if (y <= BODY_HOLD) return y;
+    const back = Math.min(1, (y - BODY_HOLD) / BODY_CATCHUP);
+    return BODY_HOLD * (1 - back);
+  });
   const [collapsed, setCollapsed] = useState(false);
 
   /* The card leaves around y 500; the title arrives as it goes. */
@@ -493,7 +501,7 @@ export default function ProfileScreen() {
 
       {/* Gives the scroll container the design's full height, so the
           absolutely-positioned body has room to scroll into. */}
-        <div style={{ height: 1781 + BODY_HOLD }} />
+        <div style={{ height: 1781 }} />
       </div>
 
       {/* Card carousel — arrives AFTER the disk, and drops onto it. The
@@ -581,8 +589,6 @@ export default function ProfileScreen() {
                 interactive={i === profileIdx}
                 collapseX={collapseX}
                 collapseScale={collapseScale}
-                collapseShrink={collapseShrink}
-                slot={i - profileIdx}
                 collapsed={collapsed}
                 onSelect={() => {
                   trackRef.current?.scrollTo({
@@ -617,9 +623,12 @@ export default function ProfileScreen() {
       >
         <div
           style={{
-            height: 136,
+            // Solid past the title, not up to it. At 136 tall fading from
+            // 62% the white ran out at 84px while the title sits at 99 —
+            // so the page showed straight through the type.
+            height: 158,
             background:
-              "linear-gradient(180deg, #ffffff 0%, #ffffff 62%, rgba(255,255,255,0) 100%)",
+              "linear-gradient(180deg, #ffffff 0%, #ffffff 82%, rgba(255,255,255,0) 100%)",
           }}
         />
         <motion.p
@@ -823,8 +832,6 @@ function WorldPassCard({
   interactive = true,
   collapseX,
   collapseScale,
-  collapseShrink,
-  slot = 0,
   collapsed = false,
   onSelect,
   onConnect,
@@ -850,11 +857,6 @@ function WorldPassCard({
   collapseX?: MotionValue<number>;
   /** Cancels the perspective magnification so the swing stays on screen. */
   collapseScale?: MotionValue<number>;
-  /** The size reduction alone, without the perspective maths — the gap
-   *  between passes is closed by exactly this so the ratio holds. */
-  collapseShrink?: MotionValue<number>;
-  /** Passes away from the one in focus: −1, 0, +1. */
-  slot?: number;
   /** True once the strip is reading as tabs rather than as cards. */
   collapsed?: boolean;
   /** Tap-to-select, which is what a tab is. */
@@ -890,17 +892,6 @@ function WorldPassCard({
     Math.min(1, Math.hypot(a as number, b as number) / 13),
   );
   const dispersion = useTransform(tiltAmount, [0, 1], [0.16, 0.85]);
-
-  /* Closing the gap by exactly the shrink is what keeps the whitespace
-     ratio constant. Scaling the passes alone leaves a fixed 76px between
-     them, so the gap grows relative to the cards; pulling each pass toward
-     the one in focus by (1 − shrink) × its distance reproduces scaling the
-     whole strip about that pass, without animating any layout. */
-  const shrinkFallback = useMotionValue(1);
-  const gapPull = useTransform(
-    collapseShrink ?? shrinkFallback,
-    (k) => -(1 - k) * slot * CARD_GAP,
-  );
 
   const onMove = (e: React.MouseEvent<HTMLDivElement>) => {
     if (!interactive) return;
@@ -1012,7 +1003,6 @@ function WorldPassCard({
         <motion.div
           className="h-full w-full"
           style={{
-            x: gapPull,
             rotateX: collapseX ?? 0,
             scale: collapseScale ?? 1,
             transformOrigin: "50% 0%",
