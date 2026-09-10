@@ -123,6 +123,12 @@ const COLLAPSE_REST_PROJ =
 const BODY_HOLD = 80;
 const BODY_CATCHUP = 260;
 
+/* Where the body starts. Figma's 614 puts the first line flush against the
+ * plinth, which ends at exactly 614 (top 526 + height 88) — no gap at all.
+ * Pushed down to let the stage breathe, and the scroller's spacer carries
+ * the same amount so the reachable bottom does not move. */
+const BODY_TOP = 660;
+
 /* Perimeter of the card's rounded rect, for the scan trace's dash maths:
  * two straight runs per axis plus one full circle of corner arc. */
 const TRACE_PERIMETER =
@@ -259,7 +265,7 @@ export default function ProfileScreen() {
     // Cancels the perspective magnification (see above).
     const fit = P / (P + CARD_H * Math.sin(r));
     /* And then shrink further if the page has closed in. The body starts
-       at 614 and the card's top is pinned at CARD_Y, so the clear height
+       at BODY_TOP and the card's top is pinned at CARD_Y, so the clear height
        is where the body has actually got to, less a breathing gap — and
        through the opening beat it has not got anywhere. Uniform, so the
        card keeps its proportions on the way down rather than squashed. */
@@ -268,7 +274,10 @@ export default function ProfileScreen() {
       yy <= BODY_HOLD
         ? yy
         : BODY_HOLD * (1 - Math.min(1, (yy - BODY_HOLD) / BODY_CATCHUP));
-    const room = Math.max(COLLAPSE_REST_PROJ, 614 - yy + held - CARD_Y - 26);
+    const room = Math.max(
+      COLLAPSE_REST_PROJ,
+      BODY_TOP - yy + held - CARD_Y - 26,
+    );
     const projected = CARD_H * Math.cos(r);
     const squeeze =
       projected > 1 ? Math.max(0, Math.min(1, room / projected)) : 1;
@@ -339,6 +348,14 @@ export default function ProfileScreen() {
         // card stage stays put and the content below it moves, which is
         // the behaviour the design implies rather than a shrunken fit.
         className="absolute inset-0 overflow-y-auto overflow-x-hidden [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
+        /* The scroller is where the containment belongs, because this is
+           the boundary everything above it depends on. position:absolute
+           with z-index auto is NOT a stacking context, so any positively
+           z-indexed descendant — anywhere in the body, at any depth, added
+           at any time — escapes into the root one and competes with the
+           pass strip and the header directly. Isolating here means nothing
+           inside can ever outrank the chrome, whatever it does. */
+        style={{ isolation: "isolate", zIndex: 0 }}
         /* Anywhere-on-screen swipe to change profile, once the passes have
            collapsed. onPan rather than drag: drag captures the pointer and
            rewrites touch-action, which would take vertical scrolling away
@@ -510,6 +527,7 @@ export default function ProfileScreen() {
         style={{ y: bodyHold, isolation: "isolate", zIndex: 0 }}
       >
       <ProfileBody
+        top={BODY_TOP}
         show={bodyIn}
         onViewBenefits={() => setBenefitsOpen(true)}
         onOpenBenefit={() => setVerifyOpen(true)}
@@ -532,7 +550,7 @@ export default function ProfileScreen() {
 
       {/* Gives the scroll container the design's full height, so the
           absolutely-positioned body has room to scroll into. */}
-        <div style={{ height: 1781 }} />
+        <div style={{ height: 1781 + (BODY_TOP - 614) }} />
       </motion.div>
 
       {/* Card carousel — arrives AFTER the disk, and drops onto it. The
@@ -553,7 +571,7 @@ export default function ProfileScreen() {
           top: CARD_Y - CARD_PAD_T,
           width: 440,
           height: CARD_H + CARD_PAD_T + CARD_PAD_B,
-          zIndex: 14,
+          zIndex: 30,
           scrollSnapType: "x mandatory",
           scrollBehavior: "smooth",
           // Snaps to the design's x, so the pass in focus lands at 94
@@ -651,7 +669,7 @@ export default function ProfileScreen() {
           arrives around them rather than replacing them. */}
       <motion.div
         className="pointer-events-none absolute inset-x-0 top-0"
-        style={{ zIndex: 15, opacity: headerIn }}
+        style={{ zIndex: 31, opacity: headerIn }}
       >
         <div
           style={{
@@ -682,7 +700,7 @@ export default function ProfileScreen() {
           the back and settings controls scrolled away with the content,
           and a status bar that scrolls off is plainly wrong on a phone.
           Sitting outside, they hold still for the whole page. */}
-      <div className="pointer-events-none absolute inset-0" style={{ zIndex: 20 }}>
+      <div className="pointer-events-none absolute inset-0" style={{ zIndex: 34 }}>
       {/* Status bar — the design uses the iOS component; this is the
           9:41 / signal / wifi / battery row it renders as. */}
       <div

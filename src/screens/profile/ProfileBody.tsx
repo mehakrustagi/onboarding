@@ -179,8 +179,12 @@ export default function ProfileBody({
   onOpenBenefit,
   onActivateBenefit,
   onOpenAgent,
+  top,
 }: {
   show: boolean;
+  /** Where this block starts on the stage. Owned by ProfileScreen, which
+   *  also measures the swinging pass against it. */
+  top: number;
   /* The benefits sheet has to cover the whole phone, and this block sits
      in an offset container 614px down — so the sheet is owned by
      ProfileScreen and this only asks for it. */
@@ -203,7 +207,7 @@ export default function ProfileBody({
   const t = (i: number) => i * 0.09;
 
   return (
-    <div className="absolute left-0 right-0" style={{ top: 614 }}>
+    <div className="absolute left-0 right-0" style={{ top }}>
       {/* KYC status line */}
       <Reveal delay={t(0)} show={show}>
         <div className="flex items-center justify-center gap-[6px]">
