@@ -1649,18 +1649,24 @@ function WorldPassCard({
             siblings sort by DEPTH, not by z-index, so a flat sibling would
             be interleaved with the faces rather than laid over them.
 
-            One grey for all of them — see below. */}
+            The pass in focus is dark, the one beside it grey — see the
+            fill below. */}
         <motion.div
           className="pointer-events-none absolute inset-0"
           style={{
             opacity: parkFill,
             borderRadius: 30,
-            // Same grey for every pass. Giving the neighbour a lighter
-            // one made the two planks read as different objects — and
-            // against the black face a dark grey is invisible while a
-            // light one is not, so mid-swing they did not even look like
-            // the same effect.
-            background: "#2f2f34",
+            /* The pass in focus takes the gradient as given: 0E0E0E to
+               747474, left to right. The neighbour is the same ramp lifted
+               into grey — same shape, same direction, so the two still
+               read as the same object, but the one you are not on sits
+               back. Differentiating by LIGHTNESS rather than by a
+               different colour is what makes that work; an earlier version
+               used an unrelated light grey and the two planks stopped
+               looking like the same effect. */
+            background: interactive
+              ? "linear-gradient(90deg, #0E0E0E 0%, #747474 100%)"
+              : "linear-gradient(90deg, #6E6E6E 0%, #B4B4B4 100%)",
             z: 2,
           }}
         />
