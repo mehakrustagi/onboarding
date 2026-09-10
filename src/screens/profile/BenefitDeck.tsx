@@ -1,5 +1,7 @@
 "use client";
 
+import { useEffect, useState } from "react";
+import { motion } from "framer-motion";
 import ActivatePill from "./ActivatePill";
 import { BENEFIT_CARDS, type BenefitCard } from "./benefitCards";
 
@@ -16,6 +18,8 @@ import { BENEFIT_CARDS, type BenefitCard } from "./benefitCards";
  *   artwork   322×181 at (233, -7) — deliberately larger than the card,
  *             which clips it
  */
+
+const IN_EASE = [0.22, 1, 0.36, 1] as const;
 
 export const DECK_W = 380;
 export const DECK_H = 186; // 70 + 116, the deepest of the three
@@ -97,41 +101,118 @@ export function BenefitCardFace({
   );
 }
 
+/* The three stack positions, as Figma draws them (853:20915/16/17):
+ *   front 380×154 at (0, 0)
+ *   mid   356×144 at (12, 26)
+ *   back  306×116 at (37, 70)
+ *
+ * Expressed as a transform of the front card rather than as three
+ * different boxes, so one card can travel between them. Each slot's
+ * centre and scale is derived from those rects: mid is centred 21px lower
+ * at 0.937×0.935, back 51px lower at 0.805×0.753. */
+const SLOTS = [
+  { y: 0, sx: 1, sy: 1, opacity: 1 },
+  { y: 21, sx: 356 / 380, sy: 144 / 154, opacity: 1 },
+  { y: 51, sx: 306 / 380, sy: 116 / 154, opacity: 1 },
+  /* A fourth, fully hidden, so a card leaving the back has somewhere to
+     go and re-enters from — without it the cycle would pop. */
+  { y: 68, sx: 0.72, sy: 0.66, opacity: 0 },
+];
+
+/* How long each card holds the front. Slow: this is ambient motion behind
+ * the reading, not a carousel asking to be watched. */
+const HOLD_MS = 3600;
+
 export default function BenefitDeck({
-  benefit = FLIGHT_BENEFIT,
+  cards = BENEFIT_CARDS,
   onOpen,
   onActivate,
 }: {
-  benefit?: BenefitFace;
-  /** Tapping the card anywhere but ACTIVATE. */
-  onOpen?: () => void;
-  onActivate?: () => void;
+  cards?: BenefitCard[];
+  /** Tapping the card anywhere but ACTIVATE — receives the card in front. */
+  onOpen?: (card: BenefitCard) => void;
+  onActivate?: (card: BenefitCard) => void;
 }) {
+  /* Which card is at the front. Advancing this rotates the whole stack:
+     the front recedes, everything behind moves up one, and the card that
+     fell off the back re-enters — a loop rather than a queue. */
+  const [front, setFront] = useState(0);
+  const [paused, setPaused] = useState(false);
+
+  useEffect(() => {
+    if (paused || cards.length < 2) return;
+    const t = window.setInterval(
+      () => setFront((f) => (f + 1) % cards.length),
+      HOLD_MS,
+    );
+    return () => window.clearInterval(t);
+  }, [paused, cards.length]);
+
+  const top = cards[front];
+
   return (
     <div
-      role="button"
-      tabIndex={0}
-      onClick={onOpen}
-      onKeyDown={(e) => {
-        if (e.key === "Enter" || e.key === " ") {
-          e.preventDefault();
-          onOpen?.();
-        }
-      }}
-      className="relative mx-auto cursor-pointer"
+      className="relative mx-auto"
       style={{ width: DECK_W, height: DECK_H }}
+      // Holds while you're reading it, and while a menu is open over it.
+      onMouseEnter={() => setPaused(true)}
+      onMouseLeave={() => setPaused(false)}
     >
-      <div
-        className="pointer-events-none absolute"
-        style={{ left: 37, top: 70, width: 306, height: 116, ...SHELL }}
-      />
-      <div
-        className="pointer-events-none absolute"
-        style={{ left: 12, top: 26, width: 356, height: 144, ...SHELL }}
-      />
-      <div className="absolute left-0 top-0">
-        <BenefitCardFace benefit={benefit} onActivate={onActivate} />
-      </div>
+      {cards.map((c, i) => {
+        // Distance from the front, wrapping — so the stack is circular
+        // rather than running out at the end of the list.
+        const pos = (i - front + cards.length) % cards.length;
+        const slot = SLOTS[Math.min(pos, SLOTS.length - 1)];
+        const isFront = pos === 0;
+        return (
+          <motion.div
+            key={c.key}
+            className="absolute left-0 top-0"
+            style={{
+              width: 380,
+              height: 154,
+              transformOrigin: "50% 50%",
+              // Later cards sit behind, and the one wrapping round is
+              // furthest back so it never crosses in front of the stack.
+              zIndex: cards.length - pos,
+              pointerEvents: isFront ? "auto" : "none",
+              cursor: isFront ? "pointer" : "default",
+            }}
+            initial={false}
+            animate={{
+              y: slot.y,
+              scaleX: slot.sx,
+              scaleY: slot.sy,
+              opacity: slot.opacity,
+            }}
+            transition={{
+              duration: 0.72,
+              ease: IN_EASE,
+              // The card dropping out of sight fades first, so it is gone
+              // before it has to travel back to the front.
+              opacity: { duration: slot.opacity === 0 ? 0.28 : 0.5, ease: IN_EASE },
+            }}
+            onClick={isFront ? () => onOpen?.(c) : undefined}
+            onKeyDown={
+              isFront
+                ? (e) => {
+                    if (e.key === "Enter" || e.key === " ") {
+                      e.preventDefault();
+                      onOpen?.(c);
+                    }
+                  }
+                : undefined
+            }
+            role={isFront ? "button" : undefined}
+            tabIndex={isFront ? 0 : -1}
+            aria-hidden={!isFront}
+          >
+            <BenefitCardFace benefit={c} onActivate={() => onActivate?.(c)} />
+          </motion.div>
+        );
+      })}
+      {/* Keeps the deck's box the design's height regardless of transforms. */}
+      <span className="sr-only">{top.title}</span>
     </div>
   );
 }

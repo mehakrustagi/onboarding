@@ -1,7 +1,13 @@
 "use client";
 
 import Image from "next/image";
-import { motion, useMotionValue, useSpring, useTransform } from "framer-motion";
+import {
+  motion,
+  useMotionValue,
+  useSpring,
+  useTransform,
+  type MotionValue,
+} from "framer-motion";
 import { useEffect, useRef, useState } from "react";
 import { haptic } from "@/lib/haptics";
 import ProfileBody from "./profile/ProfileBody";
@@ -16,7 +22,6 @@ import ProgramDetail from "./profile/ProgramDetail";
 import SettingsSheet from "./profile/SettingsSheet";
 import DisconnectTerms from "./profile/DisconnectTerms";
 import BenefitDetail, { type BenefitDetailContent } from "./profile/BenefitDetail";
-import { FLIGHT_BENEFIT } from "./profile/BenefitDeck";
 import AgentSheet from "./profile/AgentSheet";
 import AirportSheet from "./profile/AirportSheet";
 import { AGENT_SPECS } from "./profile/agentSpecs";
@@ -57,6 +62,66 @@ const CARD_GAP = CARD_W + CARD_PEEK_GAP;
  * 110px below it and only a little above. */
 const CARD_PAD_T = 24;
 const CARD_PAD_B = 120;
+
+/* The swing's shape, specified by what it should LOOK like rather than by
+ * an arbitrary camera distance.
+ *
+ * A trapezium is the one thing an affine transform cannot make — parallel
+ * edges stay parallel under scale and rotate alike — so the taper has to
+ * come from perspective. Hinged at its top edge, the card's bottom travels
+ * toward the camera and is drawn larger, which leaves the top narrower:
+ * the trapezium, for free, out of the same rotation that does the swing.
+ *
+ * So the two numbers below are the design, and the camera is solved from
+ * them. At full swing the top edge reads NARROW smaller than the bottom,
+ * and the card has lost SHRINK of its size overall. Working the projection
+ * backwards from that gives the perspective distance — which is why this
+ * is derived and not typed in. */
+const COLLAPSE_TOP_NARROW = 0.1;
+const COLLAPSE_SHRINK = 0.3;
+const COLLAPSE_PERSPECTIVE =
+  (CARD_H * (1 - COLLAPSE_SHRINK)) / COLLAPSE_TOP_NARROW - CARD_H;
+
+/* Where the swing stops. The pass does NOT go edge-on and vanish — it
+ * parks as a sliver under the header and stays there for the rest of the
+ * page, so the thing you were looking at is still on screen and still
+ * says which pass it is.
+ *
+ * Given as the height it should come to rest at, and the angle is solved
+ * from it: projected height is CARD_H·cos θ·(1 − SHRINK·sin θ), which has
+ * no clean inverse, so it's walked once at module load rather than
+ * hand-tuned to a degree figure that would silently drift the moment
+ * SHRINK changed. */
+const COLLAPSE_REST_H = 13;
+const COLLAPSE_MAX_DEG = (() => {
+  let lo = 0;
+  let hi = 90;
+  for (let i = 0; i < 40; i++) {
+    const mid = (lo + hi) / 2;
+    const r = (mid * Math.PI) / 180;
+    const h = CARD_H * Math.cos(r) * (1 - COLLAPSE_SHRINK * Math.sin(r));
+    if (h > COLLAPSE_REST_H) lo = mid;
+    else hi = mid;
+  }
+  return lo;
+})();
+/* The clamp measures against the UNSHRUNK projection, so it has to floor
+ * on the same quantity — floored on the rest height itself it kept biting
+ * past the rest point and walked the sliver down from 13px to 9 as you
+ * scrolled further. */
+const COLLAPSE_REST_PROJ =
+  CARD_H * Math.cos((COLLAPSE_MAX_DEG * Math.PI) / 180);
+
+/* The opening beat. For this many pixels the page scrolls but the body
+ * below the stage does NOT move: the plinth fades and the pass starts to
+ * lift, and only once that has read does the content begin to rise.
+ *
+ * The hold is then GIVEN BACK over the next stretch, at which point the
+ * body is exactly where the scroll says it should be. Keeping the offset
+ * left the body parked 80px low for the entire rest of the page — dead
+ * white space above the first line that no amount of scrolling closed. */
+const BODY_HOLD = 80;
+const BODY_CATCHUP = 260;
 
 /* Perimeter of the card's rounded rect, for the scan trace's dash maths:
  * two straight runs per axis plus one full circle of corner arc. */
@@ -148,6 +213,94 @@ export default function ProfileScreen() {
      the container ref is null on the first render, and useScroll captures
      that null instead of re-reading it. */
   const scrollY = useMotionValue(0);
+  /* The horizontal scroller, so a tap on a collapsed tab can scroll it
+     into place — when the passes are 26px bars there is nothing left to
+     drag, so selecting has to be a tap. */
+  const trackRef = useRef<HTMLDivElement | null>(null);
+  /* Collapse. The passes stay put as the page scrolls under them and
+     flatten into a tab strip — so the screen never loses the control that
+     says which profile you are looking at. */
+  /* The card doesn't shrink — it SWINGS. The bottom edge lifts out of the
+     viewport toward the camera while the top edge stays pinned, so the
+     face foreshortens into a bar the way a real card tipping away from you
+     does. 84° leaves a sliver rather than a true edge-on line, which would
+     vanish. */
+  /* Smoothed. onScroll fires at whatever rate the platform feels like and
+     the raw value arrives in uneven jumps — driving a 3D transform
+     straight off it is what read as staccato. Stiff enough that it still
+     tracks the finger rather than lagging behind it. */
+  const scrollS = useSpring(scrollY, {
+    stiffness: 700,
+    damping: 70,
+    mass: 0.3,
+    restDelta: 0.05,
+  });
+  const collapseX = useTransform(scrollS, [32, 320], [0, COLLAPSE_MAX_DEG], {
+    clamp: true,
+  });
+  /* Uniform scale that cancels the perspective's magnification.
+     
+     Hinged at the top, the bottom edge travels toward the camera as it
+     swings, and near things are drawn bigger — so the card was flaring out
+     past both screen edges on its way down. framer emits
+     perspective() OUTSIDE scale(), so a uniform s shrinks z along with
+     everything else: the widest point ends up at s·W·P/(P − s·H·sinθ).
+     Setting that equal to W solves to P/(P + H·sinθ), which holds the card
+     at exactly its own width the whole way through the swing. Uniform, so
+     the card keeps its proportions rather than being squeezed. */
+  /* Reads the angle off the SMOOTHED scroll but the available room off the
+     RAW one. The body rises with the real scroll position while the swing
+     trails it through the spring, so a lagging card kept catching the KYC
+     line that had already come up to meet it. Taking the room unlagged
+     means the card is never larger than the gap actually left for it. */
+  const collapseScale = useTransform([collapseX, scrollY], ([d, y]) => {
+    const P = COLLAPSE_PERSPECTIVE;
+    const r = ((d as number) * Math.PI) / 180;
+    // Cancels the perspective magnification (see above).
+    const fit = P / (P + CARD_H * Math.sin(r));
+    /* And then shrink further if the page has closed in. The body starts
+       at 614 and the card's top is pinned at CARD_Y, so the clear height
+       is where the body has actually got to, less a breathing gap — and
+       through the opening beat it has not got anywhere. Uniform, so the
+       card keeps its proportions on the way down rather than squashed. */
+    const yy = y as number;
+    const held =
+      yy <= BODY_HOLD
+        ? yy
+        : BODY_HOLD * (1 - Math.min(1, (yy - BODY_HOLD) / BODY_CATCHUP));
+    const room = Math.max(COLLAPSE_REST_PROJ, 614 - yy + held - CARD_Y - 26);
+    const projected = CARD_H * Math.cos(r);
+    const squeeze =
+      projected > 1 ? Math.max(0, Math.min(1, room / projected)) : 1;
+    const shrink = 1 - COLLAPSE_SHRINK * Math.sin(r);
+    return fit * squeeze * shrink;
+  });
+  /* The box the card occupies is deliberately NOT animated. Writing a
+     height onto it and onto the track every scroll tick forced a layout of
+     the whole preserve-3d subtree each frame, which is what made the swing
+     staccato. Nothing is laid out below the card — the track is absolutely
+     positioned — so the box can stay 350 and let the transform do all of
+     the visible work. */
+  /* The strip shrinks with them — held at full height it would sit over
+     the page and swallow taps meant for the content underneath. */
+  /* The plinth leaves BEFORE the swing starts, not alongside it. It is a
+     flat layer at z 0, and the swing brings the card's bottom edge toward
+     the camera — so the moment the card tips, its near edge passes in
+     front of the plinth and the two collide. Clearing it by 42, with the
+     swing held back to 32, means they never share the frame while the card
+     is off-plane. */
+  const stageOpacity = useTransform(scrollS, [0, 30], [1, 0], { clamp: true });
+  /* Cancels the scroll one-for-one through the opening beat, then pays the
+     offset back so the body ends up exactly where the scroll says. Off the
+     RAW scroll, not the spring: it has to cancel the native scroll
+     exactly, and a smoothed version would drift against it. */
+  const bodyHold = useTransform(scrollY, (y) => {
+    if (y <= BODY_HOLD) return y;
+    const back = Math.min(1, (y - BODY_HOLD) / BODY_CATCHUP);
+    return BODY_HOLD * (1 - back);
+  });
+  const [collapsed, setCollapsed] = useState(false);
+
   /* The card leaves around y 500; the title arrives as it goes. */
   const headerIn = useTransform(scrollY, [300, 420], [0, 1], { clamp: true });
   const titleY = useTransform(scrollY, [300, 420], [10, 0], { clamp: true });
@@ -181,17 +334,58 @@ export default function ProfileScreen() {
       className="relative h-[965px] w-[440px] select-none overflow-hidden rounded-[44px] shadow-[0_40px_80px_-20px_rgba(0,0,0,0.5)]"
       style={{ background: "#ffffff" }}
     >
-      <div
+      <motion.div
         // Scrolls: the design runs 1781px against a 965px viewport. The
         // card stage stays put and the content below it moves, which is
         // the behaviour the design implies rather than a shrunken fit.
         className="absolute inset-0 overflow-y-auto overflow-x-hidden [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
-        onScroll={(e) => scrollY.set(e.currentTarget.scrollTop)}
+        /* Anywhere-on-screen swipe to change profile, once the passes have
+           collapsed. onPan rather than drag: drag captures the pointer and
+           rewrites touch-action, which would take vertical scrolling away
+           from the page — onPan only watches. Gated on `collapsed` because
+           while the passes are open a horizontal drag belongs to the card,
+           where it turns it over. */
+        onPanEnd={(_, info) => {
+          if (!collapsed) return;
+          const dx = info.offset.x;
+          if (Math.abs(dx) < 55 || Math.abs(dx) < Math.abs(info.offset.y))
+            return;
+          // Swiping left brings the NEXT pass in, the same direction the
+          // strip itself moves under the same gesture.
+          const next = Math.min(
+            PROFILES.length - 1,
+            Math.max(0, profileIdx + (dx < 0 ? 1 : -1)),
+          );
+          if (next === profileIdx) return;
+          haptic("carouselSnap");
+          trackRef.current?.scrollTo({
+            left: next * CARD_GAP,
+            behavior: "smooth",
+          });
+        }}
+        onScroll={(e) => {
+          const y = e.currentTarget.scrollTop;
+          scrollY.set(y);
+          // Past this the passes are tabs: tapping one selects it, and
+          // the flip is off, since a 26px bar has no face to turn.
+          // Lower than the swing's end on purpose: the track keeps its full
+          // 494px box now, so past this it would sit over content that has
+          // risen underneath. By here the card is well into the swing and
+          // there is nothing left to flip.
+          setCollapsed(y > 120);
+        }}
       >
       {/* Card carousel. The second card is deliberately cut off by the
           screen edge — that's the affordance telling you there are more,
           so it isn't centred or scaled down. */}
 
+      {/* Wrapper carries the scroll fade. It cannot go on the plinth and
+          its shadow directly — both animate their own opacity on entrance,
+          and framer would drive the same value, cutting the scroll link. */}
+      <motion.div
+        className="pointer-events-none absolute inset-0"
+        style={{ opacity: stageOpacity, zIndex: 1, y: bodyHold }}
+      >
       {/* Pedestal. Shadow first so the plinth sits on it.
           zIndex keeps both above the card's own drop shadow but below
           nothing else — the plinth must read as solid, not as a smudge. */}
@@ -299,6 +493,47 @@ export default function ProfileScreen() {
           style={{ width: 354, height: 88, display: "block" }}
         />
       </motion.div>
+      </motion.div>
+
+      {/* Everything below the pedestal (853:16315) — see ProfileBody. */}
+      {/* isolation: isolate is doing real work here, not tidying.
+          The scroller is position:absolute with z-index auto, so it is NOT
+          a stacking context — any positively z-indexed descendant escapes
+          into the root one and competes with the chrome directly. The
+          benefit deck stacks its cards with zIndex: cards.length - pos,
+          which reaches 18 and beat the sticky header's 15, so the deck was
+          painting over the header on a long scroll. Isolating keeps the
+          body's internal ordering internal and lands the whole block at
+          z 0, under the pass strip and the header both. */}
+      <motion.div
+        className="relative"
+        style={{ y: bodyHold, isolation: "isolate", zIndex: 0 }}
+      >
+      <ProfileBody
+        show={bodyIn}
+        onViewBenefits={() => setBenefitsOpen(true)}
+        onOpenBenefit={() => setVerifyOpen(true)}
+        onOpenAgent={(k) => {
+          // Airport logistics isn't a preference sheet — it opens the
+          // supercar sequence, so it routes elsewhere.
+          if (k === "airport") setAirportOpen(true);
+          else if (AGENT_SPECS[k]) setAgentKey(k);
+        }}
+        // Whichever card is at the front of the stack, not a fixed one.
+        onActivateBenefit={(card) =>
+          setCardDetail({
+            title: card.title,
+            terms: PROFILE_BENEFIT_TERMS,
+            art: card.art,
+          })
+        }
+      />
+      </motion.div>
+
+      {/* Gives the scroll container the design's full height, so the
+          absolutely-positioned body has room to scroll into. */}
+        <div style={{ height: 1781 }} />
+      </motion.div>
 
       {/* Card carousel — arrives AFTER the disk, and drops onto it. The
           second card is deliberately cut off by the screen edge: that's
@@ -307,7 +542,8 @@ export default function ProfileScreen() {
 
           The track is only as tall as the cards. Spanning the whole frame
           would swallow drags meant for the page beneath it. */}
-      <div
+      <motion.div
+        ref={trackRef}
         className="absolute left-0 overflow-x-auto overflow-y-hidden [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
         style={{
           // Padded well past the card, because overflow-y:hidden (which a
@@ -317,7 +553,7 @@ export default function ProfileScreen() {
           top: CARD_Y - CARD_PAD_T,
           width: 440,
           height: CARD_H + CARD_PAD_T + CARD_PAD_B,
-          zIndex: 2,
+          zIndex: 14,
           scrollSnapType: "x mandatory",
           scrollBehavior: "smooth",
           // Snaps to the design's x, so the pass in focus lands at 94
@@ -325,7 +561,17 @@ export default function ProfileScreen() {
           scrollPaddingLeft: CARD_X,
           // pan-y leaves vertical touch scrolling with the PAGE; only the
           // horizontal axis belongs to this strip.
-          touchAction: "pan-y",
+          //
+          // Collapsed, x has to go BACK to the browser: the flip drag that
+          // was consuming it is off, and swiping between tabs is now the
+          // strip's own native scroll. Left on pan-y a touch swipe would
+          // land on nothing.
+          touchAction: collapsed ? "pan-x pan-y" : "pan-y",
+          // Once the pass has swung out there is nothing left here to hit,
+          // and the reference puts content in this band — so the track
+          // stops taking the pointer rather than sitting over it as a dead
+          // 76px strip. Switching goes back to scrolling up to the passes.
+          pointerEvents: collapsed ? "none" : "auto",
         }}
         onScroll={(e) => {
           const el = e.currentTarget;
@@ -372,6 +618,16 @@ export default function ProfileScreen() {
                 // Only the pass in focus takes the cursor, so tilt never
                 // fights between two cards.
                 interactive={i === profileIdx}
+                collapseX={collapseX}
+                collapseScale={collapseScale}
+                slot={i - profileIdx}
+                collapsed={collapsed}
+                onSelect={() => {
+                  trackRef.current?.scrollTo({
+                    left: i * CARD_GAP,
+                    behavior: "smooth",
+                  });
+                }}
                 onConnect={() => setScanOpen(true)}
                 onAddProgram={() => setLoyaltyOpen(true)}
                 onOpenPrograms={() => setProgramsOpen(true)}
@@ -387,32 +643,7 @@ export default function ProfileScreen() {
             style={{ flex: "0 0 auto", width: 440 - CARD_X - CARD_W }}
           />
         </div>
-      </div>
-
-      {/* Everything below the pedestal (853:16315) — see ProfileBody. */}
-      <ProfileBody
-        show={bodyIn}
-        onViewBenefits={() => setBenefitsOpen(true)}
-        onOpenBenefit={() => setVerifyOpen(true)}
-        onOpenAgent={(k) => {
-          // Airport logistics isn't a preference sheet — it opens the
-          // supercar sequence, so it routes elsewhere.
-          if (k === "airport") setAirportOpen(true);
-          else if (AGENT_SPECS[k]) setAgentKey(k);
-        }}
-        onActivateBenefit={() =>
-          setCardDetail({
-            title: FLIGHT_BENEFIT.title,
-            terms: PROFILE_BENEFIT_TERMS,
-            art: FLIGHT_BENEFIT.art,
-          })
-        }
-      />
-
-      {/* Gives the scroll container the design's full height, so the
-          absolutely-positioned body has room to scroll into. */}
-        <div style={{ height: 1781 }} />
-      </div>
+      </motion.div>
 
       {/* Sticky header. Fades in as the card scrolls away, so the screen
           keeps a title once the card that WAS the title is gone. It sits
@@ -424,9 +655,12 @@ export default function ProfileScreen() {
       >
         <div
           style={{
-            height: 136,
+            // Solid past the title, not up to it. At 136 tall fading from
+            // 62% the white ran out at 84px while the title sits at 99 —
+            // so the page showed straight through the type.
+            height: 158,
             background:
-              "linear-gradient(180deg, #ffffff 0%, #ffffff 62%, rgba(255,255,255,0) 100%)",
+              "linear-gradient(180deg, #ffffff 0%, #ffffff 82%, rgba(255,255,255,0) 100%)",
           }}
         />
         <motion.p
@@ -628,6 +862,11 @@ function WorldPassCard({
   delay,
   lit,
   interactive = true,
+  collapseX,
+  collapseScale,
+  slot = 0,
+  collapsed = false,
+  onSelect,
   onConnect,
   onAddProgram,
   onOpenPrograms,
@@ -647,6 +886,16 @@ function WorldPassCard({
   /** The peeking card is scenery — it floats, but doesn't take the
    *  cursor, so tilt never fights between the two. */
   interactive?: boolean;
+  /** Degrees of the collapse swing: 0 face-on, 90 edge-on. */
+  collapseX?: MotionValue<number>;
+  /** Cancels the perspective magnification so the swing stays on screen. */
+  collapseScale?: MotionValue<number>;
+  /** Passes away from the one in focus: −1, 0, +1. */
+  slot?: number;
+  /** True once the strip is reading as tabs rather than as cards. */
+  collapsed?: boolean;
+  /** Tap-to-select, which is what a tab is. */
+  onSelect?: () => void;
   /** Whose pass this is. */
   profile: (typeof PROFILES)[number];
 }) {
@@ -668,6 +917,32 @@ function WorldPassCard({
   // card would read as a decal printed on it.
   const glossX = useTransform(rys, [-14, 14], ["82%", "18%"]);
   const glossY = useTransform(rxs, [-14, 14], ["18%", "82%"]);
+  /* Refraction. Real glass splits light as it bends it, so the dispersion
+     travels FURTHER than the white highlight and in the opposite
+     direction — that separation is the whole effect. It also strengthens
+     with tilt: face-on there is nothing to bend. */
+  const dispX = useTransform(rys, [-14, 14], ["112%", "-12%"]);
+  const dispY = useTransform(rxs, [-14, 14], ["-12%", "112%"]);
+  const tiltAmount = useTransform([rxs, rys], ([a, b]) =>
+    Math.min(1, Math.hypot(a as number, b as number) / 13),
+  );
+  const dispersion = useTransform(tiltAmount, [0, 1], [0.16, 0.85]);
+
+  const zero = useMotionValue(0);
+  /* The passes' own elevation, faded out with the swing.
+     
+     This is what read as the two cards colliding. The gap between them
+     never drops below ~62px, but each card throws a 50px blur either side,
+     so two of them met in the middle and filled that gap with grey. A card
+     lying nearly flat has nothing to cast anyway. */
+  const cardShadow = useTransform(collapseX ?? zero, (d) => {
+    const f = 1 - Math.sin((d * Math.PI) / 180);
+    return [
+      `0 2px 6px -2px rgba(0,0,0,${(0.25 * f).toFixed(3)})`,
+      `0 26px 50px -22px rgba(0,0,0,${(0.35 * f).toFixed(3)})`,
+      `0 30px 46px -32px rgba(0,0,0,${(0.22 * f).toFixed(3)})`,
+    ].join(", ");
+  });
 
   const onMove = (e: React.MouseEvent<HTMLDivElement>) => {
     if (!interactive) return;
@@ -689,6 +964,7 @@ function WorldPassCard({
       // own faces rely on.
       className="relative"
       style={{ width: CARD_W, height: CARD_H }}
+      onClick={collapsed ? onSelect : undefined}
       initial={{ opacity: 0, y: 26, scale: 0.96 }}
       animate={{ opacity: 1, y: 0, scale: 1 }}
       transition={{ delay, duration: 0.8, ease: IN_EASE }}
@@ -697,9 +973,16 @@ function WorldPassCard({
           the sway never line up into an obvious loop — the card wanders
           instead of ticking. */}
       <motion.div
-        className="h-full w-full"
-        style={{ perspective: 1200 }}
-        animate={{ y: [0, -7, 0, -3, 0], x: [0, 2.5, 0, -2.5, 0] }}
+        className="absolute left-0 top-0"
+        // Fixed at the card's real height. If this followed the shrinking
+        // box the faces would be scaled flat as well as rotated, and the
+        // two together read as a squash rather than a swing.
+        style={{ width: CARD_W, height: CARD_H, perspective: 1200 }}
+        animate={
+          collapsed
+            ? { y: 0, x: 0 }
+            : { y: [0, -7, 0, -3, 0], x: [0, 2.5, 0, -2.5, 0] }
+        }
         transition={{
           y: { duration: 6.4, repeat: Infinity, ease: "easeInOut" },
           x: { duration: 8.9, repeat: Infinity, ease: "easeInOut" },
@@ -720,7 +1003,7 @@ function WorldPassCard({
             Outside the flip plane, since it points AT the card and must
             not mirror when the card turns; it keeps the tilt and drag so
             it still travels along. */}
-        {interactive && (
+        {interactive && !collapsed && (
           <motion.div
             className="pointer-events-none absolute inset-0"
             style={{
@@ -762,6 +1045,35 @@ function WorldPassCard({
           </motion.div>
         )}
 
+        {/* The swing. Its own perspective rather than the float wrapper's,
+            because the vanishing point has to sit ON the hinge — with the
+            default centre origin the near bottom edge projects downward
+            and outward as it comes at you, so the card got TALLER on its
+            way to becoming a bar. transformPerspective puts the vanishing
+            point at transformOrigin, and that origin is the top edge. */}
+        <motion.div
+          className="h-full w-full"
+          style={{
+            rotateX: collapseX ?? 0,
+            scale: collapseScale ?? 1,
+            /* Every pass turns on its OWN wheel — same axis height, no
+               lateral travel, so none of them slides across the screen on
+               the way down. What differs is only WHERE along its width
+               each one shrinks toward: the pass in focus contracts about
+               its own centre and stays centred, while a neighbour
+               contracts toward the focused side, so the sliver of it that
+               was peeking stays exactly where it was peeking rather than
+               being pulled off the edge with the rest of the card.
+
+               An earlier version got this by translating the neighbours
+               inward, which is the same end position but reads as the
+               strip sliding — not as each card turning in place. */
+            transformOrigin: `${50 - Math.sign(slot) * 50}% 0%`,
+            transformPerspective: COLLAPSE_PERSPECTIVE,
+            transformStyle: "preserve-3d",
+            willChange: "transform",
+          }}
+        >
         {/* Flip plane. Drag horizontally to turn the card — unchanged, and
             it does not fight the carousel: that is a native SCROLL
             container, and scrolling (wheel / trackpad) is a different
@@ -777,7 +1089,7 @@ function WorldPassCard({
           style={{ transformStyle: "preserve-3d" }}
           animate={{ rotateY: turns * 180 }}
           transition={{ type: "spring", stiffness: 60, damping: 14, mass: 1.1 }}
-          drag={interactive ? "x" : false}
+          drag={interactive && !collapsed ? "x" : false}
           dragSnapToOrigin
           dragElastic={0.16}
           dragConstraints={{ left: 0, right: 0 }}
@@ -789,7 +1101,11 @@ function WorldPassCard({
             const fast = Math.abs(info.velocity.x) > 380;
             if (far || fast) {
               haptic("cardFlip");
-              setTurns((t) => t + (info.offset.x < 0 ? 1 : -1));
+              // Dragging LEFT turns the card's right edge toward you.
+              // CSS rotateY is the other way round — positive swings the
+              // right edge AWAY — so a leftward drag has to decrement,
+              // which is the reverse of what this did.
+              setTurns((t) => t + (info.offset.x < 0 ? -1 : 1));
             }
           }}
         >
@@ -806,18 +1122,9 @@ function WorldPassCard({
             willChange: "transform",
             // Stacked elevation — a tight contact shadow under a wide
             // soft one, so the card sits ON the pedestal instead of
-            // hovering over a single blur.
-            // Halved from 0.5/0.7/0.55 — the stack read as a much
-            // heavier object than the card is.
-            boxShadow: [
-              "0 2px 6px -2px rgba(0,0,0,0.25)",
-              "0 26px 50px -22px rgba(0,0,0,0.35)",
-              // Pulled in hard. At 90px blur under a 264-wide card this cast a
-              // wash far wider than the plinth it lands on — which is what
-              // kept reading as an uncropped shadow around the pedestal,
-              // rather than the plinth's own.
-              "0 30px 46px -32px rgba(0,0,0,0.22)",
-            ].join(", "),
+            // hovering over a single blur. Halved from 0.5/0.7/0.55, and
+            // faded out by the swing (see cardShadow).
+            boxShadow: cardShadow,
           }}
         >
           {/* Idle rotation. Very small and on its own long period, so the
@@ -1017,9 +1324,35 @@ function WorldPassCard({
               />
             </svg>
 
-            {/* Cursor-tracked specular. Kept wide and soft — a tight
-                highlight on a near-black card reads as a bright dot
-                rather than as a sheen across glass. */}
+            {/* Refraction. A prismatic band swung across the face by the
+                tilt, on plus-lighter so it ADDS colour to the black rather
+                than washing it grey. It leads the white highlight and runs
+                the other way, which is what separating light looks like;
+                a tint that tracked the specular would just read as a
+                coloured version of it. */}
+            <motion.div
+              className="pointer-events-none absolute inset-0"
+              style={{
+                borderRadius: 30,
+                zIndex: 3,
+                opacity: dispersion,
+                backgroundImage: useTransform(
+                  [dispX, dispY],
+                  ([dx, dy]) =>
+                    `radial-gradient(78% 64% at ${dx} ${dy},` +
+                    ` rgba(120,180,255,0.30) 0%,` +
+                    ` rgba(170,130,255,0.22) 26%,` +
+                    ` rgba(255,120,190,0.16) 48%,` +
+                    ` rgba(255,200,110,0.12) 68%,` +
+                    ` rgba(255,255,255,0) 88%)`,
+                ),
+                mixBlendMode: "plus-lighter",
+              }}
+            />
+
+            {/* Cursor-tracked specular. Wide and soft — a tight highlight
+                on a near-black card reads as a bright dot rather than as a
+                sheen across glass. */}
             <motion.div
               className="pointer-events-none absolute inset-0"
               style={{
@@ -1028,7 +1361,7 @@ function WorldPassCard({
                 backgroundImage: useTransform(
                   [glossX, glossY],
                   ([gx, gy]) =>
-                    `radial-gradient(60% 52% at ${gx} ${gy}, rgba(255,255,255,0.16) 0%, rgba(255,255,255,0.05) 42%, rgba(255,255,255,0) 74%)`,
+                    `radial-gradient(64% 56% at ${gx} ${gy}, rgba(255,255,255,0.34) 0%, rgba(255,255,255,0.13) 40%, rgba(255,255,255,0.04) 62%, rgba(255,255,255,0) 80%)`,
                 ),
                 mixBlendMode: "screen",
               }}
@@ -1207,6 +1540,7 @@ function WorldPassCard({
             </div>
           </div>
 
+        </motion.div>
         </motion.div>
         </motion.div>
       </motion.div>
