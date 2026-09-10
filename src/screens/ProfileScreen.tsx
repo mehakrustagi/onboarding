@@ -66,49 +66,59 @@ const CARD_PAD_B = 120;
 /* The swing's shape, specified by what it should LOOK like rather than by
  * an arbitrary camera distance.
  *
- * A trapezium is the one thing an affine transform cannot make — parallel
- * edges stay parallel under scale and rotate alike — so the taper has to
- * come from perspective. Hinged at its top edge, the card's bottom travels
- * toward the camera and is drawn larger, which leaves the top narrower:
- * the trapezium, for free, out of the same rotation that does the swing.
+ * The pass tips AWAY from you, hinged on its top edge: the bottom travels
+ * back into the screen while the top stays on the picture plane. So the
+ * top edge keeps its full width and the bottom is the one that narrows —
+ * the trapezium reads top-wide, which is what a card falling away from the
+ * viewer looks like. (Tipping it the other way, bottom-toward-camera, is
+ * the same rotation negated, and gives the mirrored trapezium plus a flare
+ * past the screen edges that then has to be scaled back out.)
  *
- * So the two numbers below are the design, and the camera is solved from
- * them. At full swing the top edge reads NARROW smaller than the bottom,
- * and the card has lost SHRINK of its size overall. Working the projection
- * backwards from that gives the perspective distance — which is why this
- * is derived and not typed in. */
+ * Nothing here magnifies, so there is no flare to cancel and no
+ * compensating scale: every part of the card is at or behind the picture
+ * plane and therefore at or under its own width.
+ *
+ * The two numbers below are the design, and the camera is solved from
+ * them. At full swing the bottom edge reads NARROW smaller than the top,
+ * and the card has lost SHRINK of its size. Bottom width is
+ * P/(P + k·H) of the top, so NARROW = k·H/(P + k·H) inverts to the P
+ * below — which is why it is derived and not typed in. */
 const COLLAPSE_TOP_NARROW = 0.1;
-const COLLAPSE_SHRINK = 0.3;
+const COLLAPSE_SHRINK = 0.18;
 const COLLAPSE_PERSPECTIVE =
-  (CARD_H * (1 - COLLAPSE_SHRINK)) / COLLAPSE_TOP_NARROW - CARD_H;
+  CARD_H * (1 - COLLAPSE_SHRINK) * (1 / COLLAPSE_TOP_NARROW - 1);
+
+/* Projected height at a given angle, for a card already scaled by k. The
+ * cos is the foreshortening; the second factor is the bottom edge sitting
+ * further from the camera than the top. */
+const collapseProj = (deg: number, k: number) => {
+  const r = (deg * Math.PI) / 180;
+  const back = k * CARD_H * Math.sin(r);
+  return (k * CARD_H * Math.cos(r) * COLLAPSE_PERSPECTIVE) /
+    (COLLAPSE_PERSPECTIVE + back);
+};
 
 /* Where the swing stops. The pass does NOT go edge-on and vanish — it
  * parks as a sliver under the header and stays there for the rest of the
- * page, so the thing you were looking at is still on screen and still
- * says which pass it is.
+ * page, so the thing you were looking at is still on screen and still says
+ * which pass it is.
  *
  * Given as the height it should come to rest at, and the angle is solved
- * from it: projected height is CARD_H·cos θ·(1 − SHRINK·sin θ), which has
- * no clean inverse, so it's walked once at module load rather than
- * hand-tuned to a degree figure that would silently drift the moment
- * SHRINK changed. */
+ * from it: the projection above has no clean inverse, so it is walked once
+ * at module load rather than hand-tuned to a degree figure that would
+ * silently drift the moment SHRINK or NARROW changed. */
 const COLLAPSE_REST_H = 13;
 const COLLAPSE_MAX_DEG = (() => {
   let lo = 0;
   let hi = 90;
   for (let i = 0; i < 40; i++) {
     const mid = (lo + hi) / 2;
-    const r = (mid * Math.PI) / 180;
-    const h = CARD_H * Math.cos(r) * (1 - COLLAPSE_SHRINK * Math.sin(r));
-    if (h > COLLAPSE_REST_H) lo = mid;
+    const k = 1 - COLLAPSE_SHRINK * Math.sin((mid * Math.PI) / 180);
+    if (collapseProj(mid, k) > COLLAPSE_REST_H) lo = mid;
     else hi = mid;
   }
   return lo;
 })();
-/* The clamp measures against the UNSHRUNK projection, so it has to floor
- * on the same quantity — floored on the rest height itself it kept biting
- * past the rest point and walked the sliver down from 13px to 9 as you
- * scrolled further. */
 const COLLAPSE_REST_PROJ =
   CARD_H * Math.cos((COLLAPSE_MAX_DEG * Math.PI) / 180);
 
@@ -260,15 +270,13 @@ export default function ProfileScreen() {
      line that had already come up to meet it. Taking the room unlagged
      means the card is never larger than the gap actually left for it. */
   const collapseScale = useTransform([collapseX, scrollY], ([d, y]) => {
-    const P = COLLAPSE_PERSPECTIVE;
     const r = ((d as number) * Math.PI) / 180;
-    // Cancels the perspective magnification (see above).
-    const fit = P / (P + CARD_H * Math.sin(r));
-    /* And then shrink further if the page has closed in. The body starts
-       at BODY_TOP and the card's top is pinned at CARD_Y, so the clear height
+    const shrink = 1 - COLLAPSE_SHRINK * Math.sin(r);
+    /* And shrink further if the page has closed in. The body starts at
+       BODY_TOP and the card's top is pinned at CARD_Y, so the clear height
        is where the body has actually got to, less a breathing gap — and
        through the opening beat it has not got anywhere. Uniform, so the
-       card keeps its proportions on the way down rather than squashed. */
+       card keeps its proportions rather than being squashed. */
     const yy = y as number;
     const held =
       yy <= BODY_HOLD
@@ -278,11 +286,9 @@ export default function ProfileScreen() {
       COLLAPSE_REST_PROJ,
       BODY_TOP - yy + held - CARD_Y - 26,
     );
-    const projected = CARD_H * Math.cos(r);
-    const squeeze =
-      projected > 1 ? Math.max(0, Math.min(1, room / projected)) : 1;
-    const shrink = 1 - COLLAPSE_SHRINK * Math.sin(r);
-    return fit * squeeze * shrink;
+    const proj = collapseProj(d as number, 1);
+    const squeeze = proj > 1 ? Math.max(0, Math.min(1, room / proj)) : 1;
+    return shrink * squeeze;
   });
   /* The box the card occupies is deliberately NOT animated. Writing a
      height onto it and onto the track every scroll tick forced a layout of
@@ -947,6 +953,7 @@ function WorldPassCard({
   const dispersion = useTransform(tiltAmount, [0, 1], [0.16, 0.85]);
 
   const zero = useMotionValue(0);
+  const collapseXNeg = useTransform(collapseX ?? zero, (d) => -d);
   /* The passes' own elevation, faded out with the swing.
      
      This is what read as the two cards colliding. The gap between them
@@ -954,7 +961,11 @@ function WorldPassCard({
      so two of them met in the middle and filled that gap with grey. A card
      lying nearly flat has nothing to cast anyway. */
   const cardShadow = useTransform(collapseX ?? zero, (d) => {
-    const f = 1 - Math.sin((d * Math.PI) / 180);
+    // Floors at 0.3 rather than 0. Fully off, the parked sliver sat on
+    // the page with nothing under it; the reference keeps a soft one. The
+    // gap between passes is ~99px at rest and this reaches ~28 from each
+    // side, so the two no longer meet and grey out the whitespace.
+    const f = 1 - 0.7 * Math.sin((d * Math.PI) / 180);
     return [
       `0 2px 6px -2px rgba(0,0,0,${(0.25 * f).toFixed(3)})`,
       `0 26px 50px -22px rgba(0,0,0,${(0.35 * f).toFixed(3)})`,
@@ -1072,7 +1083,10 @@ function WorldPassCard({
         <motion.div
           className="h-full w-full"
           style={{
-            rotateX: collapseX ?? 0,
+            // Negative: the bottom edge goes BACK into the screen rather
+            // than out toward the camera, which is the direction that
+            // keeps the top edge wide and the card inside its own width.
+            rotateX: collapseXNeg,
             scale: collapseScale ?? 1,
             /* Every pass turns on its OWN wheel — same axis height, no
                lateral travel, so none of them slides across the screen on
