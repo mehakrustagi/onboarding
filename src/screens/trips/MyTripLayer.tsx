@@ -3,7 +3,8 @@
 import Image from "next/image";
 import { useState, type ReactNode } from "react";
 import { motion, useTransform, type MotionValue } from "framer-motion";
-import TripSheet from "./TripSheet";
+import TripSheet, { PILL_FILL } from "./TripSheet";
+import { useDragScroll } from "./useDragScroll";
 import TripOverlays, { type TripOverlay } from "./TripOverlays";
 import type { HandoffBeat } from "./beats";
 import { applyMask, incomingMask, rippleAt, submergence, useRippleStyle } from "./ripple";
@@ -115,6 +116,10 @@ const TABS = [
   { label: "Forex", icon: "/assets/trips/tab-forex.svg", x: 382.71, w: 101, dot: false },
 ] as const;
 
+/* The scroll track has to hold the last tab plus the 30 inset the row
+   starts with, or Forex butts against the end of the scroll. */
+const TABS_W = 382.71 + 101 + 30;
+
 const ORBS = [
   { src: "/assets/trips/orb-1.png", x: 114.4 },
   { src: "/assets/trips/orb-2.png", x: 138.4 },
@@ -134,6 +139,7 @@ export default function MyTripLayer({
      because the sheets have to escape the scroller and cover the whole
      shell, and TripSheet lives inside it. */
   const [overlay, setOverlay] = useState<TripOverlay | null>(null);
+  const tabs = useDragScroll<HTMLDivElement>();
   const maskRef = useRippleStyle<HTMLDivElement>(sweep, incomingMask, applyMask);
 
   return (
@@ -423,16 +429,54 @@ export default function MyTripLayer({
       {/* ── Category tabs ─────────────────────────────────────────────── */}
       <Surface sweep={sweep} at={565}>
 
-      {/* The row is 453 wide in a 440 frame: Forex is meant to be clipped so
-          the strip reads as scrollable. Kept as an overflow rather than
+      {/* The row is 483 wide in a 440 frame: Forex is meant to be clipped
+          so the strip reads as scrollable. Kept as an overflow rather than
           squeezed to fit — a row that exactly fits says there is nothing
-          more to see. */}
-      <div className="absolute" style={{ left: 0, top: 0, right: 0, height: 620, overflow: "hidden" }}>
+          more to see.
+
+          It used to be an overflow:hidden clip box, which made that promise
+          and then broke it: the strip looked scrollable and was not. It is
+          a real scroller now, sized to the tab band rather than the 620 the
+          clip box spanned — a full-height box here would sit over the copy
+          above the tabs and eat its pointer events. The tabs keep their
+          Figma x positions inside a track wide enough for the last one. */}
+      <div
+        ref={tabs}
+        className="absolute overflow-x-auto overscroll-x-contain"
+        style={{
+          left: 0,
+          top: 530,
+          right: 0,
+          height: 52,
+          scrollbarWidth: "none",
+          touchAction: "pan-x",
+          cursor: "grab",
+          /* Its Surface is the absolute variant, which blanks pointer
+             events so it cannot swallow the column's scroll. A scroller
+             inside one has to opt back in, the same way the composer used
+             to — and this box is only the 52px tab band, so re-enabling it
+             costs nothing above or below. */
+          pointerEvents: "auto",
+        }}
+      >
+        <div className="relative" style={{ width: TABS_W, height: 52 }}>
         {TABS.map((t) => (
           <div key={t.label}>
             <div
-              className="absolute rounded-[30px] border border-[#eceaef] bg-white"
-              style={{ left: t.x, top: 536.61, width: t.w, height: 39 }}
+              className="absolute rounded-[30px]"
+              /* Same material as every other pill in the trip view — see
+                 PILL in TripSheet. These were white on an #ECEAEF outline,
+                 which read as a different control from the action rows
+                 sitting a few hundred pixels below them. */
+              style={{
+                left: t.x,
+                top: 6.61,
+                width: t.w,
+                height: 39,
+                border: "1px solid #ffffff",
+                backgroundImage: PILL_FILL,
+                boxShadow: "0px 4px 30px -2px rgba(0,0,0,0.05)",
+              }}
             />
             <Image
               src={t.icon}
@@ -442,7 +486,7 @@ export default function MyTripLayer({
               style={{
                 position: "absolute",
                 left: t.x + 20,
-                top: 548.11,
+                top: 18.11,
                 width: 16,
                 height: 16,
               }}
@@ -451,7 +495,7 @@ export default function MyTripLayer({
               className="absolute whitespace-nowrap font-semibold"
               style={{
                 left: t.x + 44,
-                top: 546.61,
+                top: 16.61,
                 fontSize: 14,
                 lineHeight: "19px",
                 letterSpacing: "-0.14px",
@@ -465,7 +509,7 @@ export default function MyTripLayer({
                 className="absolute rounded-full"
                 style={{
                   left: t.x + 90,
-                  top: 536.61,
+                  top: 6.61,
                   width: 10,
                   height: 10,
                   background: "#ef4444",
@@ -474,6 +518,7 @@ export default function MyTripLayer({
             )}
           </div>
         ))}
+        </div>
       </div>
 
       <div
