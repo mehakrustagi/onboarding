@@ -202,18 +202,27 @@ function Rail({ branches, gid }: { branches: number[]; gid: string }) {
   );
 }
 
-function RailNode({ done, onOpen }: { done?: boolean; onOpen?: () => void }) {
+function RailNode({
+  done,
+  label,
+  onToggle,
+}: {
+  done?: boolean;
+  label: string;
+  onToggle: () => void;
+}) {
   /* 30x30, r10.714, 1.5px #D6D9DC. When complete it carries a 22x22
-     #0B0B0B square at r8 with a white tick — not a green circle. */
-  /* A button only where a sheet exists behind it. Making every node
-     tappable would advertise a panel on twenty rows that have none, and a
-     control that does nothing is worse than no control. */
-  const Tag = onOpen ? "button" : "div";
+     #0B0B0B square at r8 with a white tick — not a green circle.
+     It is a real checkbox: every step in the column can be ticked off by
+     hand, which is the whole reason the design draws an empty box on the
+     rows that are not done yet. */
   return (
-    <Tag
-      type={onOpen ? "button" : undefined}
-      onClick={onOpen}
-      aria-label={onOpen ? "Open details" : undefined}
+    <button
+      type="button"
+      role="checkbox"
+      aria-checked={Boolean(done)}
+      aria-label={label}
+      onClick={onToggle}
       className="absolute"
       style={{
         left: 20,
@@ -222,24 +231,37 @@ function RailNode({ done, onOpen }: { done?: boolean; onOpen?: () => void }) {
         height: 30,
         borderRadius: 10.714,
         border: "1.5px solid #d6d9dc",
-        cursor: onOpen ? "pointer" : undefined,
+        cursor: "pointer",
       }}
     >
-      {done && (
-        <div
-          className="absolute"
-          style={{ left: 2.5, top: 2.5, width: 22, height: 22, borderRadius: 8, background: "#0b0b0b" }}
-        >
-          <Image
-            src={`${S}/done.svg`}
-            alt=""
-            width={18}
-            height={18}
-            style={{ position: "absolute", left: 2, top: 2, width: 18, height: 18 }}
-          />
-        </div>
-      )}
-    </Tag>
+      <AnimatePresence initial={false}>
+        {done && (
+          <motion.div
+            className="absolute"
+            style={{
+              left: 2.5,
+              top: 2.5,
+              width: 22,
+              height: 22,
+              borderRadius: 8,
+              background: "#0b0b0b",
+            }}
+            initial={{ scale: 0.4, opacity: 0 }}
+            animate={{ scale: 1, opacity: 1 }}
+            exit={{ scale: 0.4, opacity: 0 }}
+            transition={{ type: "spring", visualDuration: 0.24, bounce: 0.42 }}
+          >
+            <Image
+              src={`${S}/done.svg`}
+              alt=""
+              width={18}
+              height={18}
+              style={{ position: "absolute", left: 2, top: 2, width: 18, height: 18 }}
+            />
+          </motion.div>
+        )}
+      </AnimatePresence>
+    </button>
   );
 }
 
@@ -435,13 +457,23 @@ function Item({
   item,
   last,
   index,
+  rowKey,
+  ticked,
+  onToggle,
   onOpen,
 }: {
   item: TripItem;
   last: boolean;
   index: number;
+  /** Stable id for this row's tick state, held above the section so it
+      survives a collapse. */
+  rowKey: string;
+  ticked: Record<string, boolean>;
+  onToggle: (key: string, next: boolean) => void;
   onOpen: (o: TripOverlay) => void;
 }) {
+  /* The data seeds it; the user owns it from the first tap onward. */
+  const done = ticked[rowKey] ?? Boolean(item.done);
   /* A row is WORKING when it has something live to say and has not
      finished. Those get onboarding's two shine treatments — the coloured
      sweep on the status line, the grey sweep on the body underneath —
@@ -451,7 +483,7 @@ function Item({
      Staggered per item. A shared CSS animation fires every line in unison,
      which reads as one flash across the page instead of several agents
      each doing their own work. Same reason AgentSheet staggers by section. */
-  const working = (Boolean(item.status) || Boolean(item.live)) && !item.done;
+  const working = (Boolean(item.status) || Boolean(item.live)) && !done;
   const shine = { animationDelay: `${(index % 5) * 0.55}s` };
 
   /* Gradient ids have to be unique per rail — SVG defs are document-global,
@@ -468,8 +500,16 @@ function Item({
           step of its own. */}
       {item.title && (
         <RailNode
-          done={item.done}
-          onOpen={item.sheet ? () => onOpen({ kind: "info", id: item.sheet! }) : undefined}
+          done={done}
+          label={item.title}
+          onToggle={() => {
+            onToggle(rowKey, !done);
+            /* Two rows answer back when you tick them. The sheet is the
+               row's own status panel, so it opens on either direction:
+               tick the visa and it confirms delivery is on track, untick
+               the flight and it asks you for the booking it just lost. */
+            if (item.sheet) onOpen({ kind: "info", id: item.sheet });
+          }}
         />
       )}
       {item.title && <Rail branches={itemBranches(item)} gid={railId} />}
@@ -575,7 +615,7 @@ function Item({
           )}
           <span
             className={
-              item.done ? "absolute whitespace-nowrap" : "absolute whitespace-nowrap gradient-text-shine"
+              done ? "absolute whitespace-nowrap" : "absolute whitespace-nowrap gradient-text-shine"
             }
             style={{
               left: item.call ? 20 : 0,
@@ -584,7 +624,7 @@ function Item({
               lineHeight: "16px",
               letterSpacing: "-0.12px",
               fontWeight: 600,
-              ...(item.done ? gradient(GRAD_GREEN) : shine),
+              ...(done ? gradient(GRAD_GREEN) : shine),
             }}
           >
             {item.status}
@@ -620,11 +660,17 @@ function Group({
   first,
   last,
   offset,
+  keyPrefix,
+  ticked,
+  onToggle,
   onOpen,
 }: {
   group: TripGroup;
   first: boolean;
   last: boolean;
+  keyPrefix: string;
+  ticked: Record<string, boolean>;
+  onToggle: (key: string, next: boolean) => void;
   onOpen: (o: TripOverlay) => void;
   /* Running item count before this group, so the shine stagger spreads
      across the whole section rather than restarting at every heading —
@@ -632,6 +678,9 @@ function Group({
      firing on the same beat. */
   offset: number;
 }) {
+  const headingKey = `${keyPrefix}:heading`;
+  const headingDone = ticked[headingKey] ?? true;
+
   return (
     <div style={{ marginTop: first ? 30 : 40 }}>
       {group.heading && (
@@ -645,7 +694,14 @@ function Group({
               design does not have. */}
           {group.marker === "done" ? (
             <>
-              <RailNode done />
+              {/* In these groups the heading IS the step, so its node is
+                  the checkbox — there is no titled row beneath to carry
+                  one. */}
+              <RailNode
+                done={headingDone}
+                label={group.heading ?? "Step"}
+                onToggle={() => onToggle(headingKey, !headingDone)}
+              />
               {/* The heading IS the step here, so the run down to the status
                   line has to come off the heading's node — Item only draws a
                   rail for rows that carry a title, and these rows carry none,
@@ -710,6 +766,9 @@ function Group({
           item={it}
           index={offset + i}
           last={i === group.items.length - 1}
+          rowKey={`${keyPrefix}:${it.title ?? it.status ?? i}`}
+          ticked={ticked}
+          onToggle={onToggle}
           onOpen={onOpen}
         />
       ))}
@@ -794,9 +853,13 @@ function Group({
 
 function Section({
   section,
+  ticked,
+  onToggle,
   onOpen,
 }: {
   section: TripSection;
+  ticked: Record<string, boolean>;
+  onToggle: (key: string, next: boolean) => void;
   onOpen: (o: TripOverlay) => void;
 }) {
   /* The chevron collapses the section to just its header card. Figma draws
@@ -828,9 +891,15 @@ function Section({
            after the last action row (last pill ends 1506, tile ends 1546).
            Without the top inset the card sat flush against the tile edge,
            so the grey frame only showed on three sides and every bit of
-           breathing room fell to the bottom. */
+           breathing room fell to the bottom.
+
+           The bottom inset is 10 here and the remaining 30 lives INSIDE
+           the collapsible block, so closing a section leaves the tile
+           hugging its card with the same 10 all round instead of a band
+           of empty grey underneath — and the collapse animation carries
+           that padding away with the content rather than snapping it. */
         paddingTop: 10,
-        paddingBottom: 40,
+        paddingBottom: 10,
       }}
     >
       {/* Header card — 360x124 at a 10px inset. */}
@@ -959,6 +1028,9 @@ function Section({
             offset={section.groups
               .slice(0, i)
               .reduce((n, g2) => n + g2.items.length, 0)}
+            keyPrefix={`${section.key}:${i}`}
+            ticked={ticked}
+            onToggle={onToggle}
             onOpen={onOpen}
           />
         ))}
@@ -988,6 +1060,9 @@ function Section({
             {section.add}
           </div>
         )}
+
+            {/* The other 30 of Figma's 40 bottom inset. */}
+            <div style={{ height: 30 }} />
           </motion.div>
         )}
       </AnimatePresence>
@@ -996,10 +1071,17 @@ function Section({
 }
 
 export default function TripSheet({ onOpen }: { onOpen: (o: TripOverlay) => void }) {
+  /* Overrides only — a row absent from this map falls back to whatever the
+     data seeded it with. Held at the root rather than per section so a
+     section can collapse and unmount its rows without losing their ticks. */
+  const [ticked, setTicked] = useState<Record<string, boolean>>({});
+  const onToggle = (key: string, next: boolean) =>
+    setTicked((t) => ({ ...t, [key]: next }));
+
   return (
     <div className="flex flex-col" style={{ gap: 20 }}>
       {TRIP_SECTIONS.map((s) => (
-        <Section key={s.key} section={s} onOpen={onOpen} />
+        <Section key={s.key} section={s} ticked={ticked} onToggle={onToggle} onOpen={onOpen} />
       ))}
       {/* Tail padding so the last section can clear the bottom of the
           scroll rather than ending flush against it. */}
