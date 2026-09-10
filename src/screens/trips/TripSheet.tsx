@@ -74,6 +74,20 @@ const GLASS_BLUR: React.CSSProperties = {
  * lines now take it via the .gradient-text-shine class rather than an
  * inline fill — the class carries the sweep animation with it, so there is
  * no second copy of the gradient to keep in step. */
+/* The action pill's fill.
+ *
+ * Figma exports these as rgba(255,255,255,0.1), which is invisible — the
+ * whole appearance is in effects the export does not carry, the same
+ * problem the sources chip has. So this is measured off the rendered
+ * node (947:27270) instead of copied from the export: the pill ramps
+ * from #F1F2F4 at its top-left corner to white at its bottom-right,
+ * crossing the #F9FAFB ground about halfway. Sampled greys were 242 at
+ * the top-left, 246 and 250 through the middle and 251 near the right.
+ * The 255s that show up within a few pixels of any edge are the 1px
+ * white rim, not the fill, which is why the end stop is #FDFDFE rather
+ * than pure white. Stop positions are Figma's own 10.5% and 72%. */
+const PILL_FILL = "linear-gradient(135deg, #f4f5f6 10.5%, #fdfdfe 72%)";
+
 const GRAD_GREEN = "linear-gradient(90deg, #0b0b0b 0%, #10b981 100%)";
 const GRAD_PILL = "linear-gradient(90deg, #000 0%, #666 100%)";
 const GRAD_STATE: Record<TripSection["state"], string> = {
@@ -401,20 +415,32 @@ function Actions({ actions, onAct }: { actions: string[]; onAct: (a: string) => 
           key={a}
           type="button"
           onClick={() => onAct(a)}
-          className="flex-none whitespace-nowrap"
+          className="flex flex-none items-center whitespace-nowrap"
           style={{
             height: 40,
             padding: "0 20px",
             borderRadius: 49.5,
-            ...GLASS,
-            fontSize: 12,
-            lineHeight: "16px",
-            letterSpacing: "-0.12px",
-            fontWeight: 600,
-            ...gradient(GRAD_PILL),
+            border: "1px solid #ffffff",
+            backgroundImage: PILL_FILL,
+            boxShadow: CARD_SHADOW,
           }}
         >
-          {a}
+          {/* The label carries the text gradient on its OWN element.
+              Spreading it onto the button set background-image a second
+              time and clipped it to the glyphs, which left the pill with
+              no fill at all — every one of these was an outline and a
+              shadow around bare tile. */}
+          <span
+            style={{
+              fontSize: 12,
+              lineHeight: "16px",
+              letterSpacing: "-0.12px",
+              fontWeight: 600,
+              ...gradient(GRAD_PILL),
+            }}
+          >
+            {a}
+          </span>
         </button>
       ))}
     </div>
