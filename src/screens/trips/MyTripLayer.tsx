@@ -4,6 +4,7 @@ import Image from "next/image";
 import type { ReactNode } from "react";
 import { motion, useTransform, type MotionValue } from "framer-motion";
 import AskBar from "@/components/AskBar";
+import TripSheet from "./TripSheet";
 import type { HandoffBeat } from "./beats";
 import { applyMask, incomingMask, rippleAt, submergence, useRippleStyle } from "./ripple";
 
@@ -55,10 +56,14 @@ import { applyMask, incomingMask, rippleAt, submergence, useRippleStyle } from "
 function Surface({
   sweep,
   at,
+  flow = false,
   children,
 }: {
   sweep: MotionValue<number>;
   at: number;
+  /* In-flow rather than absolutely positioned. The scroll column's height
+     has to come from its content, so the sheet cannot be absolute. */
+  flow?: boolean;
   children: ReactNode;
 }) {
   const p = useTransform(sweep, (v) => submergence(rippleAt(v), at));
@@ -69,7 +74,17 @@ function Surface({
   const blur = useTransform(p, (v) => `blur(${((1 - v) * 9).toFixed(2)}px)`);
 
   return (
-    <motion.div className="absolute inset-0" style={{ opacity, y, filter: blur }}>
+    <motion.div
+      className={flow ? "relative" : "absolute inset-0"}
+      /* pointerEvents none is not cosmetic. In absolute mode this wrapper
+         is a transparent div covering the entire 965px layer, and there is
+         one of these per content group — including the composer's, which
+         sits OUTSIDE the scroll container and after it in DOM order. That
+         one was swallowing every wheel and touch event on the screen, so
+         the column could be scrolled programmatically but not by hand.
+         The bar itself re-enables pointer events on its own box. */
+      style={{ opacity, y, filter: blur, pointerEvents: "none" }}
+    >
       {children}
     </motion.div>
   );
@@ -133,6 +148,23 @@ export default function MyTripLayer({
           NOT here. It is a swirled bitmap standing in for moving water, and
           with a live wave crossing the screen the two read as two different
           bodies of water — a static texture the real one passes through. */}
+
+      {/* THE WHOLE COLUMN SCROLLS, not just the sheet.
+          Figma 947:26137 puts everything from the country chips down inside
+          one 8003px group — chips, destination, progress, copy, tabs and
+          the agent sections all move together, and only the composer is
+          pinned. An earlier pass scrolled the sheet alone, which left a
+          327px window: technically scrolling, useless to read.
+          overscroll-contain stops a flick at either end from scrolling the
+          review page behind the phone. */}
+      <div
+        className="absolute inset-0 overflow-y-auto overscroll-contain"
+        style={{ scrollbarWidth: "none" }}
+      >
+        <div className="relative">
+          {/* Holds open the height the absolutely-positioned header needs;
+              everything below it is in flow and sets the scroll length. */}
+          <div style={{ height: 638 }} />
 
       {/* ── Country chips ─────────────────────────────────────────────── */}
       <Surface sweep={sweep} at={104}>
@@ -411,131 +443,16 @@ export default function MyTripLayer({
 
       </Surface>
 
-      {/* ── Agent activity sheet ──────────────────────────────────────── */}
-      <Surface sweep={sweep} at={770}>
-
-      {/* Rectangle 240648187 — the tall white sheet the card stack scrolls
-          inside. Runs off the bottom of the frame by design. */}
-      <div
-        className="absolute"
-        style={{
-          left: 30,
-          top: 638,
-          width: 380,
-          height: 327,
-          borderRadius: 30,
-          background: "rgba(255,255,255,0.72)",
-          backdropFilter: "blur(18px)",
-          WebkitBackdropFilter: "blur(18px)",
-        }}
-      />
-
-      {/* First card — Australia Visa / WATCHING (947:43237). */}
-      <div
-        className="absolute"
-        style={{
-          left: 40,
-          top: 648,
-          width: 360,
-          height: 124,
-          borderRadius: 22,
-          background: "#ffffff",
-          boxShadow: "0 4px 24px -6px rgba(0,0,0,0.08)",
-        }}
-      >
-        <div
-          className="absolute rounded-full"
-          style={{ left: 20, top: 26, width: 44, height: 44, overflow: "hidden" }}
-        >
-          <Image
-            src="/assets/trips/orb-1.png"
-            alt=""
-            width={44}
-            height={44}
-            style={{ width: 44, height: 44 }}
-          />
+          {/* ── Agent activity sheet ──────────────────────────────────── */}
+          <Surface sweep={sweep} at={770} flow>
+            <div style={{ marginLeft: 30, width: 380 }}>
+              <TripSheet />
+            </div>
+          </Surface>
         </div>
-        <p
-          className="absolute font-semibold"
-          style={{
-            left: 76,
-            top: 30,
-            fontSize: 16,
-            lineHeight: "22px",
-            letterSpacing: "-0.32px",
-            color: "#0b0b0b",
-          }}
-        >
-          Australia Visa
-        </p>
-        <p
-          className="absolute font-medium"
-          style={{
-            left: 76,
-            top: 62,
-            width: 200,
-            fontSize: 12,
-            lineHeight: "16px",
-            letterSpacing: "-0.12px",
-            color: "#9a9aa2",
-          }}
-        >
-          Visa monitoring agent is working on 2 task...
-        </p>
-        <div
-          className="absolute rounded-full"
-          style={{ left: 268, top: 24, width: 5, height: 5, background: "#8b5cf6" }}
-        />
-        <p
-          className="absolute font-bold uppercase"
-          style={{
-            left: 280,
-            top: 20,
-            fontSize: 10,
-            lineHeight: "10px",
-            letterSpacing: "0.8px",
-            color: "#8b5cf6",
-          }}
-        >
-          Watching
-        </p>
       </div>
 
-      {/* Second card, peeking (947:43285). Only its head shows above the
-          composer, which is what tells you the sheet scrolls. */}
-      <div
-        className="absolute"
-        style={{
-          left: 40,
-          top: 784,
-          width: 360,
-          height: 124,
-          borderRadius: 22,
-          background: "#ffffff",
-          boxShadow: "0 4px 24px -6px rgba(0,0,0,0.08)",
-        }}
-      >
-        <div
-          className="absolute rounded-full border border-[#e6e6ea]"
-          style={{ left: 20, top: 16, width: 28, height: 28 }}
-        />
-        <p
-          className="absolute font-semibold"
-          style={{
-            left: 60,
-            top: 19,
-            fontSize: 15,
-            lineHeight: "20px",
-            letterSpacing: "-0.3px",
-            color: "#0b0b0b",
-          }}
-        >
-          Visa Delivery
-        </p>
-      </div>
-
-      </Surface>
-
+      {/* Pinned: the composer floats over the scroll, as in Figma. */}
       <Surface sweep={sweep} at={872}>
         <AskBar sendFilled delay={0} />
       </Surface>
