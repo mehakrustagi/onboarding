@@ -253,11 +253,20 @@ export default function ProfileScreen() {
      trails it through the spring, so a lagging card kept catching the KYC
      line that had already come up to meet it. Taking the room unlagged
      means the card is never larger than the gap actually left for it. */
-  /* Each pass shrinks about its OWN centre and the 76px pitch between them
-     is left alone, so the whitespace opens as they get smaller. An earlier
-     version pulled them together by exactly the shrink, to hold the gap
-     ratio constant — but that is the direction that makes them touch, and
-     two passes colliding is a worse read than a gap that grows. */
+  /* Each pass shrinks about its own centre, which walks the NEIGHBOUR's
+     visible edge off the right of the screen: its centre sits at 548 and
+     only its left sliver was ever on screen, so shrinking toward that
+     centre takes the sliver with it — at rest just 11px of it was left.
+     So the strip is pulled in toward the pass in focus by the shrink,
+     which is the same thing as scaling the whole strip about that pass and
+     keeps roughly 74px of the neighbour showing.
+
+     This was removed once as the cause of the two passes colliding. It was
+     not: the gap under it runs 62–66px the whole way down. What filled
+     that gap was the two cards' drop shadows, which is handled below. */
+  const collapseShrink = useTransform(collapseX, (d) =>
+    1 - COLLAPSE_SHRINK * Math.sin((d * Math.PI) / 180),
+  );
   const collapseScale = useTransform([collapseX, scrollY], ([d, y]) => {
     const P = COLLAPSE_PERSPECTIVE;
     const r = ((d as number) * Math.PI) / 180;
@@ -339,11 +348,35 @@ export default function ProfileScreen() {
       className="relative h-[965px] w-[440px] select-none overflow-hidden rounded-[44px] shadow-[0_40px_80px_-20px_rgba(0,0,0,0.5)]"
       style={{ background: "#ffffff" }}
     >
-      <div
+      <motion.div
         // Scrolls: the design runs 1781px against a 965px viewport. The
         // card stage stays put and the content below it moves, which is
         // the behaviour the design implies rather than a shrunken fit.
         className="absolute inset-0 overflow-y-auto overflow-x-hidden [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
+        /* Anywhere-on-screen swipe to change profile, once the passes have
+           collapsed. onPan rather than drag: drag captures the pointer and
+           rewrites touch-action, which would take vertical scrolling away
+           from the page — onPan only watches. Gated on `collapsed` because
+           while the passes are open a horizontal drag belongs to the card,
+           where it turns it over. */
+        onPanEnd={(_, info) => {
+          if (!collapsed) return;
+          const dx = info.offset.x;
+          if (Math.abs(dx) < 55 || Math.abs(dx) < Math.abs(info.offset.y))
+            return;
+          // Swiping left brings the NEXT pass in, the same direction the
+          // strip itself moves under the same gesture.
+          const next = Math.min(
+            PROFILES.length - 1,
+            Math.max(0, profileIdx + (dx < 0 ? 1 : -1)),
+          );
+          if (next === profileIdx) return;
+          haptic("carouselSnap");
+          trackRef.current?.scrollTo({
+            left: next * CARD_GAP,
+            behavior: "smooth",
+          });
+        }}
         onScroll={(e) => {
           const y = e.currentTarget.scrollTop;
           scrollY.set(y);
@@ -514,7 +547,7 @@ export default function ProfileScreen() {
       {/* Gives the scroll container the design's full height, so the
           absolutely-positioned body has room to scroll into. */}
         <div style={{ height: 1781 }} />
-      </div>
+      </motion.div>
 
       {/* Card carousel — arrives AFTER the disk, and drops onto it. The
           second card is deliberately cut off by the screen edge: that's
@@ -601,6 +634,8 @@ export default function ProfileScreen() {
                 interactive={i === profileIdx}
                 collapseX={collapseX}
                 collapseScale={collapseScale}
+                collapseShrink={collapseShrink}
+                slot={i - profileIdx}
                 collapsed={collapsed}
                 onSelect={() => {
                   trackRef.current?.scrollTo({
@@ -844,6 +879,8 @@ function WorldPassCard({
   interactive = true,
   collapseX,
   collapseScale,
+  collapseShrink,
+  slot = 0,
   collapsed = false,
   onSelect,
   onConnect,
@@ -869,6 +906,10 @@ function WorldPassCard({
   collapseX?: MotionValue<number>;
   /** Cancels the perspective magnification so the swing stays on screen. */
   collapseScale?: MotionValue<number>;
+  /** The size reduction alone, without the perspective maths. */
+  collapseShrink?: MotionValue<number>;
+  /** Passes away from the one in focus: −1, 0, +1. */
+  slot?: number;
   /** True once the strip is reading as tabs rather than as cards. */
   collapsed?: boolean;
   /** Tap-to-select, which is what a tab is. */
@@ -904,6 +945,27 @@ function WorldPassCard({
     Math.min(1, Math.hypot(a as number, b as number) / 13),
   );
   const dispersion = useTransform(tiltAmount, [0, 1], [0.16, 0.85]);
+
+  const one = useMotionValue(1);
+  const zero = useMotionValue(0);
+  const gapPull = useTransform(
+    collapseShrink ?? one,
+    (k) => -(1 - k) * slot * CARD_GAP,
+  );
+  /* The passes' own elevation, faded out with the swing.
+     
+     This is what read as the two cards colliding. The gap between them
+     never drops below ~62px, but each card throws a 50px blur either side,
+     so two of them met in the middle and filled that gap with grey. A card
+     lying nearly flat has nothing to cast anyway. */
+  const cardShadow = useTransform(collapseX ?? zero, (d) => {
+    const f = 1 - Math.sin((d * Math.PI) / 180);
+    return [
+      `0 2px 6px -2px rgba(0,0,0,${(0.25 * f).toFixed(3)})`,
+      `0 26px 50px -22px rgba(0,0,0,${(0.35 * f).toFixed(3)})`,
+      `0 30px 46px -32px rgba(0,0,0,${(0.22 * f).toFixed(3)})`,
+    ].join(", ");
+  });
 
   const onMove = (e: React.MouseEvent<HTMLDivElement>) => {
     if (!interactive) return;
@@ -1015,6 +1077,7 @@ function WorldPassCard({
         <motion.div
           className="h-full w-full"
           style={{
+            x: gapPull,
             rotateX: collapseX ?? 0,
             scale: collapseScale ?? 1,
             transformOrigin: "50% 0%",
@@ -1071,18 +1134,9 @@ function WorldPassCard({
             willChange: "transform",
             // Stacked elevation — a tight contact shadow under a wide
             // soft one, so the card sits ON the pedestal instead of
-            // hovering over a single blur.
-            // Halved from 0.5/0.7/0.55 — the stack read as a much
-            // heavier object than the card is.
-            boxShadow: [
-              "0 2px 6px -2px rgba(0,0,0,0.25)",
-              "0 26px 50px -22px rgba(0,0,0,0.35)",
-              // Pulled in hard. At 90px blur under a 264-wide card this cast a
-              // wash far wider than the plinth it lands on — which is what
-              // kept reading as an uncropped shadow around the pedestal,
-              // rather than the plinth's own.
-              "0 30px 46px -32px rgba(0,0,0,0.22)",
-            ].join(", "),
+            // hovering over a single blur. Halved from 0.5/0.7/0.55, and
+            // faded out by the swing (see cardShadow).
+            boxShadow: cardShadow,
           }}
         >
           {/* Idle rotation. Very small and on its own long period, so the
