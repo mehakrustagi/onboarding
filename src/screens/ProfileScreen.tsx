@@ -16,7 +16,6 @@ import ProgramDetail from "./profile/ProgramDetail";
 import SettingsSheet from "./profile/SettingsSheet";
 import DisconnectTerms from "./profile/DisconnectTerms";
 import BenefitDetail, { type BenefitDetailContent } from "./profile/BenefitDetail";
-import { FLIGHT_BENEFIT } from "./profile/BenefitDeck";
 import AgentSheet from "./profile/AgentSheet";
 import AirportSheet from "./profile/AirportSheet";
 import { AGENT_SPECS } from "./profile/agentSpecs";
@@ -400,11 +399,12 @@ export default function ProfileScreen() {
           if (k === "airport") setAirportOpen(true);
           else if (AGENT_SPECS[k]) setAgentKey(k);
         }}
-        onActivateBenefit={() =>
+        // Whichever card is at the front of the stack, not a fixed one.
+        onActivateBenefit={(card) =>
           setCardDetail({
-            title: FLIGHT_BENEFIT.title,
+            title: card.title,
             terms: PROFILE_BENEFIT_TERMS,
-            art: FLIGHT_BENEFIT.art,
+            art: card.art,
           })
         }
       />
@@ -789,7 +789,11 @@ function WorldPassCard({
             const fast = Math.abs(info.velocity.x) > 380;
             if (far || fast) {
               haptic("cardFlip");
-              setTurns((t) => t + (info.offset.x < 0 ? 1 : -1));
+              // Dragging LEFT turns the card's right edge toward you.
+              // CSS rotateY is the other way round — positive swings the
+              // right edge AWAY — so a leftward drag has to decrement,
+              // which is the reverse of what this did.
+              setTurns((t) => t + (info.offset.x < 0 ? -1 : 1));
             }
           }}
         >

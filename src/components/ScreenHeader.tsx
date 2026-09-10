@@ -13,6 +13,7 @@ const ROUTES = [
   { href: "/post-payment", label: "Post-payment" },
   { href: "/profile", label: "Profile" },
   { href: "/thinking-mode", label: "Thinking mode" },
+  { href: "/trips", label: "Trips" },
 ] as const;
 
 export default function ScreenHeader({

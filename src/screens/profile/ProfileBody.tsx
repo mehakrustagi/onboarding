@@ -5,6 +5,7 @@ import { motion } from "framer-motion";
 import PlanetCluster from "./PlanetCluster";
 import ActivatePill from "./ActivatePill";
 import BenefitDeck from "./BenefitDeck";
+import type { BenefitCard } from "./benefitCards";
 
 /* Everything below the pedestal — Figma node 853:16315.
  *
@@ -185,9 +186,9 @@ export default function ProfileBody({
      ProfileScreen and this only asks for it. */
   onViewBenefits: () => void;
   /** Tapping the benefit deck anywhere but ACTIVATE (853:21346). */
-  onOpenBenefit: () => void;
+  onOpenBenefit: (card: BenefitCard) => void;
   /** ACTIVATE on the deck — the same detail every benefit card opens. */
-  onActivateBenefit: () => void;
+  onActivateBenefit: (card: BenefitCard) => void;
   /** Tapping a Travel preferences tile opens that agent's sheet. */
   onOpenAgent: (key: string) => void;
 }) {
