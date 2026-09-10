@@ -668,6 +668,16 @@ function WorldPassCard({
   // card would read as a decal printed on it.
   const glossX = useTransform(rys, [-14, 14], ["82%", "18%"]);
   const glossY = useTransform(rxs, [-14, 14], ["18%", "82%"]);
+  /* Refraction. Real glass splits light as it bends it, so the dispersion
+     travels FURTHER than the white highlight and in the opposite
+     direction — that separation is the whole effect. It also strengthens
+     with tilt: face-on there is nothing to bend. */
+  const dispX = useTransform(rys, [-14, 14], ["112%", "-12%"]);
+  const dispY = useTransform(rxs, [-14, 14], ["-12%", "112%"]);
+  const tiltAmount = useTransform([rxs, rys], ([a, b]) =>
+    Math.min(1, Math.hypot(a as number, b as number) / 13),
+  );
+  const dispersion = useTransform(tiltAmount, [0, 1], [0.16, 0.85]);
 
   const onMove = (e: React.MouseEvent<HTMLDivElement>) => {
     if (!interactive) return;
@@ -1021,9 +1031,35 @@ function WorldPassCard({
               />
             </svg>
 
-            {/* Cursor-tracked specular. Kept wide and soft — a tight
-                highlight on a near-black card reads as a bright dot
-                rather than as a sheen across glass. */}
+            {/* Refraction. A prismatic band swung across the face by the
+                tilt, on plus-lighter so it ADDS colour to the black rather
+                than washing it grey. It leads the white highlight and runs
+                the other way, which is what separating light looks like;
+                a tint that tracked the specular would just read as a
+                coloured version of it. */}
+            <motion.div
+              className="pointer-events-none absolute inset-0"
+              style={{
+                borderRadius: 30,
+                zIndex: 3,
+                opacity: dispersion,
+                backgroundImage: useTransform(
+                  [dispX, dispY],
+                  ([dx, dy]) =>
+                    `radial-gradient(78% 64% at ${dx} ${dy},` +
+                    ` rgba(120,180,255,0.30) 0%,` +
+                    ` rgba(170,130,255,0.22) 26%,` +
+                    ` rgba(255,120,190,0.16) 48%,` +
+                    ` rgba(255,200,110,0.12) 68%,` +
+                    ` rgba(255,255,255,0) 88%)`,
+                ),
+                mixBlendMode: "plus-lighter",
+              }}
+            />
+
+            {/* Cursor-tracked specular. Wide and soft — a tight highlight
+                on a near-black card reads as a bright dot rather than as a
+                sheen across glass. */}
             <motion.div
               className="pointer-events-none absolute inset-0"
               style={{
@@ -1032,7 +1068,7 @@ function WorldPassCard({
                 backgroundImage: useTransform(
                   [glossX, glossY],
                   ([gx, gy]) =>
-                    `radial-gradient(60% 52% at ${gx} ${gy}, rgba(255,255,255,0.16) 0%, rgba(255,255,255,0.05) 42%, rgba(255,255,255,0) 74%)`,
+                    `radial-gradient(64% 56% at ${gx} ${gy}, rgba(255,255,255,0.34) 0%, rgba(255,255,255,0.13) 40%, rgba(255,255,255,0.04) 62%, rgba(255,255,255,0) 80%)`,
                 ),
                 mixBlendMode: "screen",
               }}

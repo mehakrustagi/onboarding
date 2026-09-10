@@ -2,10 +2,10 @@
 
 import Image from "next/image";
 import type { ReactNode } from "react";
-import { motion, type MotionValue } from "framer-motion";
+import { motion, useTransform, type MotionValue } from "framer-motion";
 import AskBar from "@/components/AskBar";
 import type { HandoffBeat } from "./beats";
-import { applyMask, incomingMask, useRippleStyle } from "./ripple";
+import { applyMask, incomingMask, rippleAt, submergence, useRippleStyle } from "./ripple";
 
 /* MyTrip — Figma frame 947:43120 ("4" in the Transition to MyTrip section).
  *
@@ -30,44 +30,46 @@ import { applyMask, incomingMask, useRippleStyle } from "./ripple";
  * which is what this pass needed it to do.
  *
  *
- * THE SCREEN ARRIVES; IT IS NOT UNCOVERED
+ * THE WATER CHANGES THE PAGE; IT DOES NOT UNCOVER IT
  *
- * The ripple's mask reveals this layer's SURFACE — the silk ground and
- * nothing else. Every piece of content on top of it waits for the wave to
- * pass and then arrives, in order, out of the white the wave left behind.
+ * Nothing here is on a timer. Every group of content is tied to the
+ * waterline: it surfaces when the rising wave reaches its own height on the
+ * screen, so the composer comes up first — it is nearest the source — and
+ * the country chips last. What you should read is water rising up a page
+ * and changing what it passes over, in the order it passes over it.
  *
- * That distinction is the whole difference between the transition looking
- * like a page load and looking like a page arriving. An earlier pass had
- * the finished screen sitting behind the crest, fully composed, so the
- * wave was just a shutter being pulled off something that had obviously
- * been there all along — which is exactly what it felt like. Nothing about
- * the wave changed to fix it; what changed is that there is now nothing
- * behind the wave until it has gone.
+ * Two earlier versions each got this wrong in the way the other didn't. The
+ * first had the finished screen sitting behind the crest, so the wave was a
+ * shutter pulled off something that had obviously been there all along. The
+ * second moved every element to a fixed delay AFTER the wave had gone,
+ * which fixed the pre-loaded feeling but severed the connection — the text
+ * arrived because a timer said so, not because the water reached it.
  */
 
-/* One group of content, arriving after the wave. Absolutely positioned and
- * inset so the children keep the frame coordinates read off Figma — the
- * wrapper is purely a handle for the animation. */
-function Arrive({
-  show,
-  delay,
+/* One group of content, surfacing as the water passes its height.
+ *
+ * Absolutely positioned and inset so the children keep the frame
+ * coordinates read off Figma; the wrapper is purely a handle for the
+ * animation. `at` is the group's height on the shell, which is the only
+ * thing that decides when it comes up. */
+function Surface({
+  sweep,
+  at,
   children,
 }: {
-  show: boolean;
-  delay: number;
+  sweep: MotionValue<number>;
+  at: number;
   children: ReactNode;
 }) {
+  const p = useTransform(sweep, (v) => submergence(rippleAt(v), at));
+  const opacity = useTransform(p, [0, 0.55, 1], [0, 0.6, 1]);
+  /* Rises the last few pixels into place as it clears, so it reads as
+     something breaking the surface rather than fading up in position. */
+  const y = useTransform(p, (v) => (1 - v) * 22);
+  const blur = useTransform(p, (v) => `blur(${((1 - v) * 9).toFixed(2)}px)`);
+
   return (
-    <motion.div
-      className="absolute inset-0"
-      initial={false}
-      animate={
-        show
-          ? { opacity: 1, y: 0, filter: "blur(0px)" }
-          : { opacity: 0, y: 18, filter: "blur(8px)" }
-      }
-      transition={{ duration: 0.62, delay: show ? delay : 0, ease: IN_EASE }}
-    >
+    <motion.div className="absolute inset-0" style={{ opacity, y, filter: blur }}>
       {children}
     </motion.div>
   );
@@ -107,10 +109,6 @@ export default function MyTripLayer({
   sweep: MotionValue<number>;
 }) {
   const revealing = beat === "sweeping" || beat === "settled";
-  /* Content waits for the wave to have gone by. `settled` is the beat after
-     the ripple finishes, so everything below arrives into the white it
-     leaves rather than being uncovered by it. */
-  const arrived = beat === "settled";
   const maskRef = useRippleStyle<HTMLDivElement>(sweep, incomingMask, applyMask);
 
   return (
@@ -145,7 +143,7 @@ export default function MyTripLayer({
       </div>
 
       {/* ── Country chips ─────────────────────────────────────────────── */}
-      <Arrive show={arrived} delay={0.02}>
+      <Surface sweep={sweep} at={104}>
 
       <Image
         src="/assets/trips/chip-add.svg"
@@ -204,10 +202,10 @@ export default function MyTripLayer({
         style={{ position: "absolute", left: 163.47, top: 47.46, width: 117, height: 117 }}
       />
 
-      </Arrive>
+      </Surface>
 
       {/* ── Destination ───────────────────────────────────────────────── */}
-      <Arrive show={arrived} delay={0.1}>
+      <Surface sweep={sweep} at={205}>
 
       <p
         className="absolute -translate-x-1/2 whitespace-nowrap text-center font-bold uppercase"
@@ -258,10 +256,10 @@ export default function MyTripLayer({
         style={{ position: "absolute", left: 280.97, top: 228.39, width: 25, height: 25 }}
       />
 
-      </Arrive>
+      </Surface>
 
       {/* ── Progress ──────────────────────────────────────────────────── */}
-      <Arrive show={arrived} delay={0.2}>
+      <Surface sweep={sweep} at={300}>
 
       <div
         className="absolute"
@@ -320,10 +318,10 @@ export default function MyTripLayer({
         </div>
       ))}
 
-      </Arrive>
+      </Surface>
 
       {/* ── What the agent is doing ───────────────────────────────────── */}
-      <Arrive show={arrived} delay={0.28}>
+      <Surface sweep={sweep} at={405}>
 
       <p
         className="absolute -translate-x-1/2 text-center font-medium"
@@ -356,10 +354,10 @@ export default function MyTripLayer({
         and keeping a close eye on your visa application
       </p>
 
-      </Arrive>
+      </Surface>
 
       {/* ── Category tabs ─────────────────────────────────────────────── */}
-      <Arrive show={arrived} delay={0.38}>
+      <Surface sweep={sweep} at={565}>
 
       {/* The row is 453 wide in a 440 frame: Forex is meant to be clipped so
           the strip reads as scrollable. Kept as an overflow rather than
@@ -419,10 +417,10 @@ export default function MyTripLayer({
         style={{ left: 30.71, top: 605.71, width: 380, height: 1, background: "rgba(0,0,0,0.07)" }}
       />
 
-      </Arrive>
+      </Surface>
 
       {/* ── Agent activity sheet ──────────────────────────────────────── */}
-      <Arrive show={arrived} delay={0.46}>
+      <Surface sweep={sweep} at={770}>
 
       {/* Rectangle 240648187 — the tall white sheet the card stack scrolls
           inside. Runs off the bottom of the frame by design. */}
@@ -544,11 +542,11 @@ export default function MyTripLayer({
         </p>
       </div>
 
-      </Arrive>
+      </Surface>
 
-      <Arrive show={arrived} delay={0.56}>
+      <Surface sweep={sweep} at={872}>
         <AskBar sendFilled delay={0} />
-      </Arrive>
+      </Surface>
     </motion.div>
   );
 }

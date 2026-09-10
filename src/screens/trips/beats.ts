@@ -31,7 +31,7 @@ export type HandoffBeat = "idle" | "charging" | "contact" | "sweeping" | "settle
  * At 0.78s that was a flash; at 1.15 you could see it but not feel the text
  * being carried. 1.85 gives each line of copy time to lean, be thrown, be
  * pulled back and settle as the crest passes over it. */
-export const SWEEP_S = 1.85;
+export const SWEEP_S = 6.0; // TEMP-CAPTURE
 
 /* Milliseconds from the start of the sequence to the START of each beat.
  * Absolute rather than per-beat durations so the schedule reads as a

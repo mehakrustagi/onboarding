@@ -271,6 +271,40 @@ export function washGradient(s: RippleState) {
   );
 }
 
+/* ── The waterline ──────────────────────────────────────────────────────
+ *
+ * How far the water has risen past a given point on the screen.
+ *
+ * This is what makes the wave CHANGE the page rather than uncover it. The
+ * crest is a circle spreading from (220, originY), so a point at height y
+ * on the centre line is submerged once the front has travelled the distance
+ * to it. Feed that through a short ramp and every element on the incoming
+ * screen has its own moment of surfacing — the composer first because it is
+ * nearest the source, the country chips last because they are furthest —
+ * and each one emerges just behind the water rather than at a time of its
+ * own choosing.
+ *
+ * Two earlier versions both got this wrong in the way the other didn't. The
+ * first had the whole finished screen sitting behind the crest, so the wave
+ * was a shutter pulled off something already there. The second moved every
+ * element to a fixed delay after the wave had gone, which fixed the
+ * pre-loaded feeling but broke the connection — the text arrived because a
+ * timer said so, not because the water reached it.
+ *
+ * BAND_INNER offsets the reveal to behind the wake: the water passes, bends
+ * the old content, bleaches it, and only then does the new content surface
+ * out of the white.
+ *
+ * Distance is measured on the centre line. The wave is radial, so content
+ * at the left and right edges is genuinely reached a little later than this
+ * says; at 220px of half-width against a front of 1240 that lag is small
+ * enough to be worth the simplicity.
+ */
+export function submergence(s: RippleState, y: number, ramp = 170) {
+  const distance = s.originY - y;
+  return Math.min(1, Math.max(0, (s.front + BAND_INNER - distance) / ramp));
+}
+
 /* ── Wiring ─────────────────────────────────────────────────────────────
  *
  * Subscribes to the sweep and writes one CSS property on one element. Kept
