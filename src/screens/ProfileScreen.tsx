@@ -414,6 +414,11 @@ export default function ProfileScreen() {
           // strip's own native scroll. Left on pan-y a touch swipe would
           // land on nothing.
           touchAction: collapsed ? "pan-x pan-y" : "pan-y",
+          // Once the pass has swung out there is nothing left here to hit,
+          // and the reference puts content in this band — so the track
+          // stops taking the pointer rather than sitting over it as a dead
+          // 76px strip. Switching goes back to scrolling up to the passes.
+          pointerEvents: collapsed ? "none" : "auto",
         }}
         onScroll={(e) => {
           const el = e.currentTarget;
