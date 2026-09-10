@@ -530,21 +530,29 @@ function ThinkingDots({ working }: { working: boolean }) {
       {/* The pass of light. Wider than a dot and much narrower than the
           cluster, so it picks out a few at a time.
 
-          It runs only while the agent is working. Left running under
-          finished copy it stops meaning anything — it has to stop for the
-          arrival of the text to read as the thing it was waiting for. */}
-      {working && (
-        <motion.div
-          className="absolute inset-y-0"
-          style={{
-            width: 64,
-            background:
-              "linear-gradient(90deg, transparent, rgba(255,255,255,0.95), transparent)",
-          }}
-          animate={{ x: [-64, 166] }}
-          transition={{ duration: 2.7, repeat: Infinity, ease: "easeInOut" }}
-        />
-      )}
+          Two strengths rather than on and off. While the agent is working
+          it is bright and continuous — that is the card telling you it is
+          busy. Once the copy has landed it drops to a faint, slow pass
+          with a long rest between: the dots keep a little life without
+          claiming work is still happening. Cutting it dead made the whole
+          bottom-left corner of the card go flat the moment the text
+          arrived. */}
+      <motion.div
+        className="absolute inset-y-0"
+        style={{
+          width: working ? 64 : 88,
+          background: `linear-gradient(90deg, transparent, rgba(255,255,255,${
+            working ? 0.95 : 0.34
+          }), transparent)`,
+        }}
+        animate={{ x: working ? [-88, 166] : [-88, 166] }}
+        transition={{
+          duration: working ? 2.7 : 4.6,
+          repeat: Infinity,
+          ease: "easeInOut",
+          repeatDelay: working ? 0 : 2.4,
+        }}
+      />
     </div>
   );
 }
