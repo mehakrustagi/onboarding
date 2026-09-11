@@ -34,7 +34,9 @@ type Trigger =
   | "dragResist"       // Control panel: repeating tick while the magnet fights you
   | "dragBreak"        // Control panel: past the threshold, the magnet lets go
   | "tunnelEnter"      // Control panel: icon committed, descent begins
-  | "tunnelExit";      // Control panel: icon lands on the far platform
+  | "tunnelExit"       // Control panel: icon lands on the far platform
+  | "holdCharge"       // Profile: holding the pass down to open explore
+  | "holdExpand";      // Profile: the hold completes and the pass opens
 
 const PATTERNS: Record<Trigger, number | number[]> = {
   orbLand: 12,
@@ -101,7 +103,33 @@ const PATTERNS: Record<Trigger, number | number[]> = {
   // over ~950ms — gaps shrink so the sensation grows tighter as the
   // orb approaches the card. Terminated by benefitLand's stronger tick.
   orbTravel: [4, 280, 6, 220, 8, 170, 12, 120, 16, 90],
+  /* The hold. One fire-and-forget ladder for the whole ~1s press rather
+     than a tick scheduled per frame: the vibration motor is driven by the
+     OS on its own clock, so a pattern handed over in one call keeps its
+     rhythm where repeated short calls jitter against the frame rate.
+
+     Durations climb and gaps close, so the press feels like something
+     winding up under the thumb. Cancelled by stopHaptics() if the finger
+     leaves early — a ladder that keeps running after the user let go is
+     the one thing that would make this feel broken. */
+  holdCharge: [
+    3, 180, 4, 158, 5, 138, 6, 120, 8, 102, 10, 84, 13, 66, 16, 51, 20, 39,
+  ],
+  // The pass opens: a firm double, distinct from every tick before it.
+  holdExpand: [24, 40, 44],
 };
+
+/* Stops any pattern in flight. navigator.vibrate(0) cancels the queue,
+   which is the only way to abandon a multi-step pattern part way. */
+export function stopHaptics() {
+  if (typeof navigator === "undefined") return;
+  if (typeof navigator.vibrate !== "function") return;
+  try {
+    navigator.vibrate(0);
+  } catch {
+    // Same guard as below — some browsers throw on rapid calls.
+  }
+}
 
 export function haptic(trigger: Trigger) {
   if (typeof navigator === "undefined") return;

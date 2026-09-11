@@ -91,7 +91,14 @@ const IN_EASE = [0.22, 1, 0.36, 1] as const;
  * against the black, because that is the only thing they read against.
  * Fading it underneath them turned the release into a crossfade and took
  * the contrast out from under the one moment the beat exists for. */
-const LAST_ORB_OUT = 1.35;
+/* The scrim used to wait for the last orb to leave frame. They do not
+   leave any more — they land on the progress track — so it has to go
+   while they are still in the air, or they would touch down behind it.
+   Clear at 1.05s against a last landing at 1.41s: the final third of the
+   arrival plays against the real screen, which is the part that has to
+   read as "these are the same three agents". */
+const SCRIM_OUT_AT = 0.45;
+const SCRIM_OUT_FOR = 0.6;
 
 /* Relaxed: a soft start against the balloon's own inertia, then steady.
  * The curve does decelerate, but the exit target sits so far above the
@@ -102,6 +109,34 @@ const RISE_EASE = [0.32, 0, 0.5, 1] as const;
 /* 0.9 × 0.9 = 0.81, reaching full at 840.387 / 965 = 87.1%. */
 const SCRIM =
   "linear-gradient(to bottom, rgba(0,0,0,0) 0%, rgba(0,0,0,0.81) 87.1%, rgba(0,0,0,0.81) 100%)";
+
+/* Where each one comes down: at the START of the progress track, not at
+ * its resting position. They land on an empty bar, and then walk it out —
+ * the slide and the fill that follows them belong to MyTripLayer. Kept in
+ * step with its ORBS by hand: they are two halves of one object and a
+ * mismatch would show as the orb jumping on the frame it lands.
+ *
+ * Assigned left-to-right so no two paths cross. That means an orb does
+ * not always keep its own art: the bar's discs are Figma's for that node
+ * and the agents' are Figma's for theirs, and only one pair matches. The
+ * art crossfades over the last third of the flight, by which point the
+ * orb is moving, shrinking and swapping its ring for a white disc, so the
+ * change of face is not something you can catch. */
+const LANDING = [
+  { x: 50.97, src: "/assets/trips/orb-1.png" },
+  { x: 74.97, src: "/assets/trips/orb-2.png" },
+  { x: 98.97, src: "/assets/trips/orb-3.png" },
+] as const;
+const LAND_Y = 288.41;
+const LAND_SIZE = 30;
+/* Art inset inside the white disc, from MyTripLayer. */
+const LAND_ART = 21.5;
+
+/* One flight, staggered. Long enough to read as travel rather than a cut,
+ * short enough that the interstitial does not outstay the line it has to
+ * say. */
+const FLIGHT = 1.25;
+const FLIGHT_STAGGER = 0.08;
 
 /* The three agents. `lift` is how far each floats on its own loop — they
  * are working, not posing, and a cluster where everything bobs in step
@@ -122,16 +157,14 @@ const ORBS = [
     dur: 4.2,
     /* Figma's 706 position, then out through the top. */
     to: { dx: 8.54, dy: -260.66, scale: 1 },
-    /* Overshoots the top by ~40%: the orb is gone by t≈0.7, so the eased
-       tail never shows. */
-    exitY: -1080,
-    driftX: 46,
+    /* Leftmost of the three, so it takes the leftmost slot. */
+    slot: 0,
+    /* Lateral swing on the way over, decaying to nothing so the orb
+       arrives dead on its slot rather than sliding the last few pixels. */
     amp: 30,
     freq: 1.15,
     phase: 0.2,
     tilt: 9,
-    endScale: 0.5,
-    float: 1.55,
   },
   {
     key: "a",
@@ -147,14 +180,11 @@ const ORBS = [
     lift: 9,
     dur: 5.1,
     to: { dx: -76.26, dy: -182.68, scale: 1 },
-    exitY: -1120,
-    driftX: -96,
+    slot: 2,
     amp: 35,
     freq: 1.32,
     phase: 2.1,
     tilt: -11,
-    endScale: 0.47,
-    float: 1.4,
   },
   {
     key: "c",
@@ -171,14 +201,11 @@ const ORBS = [
     dur: 3.6,
     /* 30 / 40 — Figma has the big one come down to the others' size. */
     to: { dx: -84.27, dy: -147.49, scale: 0.75 },
-    exitY: -1180,
-    driftX: -44,
+    slot: 1,
     amp: 25,
     freq: 0.98,
     phase: 4.0,
     tilt: 7,
-    endScale: 0.4,
-    float: 1.7,
   },
 ] as const;
 
@@ -208,8 +235,8 @@ export default function AgentsOverlay({ phase }: { phase: AgentsPhase }) {
         initial={false}
         animate={{ opacity: going ? 0 : 1 }}
         transition={{
-          duration: going ? 0.7 : 0.35,
-          delay: going ? LAST_ORB_OUT : 0,
+          duration: going ? SCRIM_OUT_FOR : 0.35,
+          delay: going ? SCRIM_OUT_AT : 0,
           ease: IN_EASE,
         }}
       />
@@ -301,37 +328,56 @@ function Balloon({
       return;
     }
     const controls = animate(t, 1, {
-      duration: o.float,
+      duration: FLIGHT,
       ease: RISE_EASE,
-      delay: i * 0.08,
+      delay: i * FLIGHT_STAGGER,
     });
     return () => controls.stop();
-  }, [t, going, o.float, i]);
+  }, [t, going, i]);
 
-  /* The wave. Phase-shifted so x starts at exactly 0 — without the
-     correction the orb jumps sideways by A·sin(φ) on the first frame. */
-  const x = useTransform(
-    t,
-    (v) =>
-      o.driftX * v +
-      o.amp * (Math.sin(2 * Math.PI * o.freq * v + o.phase) - Math.sin(o.phase)),
-  );
-  const y = useTransform(t, (v) => o.exitY * v);
+  /* Where this one is headed, as a delta from where it is sitting. Both
+     measured centre-to-centre, because the orb shrinks on the way and a
+     top-left delta would land it half a disc off. */
+  const land = LANDING[o.slot];
+  const dx = land.x + LAND_SIZE / 2 - (o.x + o.size / 2);
+  const dy = LAND_Y + LAND_SIZE / 2 - (o.y + o.size / 2);
+
+  /* The flight.
+     Travel is linear in v; the swing rides on top of it and is scaled by
+     (1 - v) so it is gone by the time the orb reaches its slot. Without
+     that decay the sine leaves a few pixels on the table at v=1 and the
+     orb finishes with a visible sideways nudge.
+
+     Phase-shifted so x starts at exactly 0 — without the correction the
+     orb jumps sideways by A·sin(φ) on the first frame. */
+  const swing = (v: number) =>
+    o.amp *
+    (1 - v) *
+    (Math.sin(2 * Math.PI * o.freq * v + o.phase) - Math.sin(o.phase));
+  const x = useTransform(t, (v) => dx * v + swing(v));
+  /* Lifted off the straight line early and brought back down onto the
+     slot — an orb that travels the chord reads as a slide, one that
+     arcs reads as something thrown. */
+  const y = useTransform(t, (v) => dy * v - 90 * Math.sin(Math.PI * v));
   /* Banking into the turn: the derivative of the lateral position. */
   const rotate = useTransform(
     t,
-    (v) => -o.tilt * Math.cos(2 * Math.PI * o.freq * v + o.phase),
+    (v) => -o.tilt * (1 - v) * Math.cos(2 * Math.PI * o.freq * v + o.phase),
   );
 
+  /* Ends at exactly the bar disc's size, whatever it started as. */
   const scale = useTransform([entered, t] as const, ([e, v]: number[]) => {
     const enterScale = 0.7 + 0.3 * e;
-    return enterScale * (1 + (o.endScale - 1) * v);
+    return enterScale * (1 + (LAND_SIZE / o.size - 1) * v);
   });
-  /* Held fully opaque for the first two thirds — a balloon does not
-     dissolve on its way up, it gets far away and then leaves frame. */
-  const opacity = useTransform([entered, t] as const, ([e, v]: number[]) =>
-    e * (v < 0.66 ? 1 : Math.max(0, 1 - (v - 0.66) / 0.34)),
-  );
+  /* No fade on the way: it is landing, not leaving. */
+  const opacity = entered;
+
+  /* The agent's dress — ring and comet — gives way to the bar disc's white
+     backing over the last third, so what touches down is already the thing
+     that lives on the track. */
+  const agentLook = useTransform(t, [0.45, 0.85], [1, 0], { clamp: true });
+  const barLook = useTransform(t, [0.5, 0.9], [0, 1], { clamp: true });
 
   return (
     <motion.div
@@ -341,6 +387,9 @@ function Balloon({
         top: o.y,
         width: o.size,
         height: o.size,
+        /* Same stacking the track uses — leftmost in front, so the three
+           overlap the same way before and after they land. */
+        zIndex: 3 - o.slot,
         x,
         y,
         rotate,
@@ -359,45 +408,71 @@ function Balloon({
             : { duration: o.dur, repeat: Infinity, ease: "easeInOut" }
         }
       >
-        {/* The trailing comet, rotated -30 degrees as Figma has it. Sized
-            from its own box rather than the orb's — it overhangs on both
-            axes, which is what makes the orb look like it is moving
-            through something rather than sitting still. */}
-        <Image
-          src={o.tail}
-          alt=""
-          width={o.tailW}
-          height={o.tailH}
-          style={{
-            position: "absolute",
-            left: (o.size - o.tailW) / 2,
-            top: (o.size - o.tailH) / 2,
-            width: o.tailW,
-            height: o.tailH,
-          }}
-        />
-        <Image
-          src={o.src}
-          alt=""
-          width={o.art}
-          height={o.art}
-          style={{
-            position: "absolute",
-            left: (o.size - o.art) / 2,
-            top: (o.size - o.art) / 2,
-            width: o.art,
-            height: o.art,
-            borderRadius: "50%",
-            objectFit: "cover",
-          }}
-        />
-        <Image
-          src={o.ring}
-          alt=""
-          width={o.size}
-          height={o.size}
-          style={{ position: "absolute", inset: 0, width: o.size, height: o.size }}
-        />
+        {/* What it turns into: the bar's white disc with the track art
+            inset. Sized in the orb's own units so the parent's scale
+            carries it down to 30 along with everything else. */}
+        <motion.div
+          className="absolute rounded-full bg-white"
+          style={{ inset: 0, opacity: barLook }}
+        >
+          <Image
+            src={land.src}
+            alt=""
+            width={21.5}
+            height={21.5}
+            style={{
+              position: "absolute",
+              left: ((LAND_ART / LAND_SIZE) * o.size - o.size) / -2,
+              top: ((LAND_ART / LAND_SIZE) * o.size - o.size) / -2,
+              width: (LAND_ART / LAND_SIZE) * o.size,
+              height: (LAND_ART / LAND_SIZE) * o.size,
+              borderRadius: "50%",
+              objectFit: "cover",
+            }}
+          />
+        </motion.div>
+
+        <motion.div className="absolute" style={{ inset: 0, opacity: agentLook }}>
+          {/* The trailing comet, rotated -30 degrees as Figma has it. Sized
+              from its own box rather than the orb's — it overhangs on both
+              axes, which is what makes the orb look like it is moving
+              through something rather than sitting still. */}
+          <Image
+            src={o.tail}
+            alt=""
+            width={o.tailW}
+            height={o.tailH}
+            style={{
+              position: "absolute",
+              left: (o.size - o.tailW) / 2,
+              top: (o.size - o.tailH) / 2,
+              width: o.tailW,
+              height: o.tailH,
+            }}
+          />
+          <Image
+            src={o.src}
+            alt=""
+            width={o.art}
+            height={o.art}
+            style={{
+              position: "absolute",
+              left: (o.size - o.art) / 2,
+              top: (o.size - o.art) / 2,
+              width: o.art,
+              height: o.art,
+              borderRadius: "50%",
+              objectFit: "cover",
+            }}
+          />
+          <Image
+            src={o.ring}
+            alt=""
+            width={o.size}
+            height={o.size}
+            style={{ position: "absolute", inset: 0, width: o.size, height: o.size }}
+          />
+        </motion.div>
       </motion.div>
     </motion.div>
   );
