@@ -23,8 +23,13 @@ export const HOLD_MS = 1100;
 const BLOCK_X = 44;
 const BLOCK_Y = 346;
 const HALO = 77;
+/* The dark disc between the halo and the ring. Not in the node's layer
+ * list — it reads there as part of the ring artwork — but it is what gives
+ * the orb its weight, and without it the white ring floats on the pale
+ * halo with nothing behind it. */
+const DISC = 55;
 const RING = 39;
-const CORE = 21;
+const CORE = 26;
 /* Concentric, so all three share this centre inside the block. */
 const CX = 26 + HALO / 2;
 const CY = 40 + HALO / 2;
@@ -68,9 +73,7 @@ export default function HoldToExplore({
           height: 23,
           borderRadius: 11.5,
           paddingLeft: 8,
-          background: "rgba(122,110,240,0.16)",
-          backdropFilter: "blur(6px)",
-          WebkitBackdropFilter: "blur(6px)",
+          background: "#cfc8f2",
         }}
         animate={{ opacity: held ? 0.25 : 1 }}
         transition={{ duration: 0.25 }}
@@ -78,10 +81,12 @@ export default function HoldToExplore({
         <span
           className="whitespace-nowrap font-bold uppercase"
           style={{
-            fontSize: 9,
+            // 11/0.88 is what makes the label 115 wide inside a 131 pill,
+            // which is how the node sizes it.
+            fontSize: 11,
             lineHeight: "14px",
-            letterSpacing: "0.72px",
-            color: "#3c3480",
+            letterSpacing: "0.88px",
+            color: "#ffffff",
           }}
         >
           HOLD TO EXPLORE
@@ -99,7 +104,7 @@ export default function HoldToExplore({
           height: HALO,
           borderRadius: HALO / 2,
           background:
-            "radial-gradient(circle, rgba(122,110,240,0.34) 0%, rgba(122,110,240,0.12) 58%, rgba(122,110,240,0) 72%)",
+            "radial-gradient(circle, rgba(199,192,240,0.85) 0%, rgba(199,192,240,0.78) 62%, rgba(199,192,240,0) 76%)",
         }}
         animate={
           held
@@ -111,6 +116,19 @@ export default function HoldToExplore({
             ? { duration: 0.24 }
             : { duration: 2.4, repeat: Infinity, ease: "easeInOut" }
         }
+      />
+
+      {/* The dark body the ring sits on. */}
+      <div
+        className="absolute"
+        style={{
+          left: CX - DISC / 2,
+          top: CY - DISC / 2,
+          width: DISC,
+          height: DISC,
+          borderRadius: DISC / 2,
+          background: "#262447",
+        }}
       />
 
       {/* Ring. The track is always there; the stroke on top is the hold.
@@ -128,15 +146,18 @@ export default function HoldToExplore({
           cx={RING / 2}
           cy={RING / 2}
           r={R}
-          stroke="rgba(122,110,240,0.28)"
-          strokeWidth={2.5}
+          stroke="#ffffff"
+          strokeWidth={3}
         />
         <motion.circle
           cx={RING / 2}
           cy={RING / 2}
           r={R}
+          // Violet over the white, so at rest the ring is the solid white
+          // one the design draws and the hold is an arc travelling over it
+          // — rather than the ring being absent until you press.
           stroke="#6b5cf0"
-          strokeWidth={2.5}
+          strokeWidth={3}
           strokeLinecap="round"
           strokeDasharray={CIRC}
           style={{ strokeDashoffset: dash }}
@@ -154,7 +175,7 @@ export default function HoldToExplore({
           width: CORE,
           height: CORE,
           borderRadius: CORE / 2,
-          background: "#3b2fb8",
+          background: "#5b4fe0",
           scale: coreScale,
         }}
       />
