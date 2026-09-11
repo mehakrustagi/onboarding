@@ -9,8 +9,8 @@ import {
   useTransform,
   type MotionValue,
 } from "framer-motion";
-import { useEffect, useRef, useState } from "react";
-import { haptic } from "@/lib/haptics";
+import { useCallback, useEffect, useRef, useState } from "react";
+import { haptic, stopHaptics } from "@/lib/haptics";
 import ProfileBody from "./profile/ProfileBody";
 import BenefitsSheet from "./profile/BenefitsSheet";
 import CardBack from "./profile/CardBack";
@@ -27,6 +27,8 @@ import AgentSheet from "./profile/AgentSheet";
 import AirportSheet from "./profile/AirportSheet";
 import { AGENT_SPECS } from "./profile/agentSpecs";
 import DisconnectProgress from "./profile/DisconnectProgress";
+import HoldToExplore, { HOLD_MS } from "./profile/HoldToExplore";
+import WorldPassExplore from "./profile/WorldPassExplore";
 
 /* Profile — Figma node 853:15690 (Dump_work).
  *
@@ -324,6 +326,51 @@ export default function ProfileScreen() {
   });
   const [collapsed, setCollapsed] = useState(false);
   const [parked, setParked] = useState(false);
+
+  /* Hold to explore (1068:12764). Press and keep pressing on the pass and
+     it opens into the globe.
+
+     Progress is a MotionValue rather than state: it moves every frame of
+     the press, and re-rendering this screen at 60fps would drag the card's
+     entire 3D subtree along with it. */
+  const holdP = useMotionValue(0);
+  const [held, setHeld] = useState(false);
+  const [exploreOpen, setExploreOpen] = useState(false);
+  const holdRaf = useRef<number | null>(null);
+
+  const cancelHold = useCallback(() => {
+    if (holdRaf.current !== null) cancelAnimationFrame(holdRaf.current);
+    holdRaf.current = null;
+    // The vibration ladder was handed to the OS in one call, so letting go
+    // has to actively cancel it — otherwise it keeps winding up in your
+    // hand after you have stopped pressing.
+    stopHaptics();
+    setHeld(false);
+    holdP.set(0);
+  }, [holdP]);
+
+  const startHold = useCallback(() => {
+    if (holdRaf.current !== null) return;
+    setHeld(true);
+    haptic("holdCharge");
+    const t0 = performance.now();
+    const step = () => {
+      const p = Math.min(1, (performance.now() - t0) / HOLD_MS);
+      holdP.set(p);
+      if (p >= 1) {
+        holdRaf.current = null;
+        setHeld(false);
+        holdP.set(0);
+        haptic("holdExpand");
+        setExploreOpen(true);
+        return;
+      }
+      holdRaf.current = requestAnimationFrame(step);
+    };
+    holdRaf.current = requestAnimationFrame(step);
+  }, [holdP]);
+
+  useEffect(() => cancelHold, [cancelHold]);
 
   /* The card leaves around y 500; the title arrives as it goes. */
   const headerIn = useTransform(scrollY, [300, 420], [0, 1], { clamp: true });
@@ -682,6 +729,8 @@ export default function ProfileScreen() {
                 slot={i - profileIdx}
                 collapsed={collapsed}
                 parked={parked}
+                onHoldStart={startHold}
+                onHoldCancel={cancelHold}
                 onSelect={() => {
                   trackRef.current?.scrollTo({
                     left: i * CARD_GAP,
@@ -704,6 +753,16 @@ export default function ProfileScreen() {
           />
         </div>
       </motion.div>
+
+      {/* Hold to explore (853:18425). A sibling of the card rather than a
+          child: the node places it in frame coordinates at (44, 346), and
+          as a child it would tip and shrink with the swing — the one thing
+          that must not happen to an instruction about how to touch. */}
+      <HoldToExplore
+        progress={holdP}
+        held={held}
+        show={!collapsed && !exploreOpen}
+      />
 
       {/* Sticky header. Fades in as the card scrolls away, so the screen
           keeps a title once the card that WAS the title is gone. It sits
@@ -824,6 +883,13 @@ export default function ProfileScreen() {
       {/* Disconnecting (853:74636). Runs itself, then hands back to the
           account centre — so completing it clears the terms page and sends
           the settings stack home. */}
+      {/* The pass, opened. */}
+      <WorldPassExplore
+        open={exploreOpen}
+        name={PROFILES[profileIdx].name}
+        onClose={() => setExploreOpen(false)}
+      />
+
       <DisconnectProgress
         open={progressOpen}
         onStop={() => setProgressOpen(false)}
@@ -932,6 +998,8 @@ function WorldPassCard({
   slot = 0,
   collapsed = false,
   parked = false,
+  onHoldStart,
+  onHoldCancel,
   onSelect,
   onConnect,
   onAddProgram,
@@ -962,6 +1030,9 @@ function WorldPassCard({
   collapsed?: boolean;
   /** True once the grey plank fully covers the faces. */
   parked?: boolean;
+  /** Press and hold on the pass opens the explore view. */
+  onHoldStart?: () => void;
+  onHoldCancel?: () => void;
   /** Tap-to-select, which is what a tab is. */
   onSelect?: () => void;
   /** Whose pass this is. */
@@ -1053,6 +1124,21 @@ function WorldPassCard({
       className="relative"
       style={{ width: CARD_W, height: CARD_H }}
       onClick={collapsed ? onSelect : undefined}
+      /* The hold. Only on the pass in focus and only while it is a card —
+         a 13px plank has nothing to open.
+
+         onPointerDown rather than a click or a long-press library: the
+         press has to start the instant the finger lands so the ring and
+         the haptic ladder begin together. It is cancelled by the pointer
+         leaving, by the pointer being cancelled, and by a drag starting,
+         because a horizontal drag is the flip and the two must not both
+         fire from one gesture. */
+      onPointerDown={
+        interactive && !collapsed ? () => onHoldStart?.() : undefined
+      }
+      onPointerUp={onHoldCancel}
+      onPointerLeave={onHoldCancel}
+      onPointerCancel={onHoldCancel}
       initial={{ opacity: 0, y: 26, scale: 0.96 }}
       animate={{ opacity: 1, y: 0, scale: 1 }}
       transition={{ delay, duration: 0.8, ease: IN_EASE }}
@@ -1187,6 +1273,7 @@ function WorldPassCard({
           dragSnapToOrigin
           dragElastic={0.16}
           dragConstraints={{ left: 0, right: 0 }}
+          onDragStart={() => onHoldCancel?.()}
           onDragEnd={(_, info) => {
             // Distance OR speed — a short flick should turn the card just
             // as a slow long drag does, which is how a physical card
