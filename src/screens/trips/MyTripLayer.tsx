@@ -96,7 +96,6 @@ function Surface({
   );
 }
 
-const IN_EASE = [0.22, 1, 0.36, 1] as const;
 
 /* Inactive countries. Figma desaturates them with a mix-blend-saturation
  * ellipse laid over each flag; a filter does the same job in one property
@@ -120,26 +119,47 @@ const TABS = [
    starts with, or Forex butts against the end of the scroll. */
 const TABS_W = 382.71 + 101 + 30;
 
+/* The three discs land clustered at the start of the track and then walk
+ * it out, pulling the fill along behind them.
+ *
+ * The start x is not a round number and should not be: the fill's right
+ * edge has to keep a constant gap behind the leading disc for the whole
+ * slide, or the orbs visibly outrun what they are supposed to be drawing.
+ * Figma's rest positions are 114.4 / 138.4 / 162.4 with the fill ending
+ * at 108.4, a 6px gap. The fill grows from its own left edge at 44.97, so
+ * the leading disc has to start at 44.97 + 6 = 50.97 and travel exactly
+ * the fill's own 63.43 — same distance, same gap at both ends and every
+ * frame between. */
+const ORB_PITCH = 24;
+const ORB_START_X = 50.97;
+const ORB_ROLL = 63.429;
+
 const ORBS = [
-  { src: "/assets/trips/orb-1.png", x: 114.4 },
-  { src: "/assets/trips/orb-2.png", x: 138.4 },
-  { src: "/assets/trips/orb-3.png", x: 162.4 },
+  { src: "/assets/trips/orb-1.png", x: ORB_START_X },
+  { src: "/assets/trips/orb-2.png", x: ORB_START_X + ORB_PITCH },
+  { src: "/assets/trips/orb-3.png", x: ORB_START_X + ORB_PITCH * 2 },
 ] as const;
+
+/* One curve for the slide and the fill. They are the same gesture — the
+ * orbs are what is drawing the bar — so they cannot be on separate
+ * timings without one of them looking like it is reacting to the other. */
+const ROLL = { duration: 1.1, ease: [0.4, 0, 0.2, 1] as const };
 
 export default function MyTripLayer({
   beat,
   sweep,
   orbsOnTrack,
+  orbsRolled,
 }: {
   beat: HandoffBeat;
   sweep: MotionValue<number>;
-  /* False until the agents have flown down and settled on the progress
-     track. Everything about the track's filled state hangs off this: the
-     three discs and how far the bar has run. The screen arrives with an
-     empty track on purpose — the agents are what puts anything on it, and
-     a bar that was already populated during the handoff makes their
-     arrival decorative. */
+  /* False until the agents have flown down and come to rest at the start
+     of the track. The screen arrives with an empty bar on purpose — the
+     agents are what puts anything on it, and a bar that was already
+     populated during the handoff makes their arrival decorative. */
   orbsOnTrack: boolean;
+  /* And then they set off. This runs the slide and the fill together. */
+  orbsRolled: boolean;
 }) {
   const revealing = beat === "sweeping" || beat === "settled";
   /* Which panel the column has opened, if any — the rail nodes and the
@@ -357,12 +377,12 @@ export default function MyTripLayer({
         className="absolute origin-left"
         style={{ left: 44.97, top: 298.91, width: 63.429, height: 9 }}
         initial={false}
-        /* Grows when the agents touch down, not when the screen does. The
-           bar moving on its own timer said the trip had progressed by
-           itself; moving it here makes the progress something the three
-           of them just delivered. */
-        animate={{ scaleX: orbsOnTrack ? 1 : 0.18 }}
-        transition={{ delay: 0.12, duration: 0.9, ease: IN_EASE }}
+        /* Drawn by the orbs, not by the clock. It has no length at all
+           until they set off, and then it grows at exactly their pace —
+           the bar is the trail they leave, which is why they land at the
+           start of it rather than at the end. */
+        animate={{ scaleX: orbsRolled ? 1 : 0 }}
+        transition={ROLL}
       >
         <Image
           src="/assets/trips/progress-fill.svg"
@@ -383,10 +403,13 @@ export default function MyTripLayer({
           thing you can. */}
       {orbsOnTrack &&
         ORBS.map((o, i) => (
-          <div
+          <motion.div
             key={o.src}
             className="absolute rounded-full bg-white"
             style={{ left: o.x, top: 288.41, width: 30, height: 30, zIndex: 3 - i }}
+            initial={false}
+            animate={{ x: orbsRolled ? ORB_ROLL : 0 }}
+            transition={ROLL}
           >
             <Image
               src={o.src}
@@ -402,7 +425,7 @@ export default function MyTripLayer({
                 borderRadius: "50%",
               }}
             />
-          </div>
+          </motion.div>
         ))}
 
       </Surface>

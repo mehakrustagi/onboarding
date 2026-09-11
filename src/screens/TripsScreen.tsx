@@ -19,6 +19,7 @@ import {
   BEAT_AT,
   DISPERSE_AT,
   ORBS_LAND_AT,
+  ORBS_ROLL_AT,
   SEQUENCE_END,
   SWEEP_S,
   type HandoffBeat,
@@ -127,6 +128,10 @@ export default function TripsScreen() {
      turns this on. Separate from `agents` because it outlives the overlay
      — once the track is filled it stays filled. */
   const [orbsOnTrack, setOrbsOnTrack] = useState(false);
+  /* And whether they have since walked it out. Two states rather than one
+     because the orbs rest at the start of the bar for a beat before they
+     set off, and that pause is what makes the walk read as theirs. */
+  const [orbsRolled, setOrbsRolled] = useState(false);
   const reduceMotion = useReducedMotion();
 
   const rattle = useOscillator();
@@ -176,6 +181,7 @@ export default function TripsScreen() {
       setBeat("idle");
       setAgents("hidden");
       setOrbsOnTrack(false);
+      setOrbsRolled(false);
     });
 
     at(BEAT_AT.charging, () => setBeat("charging"));
@@ -246,6 +252,7 @@ export default function TripsScreen() {
        so the two are drawn on top of each other for the last 380ms. */
     at(ORBS_LAND_AT, () => setOrbsOnTrack(true));
     at(SEQUENCE_END, () => setAgents("hidden"));
+    at(ORBS_ROLL_AT, () => setOrbsRolled(true));
   }, [arrival, body, clearTimers, rattle, reduceMotion, sweep]);
 
   /* Jump straight to the finished trip screen.
@@ -263,8 +270,9 @@ export default function TripsScreen() {
     setBeat("settled");
     setAgents("hidden");
     /* Skip lands on the finished screen, and the finished screen has a
-       populated track. */
+       populated track with the bar already run out. */
     setOrbsOnTrack(true);
+    setOrbsRolled(true);
   }, [arrival, body, clearTimers, rattle, sweep]);
 
   /* The overlay on its own, for reviewing the landing without sitting
@@ -282,10 +290,12 @@ export default function TripsScreen() {
       /* skip() filled the track; empty it again so the preview shows what
          the agents actually do to it. */
       setOrbsOnTrack(false);
+      setOrbsRolled(false);
     });
     at(DISPERSE_AT - AGENTS_AT, () => setAgents("dispersing"));
     at(ORBS_LAND_AT - AGENTS_AT, () => setOrbsOnTrack(true));
     at(SEQUENCE_END - AGENTS_AT, () => setAgents("hidden"));
+    at(ORBS_ROLL_AT - AGENTS_AT, () => setOrbsRolled(true));
   }, [skip]);
 
   useEffect(() => {
@@ -369,6 +379,7 @@ export default function TripsScreen() {
             beat={beat}
             sweep={sweep}
             orbsOnTrack={orbsOnTrack}
+            orbsRolled={orbsRolled}
           />
           <PaymentDoneLayer beat={beat} sweep={sweep} />
           <TripWash beat={beat} sweep={sweep} />

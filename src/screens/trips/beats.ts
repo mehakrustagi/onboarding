@@ -90,3 +90,9 @@ export const ORBS_LAND_AT = DISPERSE_AT + 1420;
  * for those 380ms, at the same position, size and art — which is what
  * makes the handover invisible. */
 export const SEQUENCE_END = DISPERSE_AT + 1800;
+
+/* Then they set off along the track, dragging the fill behind them. Held
+ * until just after the overlay has let go: the slide belongs to the
+ * track's own discs, and starting it while the flying copies were still
+ * painted on top would show as the two sets separating. */
+export const ORBS_ROLL_AT = DISPERSE_AT + 1900;

@@ -110,10 +110,11 @@ const RISE_EASE = [0.32, 0, 0.5, 1] as const;
 const SCRIM =
   "linear-gradient(to bottom, rgba(0,0,0,0) 0%, rgba(0,0,0,0.81) 87.1%, rgba(0,0,0,0.81) 100%)";
 
-/* Where each one ends up: the three 30px discs riding the progress track
- * on MyTrip, at x 114.4 / 138.4 / 162.4, y 288.41. Kept in step with
- * MyTripLayer's own ORBS by hand — they are two halves of one object and
- * a mismatch would show as the orb jumping on the frame it lands.
+/* Where each one comes down: at the START of the progress track, not at
+ * its resting position. They land on an empty bar, and then walk it out —
+ * the slide and the fill that follows them belong to MyTripLayer. Kept in
+ * step with its ORBS by hand: they are two halves of one object and a
+ * mismatch would show as the orb jumping on the frame it lands.
  *
  * Assigned left-to-right so no two paths cross. That means an orb does
  * not always keep its own art: the bar's discs are Figma's for that node
@@ -122,9 +123,9 @@ const SCRIM =
  * orb is moving, shrinking and swapping its ring for a white disc, so the
  * change of face is not something you can catch. */
 const LANDING = [
-  { x: 114.4, src: "/assets/trips/orb-1.png" },
-  { x: 138.4, src: "/assets/trips/orb-2.png" },
-  { x: 162.4, src: "/assets/trips/orb-3.png" },
+  { x: 50.97, src: "/assets/trips/orb-1.png" },
+  { x: 74.97, src: "/assets/trips/orb-2.png" },
+  { x: 98.97, src: "/assets/trips/orb-3.png" },
 ] as const;
 const LAND_Y = 288.41;
 const LAND_SIZE = 30;
