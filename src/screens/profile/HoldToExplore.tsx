@@ -20,8 +20,13 @@ import { motion, useTransform, type MotionValue } from "framer-motion";
 
 export const HOLD_MS = 1100;
 
-const BLOCK_X = 44;
-const BLOCK_Y = 346;
+/* Where the block sits relative to the CARD, not the frame. The node puts
+ * it at (44, 346) and the pass at (94, 152), so it hangs 50px off the
+ * card's left edge — which is what puts half of it on white paper and half
+ * on the black card. Expressed this way it travels with the pass instead
+ * of being pinned to a spot the pass has scrolled away from. */
+export const HOLD_CUE_X = 44 - 94;
+export const HOLD_CUE_Y = 346 - 152;
 const HALO = 77;
 /* The dark body between the halo and the ring. Not in the node's layer
  * list — it reads there as part of the ring artwork — but it is what gives
@@ -61,10 +66,16 @@ export default function HoldToExplore({
   return (
     <motion.div
       className="pointer-events-none absolute"
-      // Above the pass strip (30) and the header (29), below the fixed
-      // chrome (34). It is an instruction about the card, so it cannot sit
-      // behind the card it is instructing you about.
-      style={{ left: BLOCK_X, top: BLOCK_Y, width: 131, height: 117, zIndex: 32 }}
+      /* Positioned by the card, and OUTSIDE the swing: it travels with
+         the pass horizontally, but an instruction about how to touch must
+         not itself tip away and foreshorten as the page scrolls. */
+      style={{
+        left: HOLD_CUE_X,
+        top: HOLD_CUE_Y,
+        width: 131,
+        height: 117,
+        zIndex: 9,
+      }}
       initial={{ opacity: 0, x: -8 }}
       animate={{ opacity: show ? 1 : 0, x: show ? 0 : -8 }}
       transition={{ duration: 0.45, ease: [0.22, 1, 0.36, 1] }}

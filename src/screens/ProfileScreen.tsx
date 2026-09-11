@@ -736,6 +736,13 @@ export default function ProfileScreen() {
                 parked={parked}
                 onHoldStart={startHold}
                 onHoldCancel={cancelHold}
+                holdProgress={holdP}
+                held={held}
+                // Only once KYC has completed: bodyIn is the moment the
+                // card finishes checking itself and hands over to the
+                // page, so it is the first point at which there is a
+                // verified pass to explore.
+                showHoldCue={bodyIn && !eduDone && !collapsed && !exploreOpen}
                 onSelect={() => {
                   trackRef.current?.scrollTo({
                     left: i * CARD_GAP,
@@ -758,19 +765,6 @@ export default function ProfileScreen() {
           />
         </div>
       </motion.div>
-
-      {/* Hold to explore (853:18425). A sibling of the card rather than a
-          child: the node places it in frame coordinates at (44, 346), and
-          as a child it would tip and shrink with the swing — the one thing
-          that must not happen to an instruction about how to touch. */}
-      <HoldToExplore
-        progress={holdP}
-        held={held}
-        // Only once KYC has actually completed: bodyIn is the moment the
-        // card finishes checking itself and hands over to the page, so it
-        // is the first point at which there is a verified pass to explore.
-        show={bodyIn && !eduDone && !collapsed && !exploreOpen}
-      />
 
       {/* Sticky header. Fades in as the card scrolls away, so the screen
           keeps a title once the card that WAS the title is gone. It sits
@@ -1008,6 +1002,9 @@ function WorldPassCard({
   parked = false,
   onHoldStart,
   onHoldCancel,
+  holdProgress,
+  held = false,
+  showHoldCue = false,
   onSelect,
   onConnect,
   onAddProgram,
@@ -1041,6 +1038,10 @@ function WorldPassCard({
   /** Press and hold on the pass opens the explore view. */
   onHoldStart?: () => void;
   onHoldCancel?: () => void;
+  /** 0 → 1 across the hold, shared by the screen. */
+  holdProgress?: MotionValue<number>;
+  held?: boolean;
+  showHoldCue?: boolean;
   /** Tap-to-select, which is what a tab is. */
   onSelect?: () => void;
   /** Whose pass this is. */
@@ -1151,6 +1152,21 @@ function WorldPassCard({
       animate={{ opacity: 1, y: 0, scale: 1 }}
       transition={{ delay, duration: 0.8, ease: IN_EASE }}
     >
+      {/* Hold to explore (853:18425). A child of the pass, so it travels
+          with it through the carousel — but a sibling of the SWING, so it
+          stays upright and full size while the card tips away. An
+          instruction about how to touch something must not itself
+          foreshorten into a sliver.
+
+          Every pass carries one. Only the pass in focus can be held, so
+          the others take a fixed zero instead of the live progress —
+          sharing the one MotionValue would fill every ring at once. */}
+      <HoldToExplore
+        progress={interactive && holdProgress ? holdProgress : zero}
+        held={interactive && held}
+        show={showHoldCue}
+      />
+
       {/* Idle float. Periods are deliberately different so the drift and
           the sway never line up into an obvious loop — the card wanders
           instead of ticking. */}
