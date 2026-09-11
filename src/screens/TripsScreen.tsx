@@ -18,6 +18,7 @@ import {
   AGENTS_AT,
   BEAT_AT,
   DISPERSE_AT,
+  ORBS_LAND_AT,
   SEQUENCE_END,
   SWEEP_S,
   type HandoffBeat,
@@ -120,6 +121,12 @@ export default function TripsScreen() {
   const [agents, setAgents] = useState<"hidden" | "working" | "dispersing">(
     "hidden",
   );
+  /* Whether the progress track has been populated yet. The trip screen
+     arrives with an empty bar and no orbs on it; the three agents fly down
+     and settle onto it at the end of the overlay, and that landing is what
+     turns this on. Separate from `agents` because it outlives the overlay
+     — once the track is filled it stays filled. */
+  const [orbsOnTrack, setOrbsOnTrack] = useState(false);
   const reduceMotion = useReducedMotion();
 
   const rattle = useOscillator();
@@ -168,6 +175,7 @@ export default function TripsScreen() {
     at(0, () => {
       setBeat("idle");
       setAgents("hidden");
+      setOrbsOnTrack(false);
     });
 
     at(BEAT_AT.charging, () => setBeat("charging"));
@@ -234,6 +242,9 @@ export default function TripsScreen() {
        the real ones live inside the scroll column. Leave the overlay
        holding them and they would stay put while the page moved under
        them. */
+    /* The track fills under the orbs while the overlay still holds them,
+       so the two are drawn on top of each other for the last 380ms. */
+    at(ORBS_LAND_AT, () => setOrbsOnTrack(true));
     at(SEQUENCE_END, () => setAgents("hidden"));
   }, [arrival, body, clearTimers, rattle, reduceMotion, sweep]);
 
@@ -251,6 +262,9 @@ export default function TripsScreen() {
     sweep.set(1);
     setBeat("settled");
     setAgents("hidden");
+    /* Skip lands on the finished screen, and the finished screen has a
+       populated track. */
+    setOrbsOnTrack(true);
   }, [arrival, body, clearTimers, rattle, sweep]);
 
   /* The overlay on its own, for reviewing the landing without sitting
@@ -263,8 +277,14 @@ export default function TripsScreen() {
     const at = (ms: number, fn: () => void) => {
       timers.current.push(setTimeout(fn, ms));
     };
-    at(0, () => setAgents("working"));
+    at(0, () => {
+      setAgents("working");
+      /* skip() filled the track; empty it again so the preview shows what
+         the agents actually do to it. */
+      setOrbsOnTrack(false);
+    });
     at(DISPERSE_AT - AGENTS_AT, () => setAgents("dispersing"));
+    at(ORBS_LAND_AT - AGENTS_AT, () => setOrbsOnTrack(true));
     at(SEQUENCE_END - AGENTS_AT, () => setAgents("hidden"));
   }, [skip]);
 
@@ -348,10 +368,7 @@ export default function TripsScreen() {
           <MyTripLayer
             beat={beat}
             sweep={sweep}
-            /* The overlay opens holding the three agent orbs and lands
-               them on the progress track, so the track's own copies stay
-               out of the way for the whole of it. */
-            agentsAway={agents !== "hidden"}
+            orbsOnTrack={orbsOnTrack}
           />
           <PaymentDoneLayer beat={beat} sweep={sweep} />
           <TripWash beat={beat} sweep={sweep} />

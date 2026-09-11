@@ -129,15 +129,17 @@ const ORBS = [
 export default function MyTripLayer({
   beat,
   sweep,
-  agentsAway,
+  orbsOnTrack,
 }: {
   beat: HandoffBeat;
   sweep: MotionValue<number>;
-  /* True while the agents overlay owns the three orbs — it opens holding
-     them and flies them down onto this track. The slots have to be empty
-     for that arrival to mean anything, so the track's own discs stay
-     hidden until the overlay hands them back. */
-  agentsAway: boolean;
+  /* False until the agents have flown down and settled on the progress
+     track. Everything about the track's filled state hangs off this: the
+     three discs and how far the bar has run. The screen arrives with an
+     empty track on purpose — the agents are what puts anything on it, and
+     a bar that was already populated during the handoff makes their
+     arrival decorative. */
+  orbsOnTrack: boolean;
 }) {
   const revealing = beat === "sweeping" || beat === "settled";
   /* Which panel the column has opened, if any — the rail nodes and the
@@ -355,10 +357,12 @@ export default function MyTripLayer({
         className="absolute origin-left"
         style={{ left: 44.97, top: 298.91, width: 63.429, height: 9 }}
         initial={false}
-        /* Draws itself once the screen has landed — the trip is already in
-           progress, and a bar that arrives full says nothing about that. */
-        animate={{ scaleX: beat === "settled" ? 1 : 0.18 }}
-        transition={{ delay: 0.35, duration: 0.9, ease: IN_EASE }}
+        /* Grows when the agents touch down, not when the screen does. The
+           bar moving on its own timer said the trip had progressed by
+           itself; moving it here makes the progress something the three
+           of them just delivered. */
+        animate={{ scaleX: orbsOnTrack ? 1 : 0.18 }}
+        transition={{ delay: 0.12, duration: 0.9, ease: IN_EASE }}
       >
         <Image
           src="/assets/trips/progress-fill.svg"
@@ -372,11 +376,12 @@ export default function MyTripLayer({
       {/* Agent orbs riding the track — 30px white discs with the orb art
           inset, overlapping at a 24px pitch.
 
-          Absent while the overlay has them in the air. No crossfade on the
-          handover: the flying orb finishes at exactly this position, size
-          and art, so swapping one for the other on a single frame is the
-          thing you cannot see. A fade would be the thing you can. */}
-      {!agentsAway &&
+          Absent until the agents arrive — through the whole handoff and
+          the whole overlay. No crossfade on the handover: the flying orb
+          finishes at exactly this position, size and art, so appearing
+          underneath it is the thing you cannot see. A fade would be the
+          thing you can. */}
+      {orbsOnTrack &&
         ORBS.map((o, i) => (
           <div
             key={o.src}

@@ -78,7 +78,15 @@ export const AGENTS_AT = BEAT_AT.settled + 750;
  * screen rather than a moment. */
 export const DISPERSE_AT = AGENTS_AT + 1300;
 
-/* The last orb touches down on the progress track at ~1.41s (1.25 of
- * flight behind two 0.08 stagger steps). A beat to let it settle, then
- * the overlay hands off to the track's own three discs underneath it. */
+/* The last orb touches down on the progress track at ~1.41s: 1.25 of
+ * flight behind two 0.08 stagger steps. This is when the track stops
+ * being empty — its three discs appear under the landed orbs and the
+ * fill starts growing, so the progress reads as something the agents
+ * brought with them rather than something that was already true. */
+export const ORBS_LAND_AT = DISPERSE_AT + 1420;
+
+/* A beat after that to let them settle, then the overlay lets go. The
+ * flying copies and the track's own discs are drawn on top of each other
+ * for those 380ms, at the same position, size and art — which is what
+ * makes the handover invisible. */
 export const SEQUENCE_END = DISPERSE_AT + 1800;
