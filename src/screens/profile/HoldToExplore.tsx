@@ -51,7 +51,10 @@ export default function HoldToExplore({
   return (
     <motion.div
       className="pointer-events-none absolute"
-      style={{ left: BLOCK_X, top: BLOCK_Y, width: 131, height: 117, zIndex: 8 }}
+      // Above the pass strip (30) and the header (29), below the fixed
+      // chrome (34). It is an instruction about the card, so it cannot sit
+      // behind the card it is instructing you about.
+      style={{ left: BLOCK_X, top: BLOCK_Y, width: 131, height: 117, zIndex: 32 }}
       initial={{ opacity: 0, x: -8 }}
       animate={{ opacity: show ? 1 : 0, x: show ? 0 : -8 }}
       transition={{ duration: 0.45, ease: [0.22, 1, 0.36, 1] }}

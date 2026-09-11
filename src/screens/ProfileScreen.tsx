@@ -336,6 +336,10 @@ export default function ProfileScreen() {
   const holdP = useMotionValue(0);
   const [held, setHeld] = useState(false);
   const [exploreOpen, setExploreOpen] = useState(false);
+  /* One-time education. The cue teaches the gesture; once the gesture has
+     been used it has nothing left to teach, so it goes — while the hold
+     itself, and everything the card does, stays exactly as it was. */
+  const [eduDone, setEduDone] = useState(false);
   const holdRaf = useRef<number | null>(null);
 
   const cancelHold = useCallback(() => {
@@ -362,6 +366,7 @@ export default function ProfileScreen() {
         setHeld(false);
         holdP.set(0);
         haptic("holdExpand");
+        setEduDone(true);
         setExploreOpen(true);
         return;
       }
@@ -761,7 +766,10 @@ export default function ProfileScreen() {
       <HoldToExplore
         progress={holdP}
         held={held}
-        show={!collapsed && !exploreOpen}
+        // Only once KYC has actually completed: bodyIn is the moment the
+        // card finishes checking itself and hands over to the page, so it
+        // is the first point at which there is a verified pass to explore.
+        show={bodyIn && !eduDone && !collapsed && !exploreOpen}
       />
 
       {/* Sticky header. Fades in as the card scrolls away, so the screen

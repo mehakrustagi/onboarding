@@ -30,14 +30,30 @@ const EASE = [0.22, 1, 0.36, 1] as const;
 const FROM = { x: 94, y: 152, w: 252.325, h: 350, r: 30 };
 const TO = { x: 30, y: 170, w: 380, h: 716, r: 40 };
 
-/* City glows on the globe, at their node positions inside the card. */
+/* The globe's box. Full card width, so it is centred by construction
+ * rather than by an offset that has to be kept in step with the size.
+ *
+ * The source is 720×1280 — portrait, 0.5625. Cropping it to a square (the
+ * first attempt) made object-fit scale to fill the WIDTH and throw away
+ * most of the height, which put the visible sphere off to one side. At the
+ * card's own 380 wide the treatment matches the pass face exactly, and the
+ * sphere lands in the middle. */
+const GLOBE = { x: 0, y: 58, w: 380, h: 470 };
+const GLOBE_CX = GLOBE.x + GLOBE.w / 2;
+const GLOBE_CY = GLOBE.y + GLOBE.h / 2;
+
+/* City glows, given as offsets from the globe's CENTRE rather than as
+ * frame coordinates. The node's numbers belong to its own still of the
+ * globe; ours is a video at a different size, so absolute positions left
+ * them floating off the sphere. Anchored to the centre they travel with it
+ * whatever the box does. */
 const GLOWS = [
-  { src: "/assets/profile/wx-glow-a.svg", x: 100.57, y: 183.91, s: 42.836 },
-  { src: "/assets/profile/wx-glow-b.svg", x: 64.25, y: 229.23, s: 33.524 },
-  { src: "/assets/profile/wx-glow-c.svg", x: 168.55, y: 314.85, s: 26.074 },
-  { src: "/assets/profile/wx-glow-d.svg", x: 186.01, y: 306.14, s: 19.792 },
-  { src: "/assets/profile/wx-glow-c.svg", x: 218.84, y: 254.18, s: 26.074 },
-  { src: "/assets/profile/wx-glow-e.svg", x: 249.57, y: 211.56, s: 34.103 },
+  { src: "/assets/profile/wx-glow-a.svg", dx: -68, dy: -53, s: 42.836 },
+  { src: "/assets/profile/wx-glow-b.svg", dx: -109, dy: -12, s: 33.524 },
+  { src: "/assets/profile/wx-glow-c.svg", dx: -8, dy: 70, s: 26.074 },
+  { src: "/assets/profile/wx-glow-d.svg", dx: 6, dy: 58, s: 19.792 },
+  { src: "/assets/profile/wx-glow-c.svg", dx: 42, dy: 9, s: 26.074 },
+  { src: "/assets/profile/wx-glow-e.svg", dx: 76, dy: -30, s: 34.103 },
 ];
 
 /* The five flags on the pill, overlapping at a 16px step. */
@@ -141,10 +157,10 @@ export default function WorldPassExplore({
               <video
                 className="pointer-events-none absolute"
                 style={{
-                  left: -46,
-                  top: 52,
-                  width: 472,
-                  height: 472,
+                  left: GLOBE.x,
+                  top: GLOBE.y,
+                  width: GLOBE.w,
+                  height: GLOBE.h,
                   objectFit: "cover",
                   opacity: 0.95,
                 }}
@@ -160,8 +176,8 @@ export default function WorldPassExplore({
               <div
                 className="pointer-events-none absolute"
                 style={{
-                  left: -80,
-                  top: 236,
+                  left: GLOBE_CX - 288,
+                  top: GLOBE_CY - 49,
                   width: 576,
                   height: 97.456,
                   transform: "rotate(33.43deg)",
@@ -183,7 +199,12 @@ export default function WorldPassExplore({
                 <motion.div
                   key={i}
                   className="pointer-events-none absolute"
-                  style={{ left: g.x, top: g.y, width: g.s, height: g.s }}
+                  style={{
+                    left: GLOBE_CX + g.dx - g.s / 2,
+                    top: GLOBE_CY + g.dy - g.s / 2,
+                    width: g.s,
+                    height: g.s,
+                  }}
                   animate={{ opacity: [0.55, 1, 0.55] }}
                   transition={{
                     duration: 2.6 + i * 0.45,
