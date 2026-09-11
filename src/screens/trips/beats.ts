@@ -78,6 +78,7 @@ export const AGENTS_AT = BEAT_AT.settled + 750;
  * screen rather than a moment. */
 export const DISPERSE_AT = AGENTS_AT + 1300;
 
-/* Release (last orb out at ~1.35s) plus the scrim's own 0.7s fade behind
- * it. */
-export const SEQUENCE_END = DISPERSE_AT + 2100;
+/* The last orb touches down on the progress track at ~1.41s (1.25 of
+ * flight behind two 0.08 stagger steps). A beat to let it settle, then
+ * the overlay hands off to the track's own three discs underneath it. */
+export const SEQUENCE_END = DISPERSE_AT + 1800;

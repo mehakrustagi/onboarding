@@ -18,6 +18,7 @@ import {
   AGENTS_AT,
   BEAT_AT,
   DISPERSE_AT,
+  SEQUENCE_END,
   SWEEP_S,
   type HandoffBeat,
 } from "./trips/beats";
@@ -227,6 +228,13 @@ export default function TripsScreen() {
 
     at(AGENTS_AT, () => setAgents("working"));
     at(DISPERSE_AT, () => setAgents("dispersing"));
+    /* Hands the three orbs back. They finish the flight sitting exactly on
+       the progress track's own discs, so this swap is invisible — but it
+       has to happen, because the flying copies are pinned to the shell and
+       the real ones live inside the scroll column. Leave the overlay
+       holding them and they would stay put while the page moved under
+       them. */
+    at(SEQUENCE_END, () => setAgents("hidden"));
   }, [arrival, body, clearTimers, rattle, reduceMotion, sweep]);
 
   /* Jump straight to the finished trip screen.
@@ -244,6 +252,21 @@ export default function TripsScreen() {
     setBeat("settled");
     setAgents("hidden");
   }, [arrival, body, clearTimers, rattle, sweep]);
+
+  /* The overlay on its own, for reviewing the landing without sitting
+     through the handoff. It has to play the whole beat rather than just
+     opening: the orbs end the sequence sitting on the progress track, and
+     stopping at "working" would leave them hovering over a scrim with the
+     track's own discs hidden behind it. */
+  const playAgents = useCallback(() => {
+    skip();
+    const at = (ms: number, fn: () => void) => {
+      timers.current.push(setTimeout(fn, ms));
+    };
+    at(0, () => setAgents("working"));
+    at(DISPERSE_AT - AGENTS_AT, () => setAgents("dispersing"));
+    at(SEQUENCE_END - AGENTS_AT, () => setAgents("hidden"));
+  }, [skip]);
 
   useEffect(() => {
     run();
@@ -322,7 +345,14 @@ export default function TripsScreen() {
             transformOrigin: "50% 100%",
           }}
         >
-          <MyTripLayer beat={beat} sweep={sweep} />
+          <MyTripLayer
+            beat={beat}
+            sweep={sweep}
+            /* The overlay opens holding the three agent orbs and lands
+               them on the progress track, so the track's own copies stay
+               out of the way for the whole of it. */
+            agentsAway={agents !== "hidden"}
+          />
           <PaymentDoneLayer beat={beat} sweep={sweep} />
           <TripWash beat={beat} sweep={sweep} />
           <WaveSweep
@@ -387,10 +417,7 @@ export default function TripsScreen() {
         </button>
         <button
           type="button"
-          onClick={() => {
-            skip();
-            setAgents("working");
-          }}
+          onClick={playAgents}
           className="rounded-full bg-black/5 px-3.5 py-1.5 text-[13px] text-[#4b4b53] transition-colors hover:bg-black/10"
         >
           Agents overlay

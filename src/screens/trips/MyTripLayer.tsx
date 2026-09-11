@@ -129,9 +129,15 @@ const ORBS = [
 export default function MyTripLayer({
   beat,
   sweep,
+  agentsAway,
 }: {
   beat: HandoffBeat;
   sweep: MotionValue<number>;
+  /* True while the agents overlay owns the three orbs — it opens holding
+     them and flies them down onto this track. The slots have to be empty
+     for that arrival to mean anything, so the track's own discs stay
+     hidden until the overlay hands them back. */
+  agentsAway: boolean;
 }) {
   const revealing = beat === "sweeping" || beat === "settled";
   /* Which panel the column has opened, if any — the rail nodes and the
@@ -364,29 +370,35 @@ export default function MyTripLayer({
       </motion.div>
 
       {/* Agent orbs riding the track — 30px white discs with the orb art
-          inset, overlapping at a 24px pitch. */}
-      {ORBS.map((o, i) => (
-        <div
-          key={o.src}
-          className="absolute rounded-full bg-white"
-          style={{ left: o.x, top: 288.41, width: 30, height: 30, zIndex: 3 - i }}
-        >
-          <Image
-            src={o.src}
-            alt=""
-            width={21.5}
-            height={21.5}
-            style={{
-              position: "absolute",
-              left: 4.25,
-              top: 4.25,
-              width: 21.5,
-              height: 21.5,
-              borderRadius: "50%",
-            }}
-          />
-        </div>
-      ))}
+          inset, overlapping at a 24px pitch.
+
+          Absent while the overlay has them in the air. No crossfade on the
+          handover: the flying orb finishes at exactly this position, size
+          and art, so swapping one for the other on a single frame is the
+          thing you cannot see. A fade would be the thing you can. */}
+      {!agentsAway &&
+        ORBS.map((o, i) => (
+          <div
+            key={o.src}
+            className="absolute rounded-full bg-white"
+            style={{ left: o.x, top: 288.41, width: 30, height: 30, zIndex: 3 - i }}
+          >
+            <Image
+              src={o.src}
+              alt=""
+              width={21.5}
+              height={21.5}
+              style={{
+                position: "absolute",
+                left: 4.25,
+                top: 4.25,
+                width: 21.5,
+                height: 21.5,
+                borderRadius: "50%",
+              }}
+            />
+          </div>
+        ))}
 
       </Surface>
 
