@@ -11,7 +11,7 @@ import {
   FlowVeil,
   PickerSheet,
   ResultCard,
-  SuccessWash,
+  SuccessAura,
 } from "./vault/UploadFlow";
 
 /* Trip Vault (KYC Not Done) — Figma 13463:7884 (v1) and 13554:37134 (v2),
@@ -54,9 +54,12 @@ type Version = "v1" | "v2";
 /* Long enough to read the line, short enough that you do not start to
  * wonder whether it has hung. */
 const EXTRACT_MS = 1900;
-/* The success card has one line and one card to show. Held slightly
- * longer than the extract so the payoff is not shorter than the wait. */
-const SUCCESS_MS = 1500;
+/* The success card has one line, one card, and a fan of light that has
+ * to be seen to have been worth building. Held longer than the extract on
+ * two counts: the payoff should not be shorter than the wait, and at 1.5s
+ * the rays had time for about a third of one sweep before the screen
+ * moved on. */
+const SUCCESS_MS = 2600;
 
 export default function TripVaultScreen() {
   const [version, setVersion] = useState<Version>("v1");
@@ -149,10 +152,10 @@ export default function TripVaultScreen() {
         )}
 
         <AnimatePresence>
-          {/* The dark veil carries the picker, the confirm sheet and the
-              extract. It hands over to white the moment the document
-              lands — see SuccessWash. */}
-          {flowing && stage !== "success" && <FlowVeil key="veil" />}
+          {/* One veil across all four beats, success included. The light
+              on 1558 blends with `exclusion`, which needs a dark backdrop
+              to read as light rather than as its own negative. */}
+          {flowing && <FlowVeil key="veil" />}
           {stage === "picker" && <PickerSheet key="picker" onPick={pick} />}
           {stage === "confirm" && (
             <ConfirmSheet key="confirm" onContinue={confirm} onReupload={() => setStage("picker")} />
@@ -163,7 +166,7 @@ export default function TripVaultScreen() {
           {(stage === "extracting" || stage === "success") && (
             <ResultCard key="card" filled={stage === "success"} />
           )}
-          {stage === "success" && <SuccessWash key="wash" />}
+          {stage === "success" && <SuccessAura key="aura" />}
         </AnimatePresence>
       </div>
 

@@ -2,7 +2,6 @@
 
 import Image from "next/image";
 import { motion } from "framer-motion";
-import BloomFields from "@/components/BloomFields";
 
 /* The four beats between "Upload document" and a document in the vault.
  * Figma section 1146:7099, frames 1555 / 1556 / 1557 / 1558.
@@ -506,102 +505,131 @@ export function ResultCard({ filled }: { filled: boolean }) {
 
 /* 1558's headline and the light behind it. Separate from ResultCard so
  * the card can stay mounted across the two beats while this arrives. */
-/* 1558's ground — and the one place this flow borrows from the payment
- * beat rather than from its own section.
+/* 1558's light — a shaft down the middle and a scatter of stars across
+ * the top, over the same dark veil the three beats before it are on.
  *
- * Figma draws the success moment on the same near-black veil as the three
- * beats before it, with a white headline and a shaft of light behind the
- * card. That is the right IDEA and the wrong colour: the screen you are
- * about to land on is the white vault, and going dark for the one frame
- * that announces a success means the flow's brightest moment is its
- * dimmest. It also throws away a transition this app already owns.
+ * Both are the node's own art. The shaft is image 26, a 1024×1536 bitmap
+ * laid in at 410×614 from the top edge on `exclusion` at 30%, and the
+ * stars are Group 1991427648, a set of four-point sparkles with Figma's
+ * blur filters baked in. Neither is redrawable by hand: the shaft is a
+ * photographic falloff and the sparkles carry per-star blur radii.
  *
- * So the success beat runs the post-payment treatment instead — the same
- * frosted white veil and the same pastel wash pooled at the bottom edge,
- * out of components/BloomFields, which is shared with the payment overlay
- * and the trips handoff precisely so all three cannot drift apart. Same
- * gesture, third use.
+ * EXCLUSION IS WHY IT HAS TO STAY DARK. exclusion(a, b) = a + b − 2ab,
+ * so against a near-black backdrop it returns very nearly the source and
+ * the shaft reads as light arriving. Against the white ground an earlier
+ * pass put here it inverts toward its own negative and the shaft goes
+ * grey and muddy — the blend mode and the dark veil are one decision,
+ * not two.
  *
- * ORDER MATTERS AND IS NOT OBVIOUS. The fields blend with `multiply`, and
- * multiply needs something white underneath or it returns black. The
- * white sheet is therefore not decoration — it is what the wash is
- * painted onto, and it has to sit between the dark beats' veil and the
- * colour. Dropping the wash straight onto the dimmed vault turned the
- * whole bottom of the screen to ink.
+ * THE LIGHT ARRIVES, IT IS NOT ALREADY THERE. The shaft grows downward
+ * from the top edge as the card fills in, which is what ties the two
+ * together: something was added, and the screen brightened because of it.
+ * Held static it reads as a backdrop the card happens to be sitting on.
  */
-export function SuccessWash() {
+export function SuccessAura() {
   return (
     <>
-      {/* The frosted veil, brightening the dark the previous three beats
-          were sitting in. Carries its weight in blur rather than in flat
-          white so the vault underneath still reads as shapes — the
-          document is landing IN something, and painting it out entirely
-          would make the card look like it arrived nowhere. */}
+      {/* The shaft.
+       *
+       * transformOrigin at the top edge so it extends DOWN into the
+       * screen rather than growing from its own middle, which would read
+       * as a glow swelling rather than as light coming in.
+       *
+       * THE RAYS MOVE. The bitmap is one fixed fan of light, and a fixed
+       * fan is a texture — once it has arrived there is nothing to look
+       * at. Two copies of it counter-rotating a degree or so about the
+       * top edge, each breathing its own width on its own period, and the
+       * rays slide through each other: where they cross, exclusion adds
+       * and a brighter ray appears for a moment, then drifts apart again.
+       *
+       * PERIODS ARE SET BY HOW LONG THE BEAT LASTS, not by what looks
+       * good in isolation. This screen is on for about two and a half
+       * seconds. The first pass ran the rays on 9 and 11 second loops,
+       * which is a lovely drift on a page you sit with and is, over a
+       * beat this short, a still image — the fan would move perhaps two
+       * tenths of a degree before the screen changed. Everything is at a
+       * third of that now, so a full sweep completes while you are
+       * watching. The amplitudes stay tiny (about 1.5° and 6% of width)
+       * and the periods stay coprime, so the pattern still never visibly
+       * repeats and no single ray can be watched travelling. It should
+       * read as light that is alive, not as a graphic being animated. */}
       <motion.div
-        className="pointer-events-none absolute inset-0"
+        className="pointer-events-none absolute"
         style={{
+          left: 14.79,
+          top: 0,
+          width: 410,
+          height: 614,
           zIndex: 6,
-          /* Eased off toward the bottom. Every point of white here is
-             colour you cannot see, so it holds full strength where the
-             vault needs muting and gets out of the way over the wash. */
-          background:
-            "linear-gradient(180deg, rgba(255,255,255,0.84) 0%, rgba(255,255,255,0.80) 38%, rgba(255,255,255,0.60) 72%, rgba(255,255,255,0.44) 100%)",
-          backdropFilter: "blur(30px) saturate(105%)",
-          WebkitBackdropFilter: "blur(30px) saturate(105%)",
+          mixBlendMode: "exclusion",
+          transformOrigin: "50% 0%",
         }}
-        initial={{ opacity: 0 }}
-        animate={{ opacity: 1 }}
+        initial={{ opacity: 0, scaleY: 0.55 }}
+        animate={{ opacity: 0.3, scaleY: 1 }}
         exit={{ opacity: 0 }}
-        transition={{ duration: 0.55, ease: IN_EASE }}
-      />
-
-      {/* The wash. Clipped to the shell's own radius, and its container
-          runs far past the bottom edge — at rest the surplus is
-          off-screen and costs nothing, and it is what keeps the lower
-          half covered once the colour rises. */}
-      <motion.div
-        className="pointer-events-none absolute overflow-hidden"
-        style={{ inset: 0, borderRadius: 44, zIndex: 6 }}
-        initial={{ opacity: 0 }}
-        animate={{ opacity: 1 }}
-        exit={{ opacity: 0 }}
-        transition={{ duration: 0.6, ease: IN_EASE }}
+        transition={{ duration: 0.9, ease: IN_EASE }}
       >
-        <motion.div
-          className="absolute"
-          style={{
-            left: 0,
-            top: 380,
-            width: 440,
-            height: 1240,
-            /* isolation:auto — this wrapper animates opacity, and an
-               animated-opacity group becomes its own stacking context,
-               which would trap the fields' multiply inside it and blend
-               them against nothing. */
-            isolation: "auto",
-            /* Feathered along the top. In the reference the colour has no
-               boundary at all, it just becomes the white screen somewhere
-               around the middle; without this the fields end on a visible
-               line however much they are blurred. */
-            maskImage:
-              "linear-gradient(to bottom, transparent 0px, rgba(0,0,0,0.10) 90px, rgba(0,0,0,0.34) 190px, rgba(0,0,0,0.72) 290px, black 380px, black 100%)",
-            WebkitMaskImage:
-              "linear-gradient(to bottom, transparent 0px, rgba(0,0,0,0.10) 90px, rgba(0,0,0,0.34) 190px, rgba(0,0,0,0.72) 290px, black 380px, black 100%)",
-          }}
-          /* Rises a couple of hundred pixels and stops — the trips
-             handoff's travel, not the payment beat's launch. The launch
-             exists to clear a screen on its way out; here the wash is the
-             ground the next screen is standing on, so it arrives and
-             stays. */
-          initial={{ y: 150, scaleY: 0.94 }}
-          animate={{ y: -40, scaleY: 1 }}
-          transition={{ duration: 1.4, ease: IN_EASE }}
-        >
-          <BloomFields />
-        </motion.div>
+        {[
+          { rot: [-1.2, 1.2, -1.2], sx: [1, 1.06, 1], op: [1, 0.82, 1], d: 3.1, d2: 2.3 },
+          { rot: [1.6, -1.6, 1.6], sx: [1.04, 0.97, 1.04], op: [0.55, 0.9, 0.55], d: 3.7, d2: 2.6 },
+        ].map((r, i) => (
+          <motion.div
+            key={i}
+            className="absolute inset-0"
+            style={{ transformOrigin: "50% 0%" }}
+            animate={{ rotate: r.rot, scaleX: r.sx, opacity: r.op }}
+            transition={{
+              rotate: { duration: r.d, repeat: Infinity, ease: "easeInOut" },
+              scaleX: { duration: r.d2, repeat: Infinity, ease: "easeInOut" },
+              opacity: { duration: r.d2 * 1.3, repeat: Infinity, ease: "easeInOut" },
+            }}
+          >
+            <Image
+              src={`${A}/shine.png`}
+              alt=""
+              width={410}
+              height={614}
+              style={{ width: 410, height: 614, maxWidth: "none" }}
+            />
+          </motion.div>
+        ))}
       </motion.div>
 
-      {/* Ink, not white. The headline is over a near-white ground now. */}
+      {/* The stars. Figma's group sits rotated in the frame, so its
+          metadata box is no use for placing it; measured off the render
+          instead, the sparkles span roughly x30–410 across the top band,
+          which is the 320.95 asset carried up to 380.
+
+          ONE copy, not two. An earlier pass drew it twice — mirrored and
+          offset — to fill the corners, and the result was about twenty
+          small sparkles where the reference has eight larger ones. The
+          node is sparse on purpose: a dense field reads as noise or as
+          snow, and what this is meant to say is that something good and
+          singular just happened.
+
+          They twinkle as a group rather than individually, which is all
+          one flattened SVG allows — kept slow and shallow so it reads as
+          atmosphere rather than as a blinking graphic. */}
+      <motion.div
+        className="pointer-events-none absolute"
+        style={{ left: 30, top: 0, width: 380, height: 103.9, zIndex: 6 }}
+        initial={{ opacity: 0, scale: 0.92 }}
+        animate={{ opacity: [0.78, 1, 0.78], scale: 1 }}
+        exit={{ opacity: 0 }}
+        transition={{
+          opacity: { duration: 2.6, repeat: Infinity, ease: "easeInOut" },
+          scale: { duration: 0.9, ease: IN_EASE },
+        }}
+      >
+        <Image
+          src={`${A}/sparkles.svg`}
+          alt=""
+          width={380}
+          height={103.9}
+          style={{ width: 380, height: 103.9, maxWidth: "none" }}
+        />
+      </motion.div>
+
       <motion.p
         className="absolute text-center font-semibold"
         style={{
@@ -611,7 +639,7 @@ export function SuccessWash() {
           fontSize: 18,
           lineHeight: "25px",
           letterSpacing: "-0.36px",
-          color: "#0b0b0b",
+          color: "#ffffff",
           zIndex: 7,
         }}
         initial={{ opacity: 0, y: 10 }}
