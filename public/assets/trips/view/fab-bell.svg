@@ -1,0 +1,35 @@
+<svg preserveAspectRatio="none" overflow="visible" style="display: block;" width="101" height="101" viewBox="0 0 101 101" fill="none" xmlns="http://www.w3.org/2000/svg">
+<g id="Group 1991428755">
+<path id="Rectangle 240648063" d="M28 46.5C28 34.0736 38.0736 24 50.5 24C62.9264 24 73 34.0736 73 46.5C73 58.9264 62.9264 69 50.5 69C38.0736 69 28 58.9264 28 46.5Z" fill="white"/>
+<foreignObject x="-22" y="-26" width="145" height="145"><div xmlns="http://www.w3.org/1999/xhtml" style="backdrop-filter:blur(25px);clip-path:url(#bgblur_0_0_256_clip_path);height:100%;width:100%"></div></foreignObject><g id="Rectangle 240648064" filter="url(#filter0_d_0_256)" data-figma-bg-blur-radius="50">
+<path d="M28 46.5C28 34.0736 38.0736 24 50.5 24C62.9264 24 73 34.0736 73 46.5C73 58.9264 62.9264 69 50.5 69C38.0736 69 28 58.9264 28 46.5Z" fill="#F9FAFB"/>
+<path d="M50.5 24.5C62.6503 24.5 72.5 34.3497 72.5 46.5C72.5 58.6503 62.6503 68.5 50.5 68.5C38.3497 68.5 28.5 58.6503 28.5 46.5C28.5 34.3497 38.3497 24.5 50.5 24.5Z" stroke="url(#paint0_linear_0_256)"/>
+</g>
+<g id="notifications" clip-path="url(#clip1_0_256)">
+<g id="Vector">
+</g>
+<path id="Vector_2" d="M50.5005 56.5C51.6005 56.5 52.5005 55.6 52.5005 54.5H48.5005C48.5005 55.6 49.3905 56.5 50.5005 56.5ZM56.5005 50.5V45.5C56.5005 42.43 54.8605 39.86 52.0005 39.18V38.5C52.0005 37.67 51.3305 37 50.5005 37C49.6705 37 49.0005 37.67 49.0005 38.5V39.18C46.1305 39.86 44.5005 42.42 44.5005 45.5V50.5L43.2105 51.79C42.5805 52.42 43.0205 53.5 43.9105 53.5H57.0805C57.9705 53.5 58.4205 52.42 57.7905 51.79L56.5005 50.5Z" fill="black"/>
+</g>
+</g>
+<defs>
+<filter id="filter0_d_0_256" x="-22" y="-26" width="145" height="145" filterUnits="userSpaceOnUse" color-interpolation-filters="sRGB">
+<feFlood flood-opacity="0" result="BackgroundImageFix"/>
+<feColorMatrix in="SourceAlpha" type="matrix" values="0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 127 0" result="hardAlpha"/>
+<feMorphology radius="2" operator="erode" in="SourceAlpha" result="effect1_dropShadow_0_256"/>
+<feOffset dy="4"/>
+<feGaussianBlur stdDeviation="15"/>
+<feComposite in2="hardAlpha" operator="out"/>
+<feColorMatrix type="matrix" values="0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0.05 0"/>
+<feBlend mode="normal" in2="BackgroundImageFix" result="effect1_dropShadow_0_256"/>
+<feBlend mode="normal" in="SourceGraphic" in2="effect1_dropShadow_0_256" result="shape"/>
+</filter>
+<clipPath id="bgblur_0_0_256_clip_path" transform="translate(22 26)"><path d="M28 46.5C28 34.0736 38.0736 24 50.5 24C62.9264 24 73 34.0736 73 46.5C73 58.9264 62.9264 69 50.5 69C38.0736 69 28 58.9264 28 46.5Z"/>
+</clipPath><linearGradient id="paint0_linear_0_256" x1="66.8932" y1="69" x2="18.5911" y2="39.3041" gradientUnits="userSpaceOnUse">
+<stop stop-color="white"/>
+<stop offset="1" stop-color="white" stop-opacity="0"/>
+</linearGradient>
+<clipPath id="clip1_0_256">
+<rect width="24" height="24" fill="white" transform="translate(38.5 34.5)"/>
+</clipPath>
+</defs>
+</svg>

@@ -127,6 +127,10 @@ export default function TripsScreen() {
      and settle onto it at the end of the overlay, and that landing is what
      turns this on. Separate from `agents` because it outlives the overlay
      — once the track is filled it stays filled. */
+  /* Which of the two TripView frames to land on — 1110:13508 (KYC done)
+     or 1110:13996 (the prompt, and no passport row). A prototype switch,
+     not app state: the real screen reads this off the profile. */
+  const [kycDone, setKycDone] = useState(true);
   const [orbsOnTrack, setOrbsOnTrack] = useState(false);
   /* And whether they have since walked it out. Two states rather than one
      because the orbs rest at the start of the bar for a beat before they
@@ -380,6 +384,7 @@ export default function TripsScreen() {
             sweep={sweep}
             orbsOnTrack={orbsOnTrack}
             orbsRolled={orbsRolled}
+            kycDone={kycDone}
           />
           <PaymentDoneLayer beat={beat} sweep={sweep} />
           <TripWash beat={beat} sweep={sweep} />
@@ -449,6 +454,13 @@ export default function TripsScreen() {
           className="rounded-full bg-black/5 px-3.5 py-1.5 text-[13px] text-[#4b4b53] transition-colors hover:bg-black/10"
         >
           Agents overlay
+        </button>
+        <button
+          type="button"
+          onClick={() => setKycDone((v) => !v)}
+          className="rounded-full bg-black/5 px-3.5 py-1.5 text-[13px] text-[#4b4b53] transition-colors hover:bg-black/10"
+        >
+          {kycDone ? "KYC done" : "KYC pending"}
         </button>
       </div>
     </div>
