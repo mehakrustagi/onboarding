@@ -123,11 +123,15 @@ const SCRIM =
  * orb is moving, shrinking and swapping its ring for a white disc, so the
  * change of face is not something you can catch. */
 const LANDING = [
-  { x: 50.97, src: "/assets/trips/orb-1.png" },
-  { x: 74.97, src: "/assets/trips/orb-2.png" },
-  { x: 98.97, src: "/assets/trips/orb-3.png" },
+  { x: 39, src: "/assets/trips/orb-1.png" },
+  { x: 63, src: "/assets/trips/orb-2.png" },
+  { x: 87, src: "/assets/trips/orb-3.png" },
 ] as const;
-const LAND_Y = 288.41;
+/* The new TripView (1110:13508) puts the track at y257.5 rather than
+   y295.9, so the discs rest at 250. These three numbers and MyTripLayer's
+   ORB_START_X / ORB_Y are one set — the flying orb has to finish exactly
+   where the track's own disc appears, or the handover shows as a jump. */
+const LAND_Y = 250;
 const LAND_SIZE = 30;
 /* Art inset inside the white disc, from MyTripLayer. */
 const LAND_ART = 21.5;

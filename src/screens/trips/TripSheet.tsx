@@ -968,24 +968,70 @@ function Section({
           boxShadow: CARD_SHADOW,
         }}
       >
-        {/* Agent orb: 40 ring, 37 art, both at a 20px inset. */}
-        <div className="absolute" style={{ left: 20, top: 39.82, width: 40, height: 40 }}>
-          <Image
-            src={section.orb}
-            alt=""
-            width={37}
-            height={37}
-            style={{
-              position: "absolute",
-              left: 1.5,
-              top: 1.5,
-              width: 37,
-              height: 37,
-              borderRadius: "50%",
-              objectFit: "cover",
-            }}
-          />
-        </div>
+        {/* Agent orb: 40 ring, 37 art, both at a 20px inset — one orb,
+            vertically centred, which is what every card in 947:26137 has.
+
+            A section that names a SECOND agent stacks them instead
+            (1110:14302 / 1110:14315 on the new Transport card): the
+            primary rises to the top of the card at 35 and the second sits
+            under its left shoulder at 22. The two are not centred as a
+            pair — the pile hangs off the title, which is what reads as
+            "these two are on this" rather than as a two-row avatar list. */}
+        {section.orb2 ? (
+          <>
+            <div className="absolute" style={{ left: 25, top: 30, width: 35, height: 35 }}>
+              <Image
+                src={section.orb}
+                alt=""
+                width={35}
+                height={35}
+                style={{ width: 35, height: 35, borderRadius: "50%", objectFit: "cover" }}
+              />
+            </div>
+            <div className="absolute" style={{ left: 20, top: 71.5, width: 22, height: 22 }}>
+              <Image
+                src={section.orb2}
+                alt=""
+                width={20.35}
+                height={20.35}
+                style={{
+                  position: "absolute",
+                  left: 0.82,
+                  top: 0.82,
+                  width: 20.35,
+                  height: 20.35,
+                  borderRadius: "50%",
+                  objectFit: "cover",
+                }}
+              />
+              <Image
+                src={`${S}/miniorb-ring.svg`}
+                alt=""
+                width={22}
+                height={22}
+                style={{ position: "absolute", inset: 0, width: 22, height: 22 }}
+              />
+            </div>
+          </>
+        ) : (
+          <div className="absolute" style={{ left: 20, top: 39.82, width: 40, height: 40 }}>
+            <Image
+              src={section.orb}
+              alt=""
+              width={37}
+              height={37}
+              style={{
+                position: "absolute",
+                left: 1.5,
+                top: 1.5,
+                width: 37,
+                height: 37,
+                borderRadius: "50%",
+                objectFit: "cover",
+              }}
+            />
+          </div>
+        )}
 
         <p
           className="absolute whitespace-nowrap"

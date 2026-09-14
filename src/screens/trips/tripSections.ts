@@ -96,6 +96,10 @@ export type TripSection = {
   state: "WATCHING" | "WAITING" | "DONE";
   /** Which orb art fronts the section card. */
   orb: string;
+  /** A second agent on the same section, stacked under the first
+      (1110:14302 / 1110:14315). Only Transport carries one in the new
+      TripView; every other card is still the single centred orb. */
+  orb2?: string;
   groups: TripGroup[];
   add?: string;
 };
@@ -104,53 +108,24 @@ const ORB_A = "/assets/trips/orb-1.png";
 const ORB_B = "/assets/trips/orb-2.png";
 const ORB_C = "/assets/trips/orb-3.png";
 
+/* Order is the column's order, and Transport leads it.
+ * The new TripView (1110:13546) draws Transport as the first and only
+ * section on the panel; the older node led with the visa. Nothing else
+ * about the other six changed, so they keep their relative order behind
+ * it — this is a reorder, not a cut. */
 export const TRIP_SECTIONS: TripSection[] = [
-  {
-    key: "visa",
-    name: "Australia Visa",
-    working: "Visa monitoring agent is working on 2 task...",
-    state: "WATCHING",
-    orb: ORB_A,
-    groups: [
-      {
-        items: [
-          {
-            title: "Visa Delivery",
-            sheet: "visa-delivery",
-            more: "05 more",
-            call: true,
-            agents: 1,
-            audio: "1:23",
-            status: "Called customer care...",
-            body: "Spoke with a consular officer (+91 7283763812). Confirmed that your application is on track. Follow-up scheduled for tomorrow",
-            detail:
-              "Spoke with embassy agent on +91 7283763812 and confirmed that everything is on track with your visa. Will follow up again tomorrow.",
-            emphasis: ["+91 7283763812", "Will follow up again tomorrow."],
-            sources: { label: "3 Sources", faces: 2 },
-          },
-        ],
-        actions: ["Call Embassy Tomorrow", "Track Application"],
-      },
-      {
-        items: [
-          {
-            title: "Atlys Protect",
-            status: "Activated visa assurance",
-            body: "100% Visa Guarantee active. If your visa isn't approved on time, Atlys Protect guarantees a full refund on all your trip bookings.",
-            sources: { label: "1 Source", faces: 1 },
-            done: true,
-          },
-        ],
-        actions: ["What's covered?", "Download Policy PDF"],
-      },
-    ],
-  },
   {
     key: "transport",
     name: "Transport",
-    working: "Flight & check-in agents are working on 2 task...",
-    state: "WATCHING",
+    /* The new TripView (1110:13822) rewrites this line from "Flight &
+       check-in agents are working on 2 task..." to what the agents have
+       actually established — one leg settled, one still being watched.
+       Same two agents, but the card now reports a state instead of a
+       headcount, which is the difference the whole screen turns on. */
+    working: "BLR to SYD booked · Tracking inter-city fares",
+    state: "WAITING",
     orb: ORB_B,
+    orb2: "/assets/trips/sheet/miniorb.png",
     groups: [
       {
         heading: "BLR ➔ SYD",
@@ -203,6 +178,46 @@ export const TRIP_SECTIONS: TripSection[] = [
       },
     ],
     add: "+ Add Route",
+  },
+  {
+    key: "visa",
+    name: "Australia Visa",
+    working: "Visa monitoring agent is working on 2 task...",
+    state: "WATCHING",
+    orb: ORB_A,
+    groups: [
+      {
+        items: [
+          {
+            title: "Visa Delivery",
+            sheet: "visa-delivery",
+            more: "05 more",
+            call: true,
+            agents: 1,
+            audio: "1:23",
+            status: "Called customer care...",
+            body: "Spoke with a consular officer (+91 7283763812). Confirmed that your application is on track. Follow-up scheduled for tomorrow",
+            detail:
+              "Spoke with embassy agent on +91 7283763812 and confirmed that everything is on track with your visa. Will follow up again tomorrow.",
+            emphasis: ["+91 7283763812", "Will follow up again tomorrow."],
+            sources: { label: "3 Sources", faces: 2 },
+          },
+        ],
+        actions: ["Call Embassy Tomorrow", "Track Application"],
+      },
+      {
+        items: [
+          {
+            title: "Atlys Protect",
+            status: "Activated visa assurance",
+            body: "100% Visa Guarantee active. If your visa isn't approved on time, Atlys Protect guarantees a full refund on all your trip bookings.",
+            sources: { label: "1 Source", faces: 1 },
+            done: true,
+          },
+        ],
+        actions: ["What's covered?", "Download Policy PDF"],
+      },
+    ],
   },
   {
     key: "stay",
