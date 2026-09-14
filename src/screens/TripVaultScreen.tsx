@@ -54,9 +54,12 @@ type Version = "v1" | "v2";
 /* Long enough to read the line, short enough that you do not start to
  * wonder whether it has hung. */
 const EXTRACT_MS = 1900;
-/* The success card has one line and one card to show. Held slightly
- * longer than the extract so the payoff is not shorter than the wait. */
-const SUCCESS_MS = 1500;
+/* The success card has one line, one card, and a fan of light that has
+ * to be seen to have been worth building. Held longer than the extract on
+ * two counts: the payoff should not be shorter than the wait, and at 1.5s
+ * the rays had time for about a third of one sweep before the screen
+ * moved on. */
+const SUCCESS_MS = 2600;
 
 export default function TripVaultScreen() {
   const [version, setVersion] = useState<Version>("v1");
@@ -149,6 +152,9 @@ export default function TripVaultScreen() {
         )}
 
         <AnimatePresence>
+          {/* One veil across all four beats, success included. The light
+              on 1558 blends with `exclusion`, which needs a dark backdrop
+              to read as light rather than as its own negative. */}
           {flowing && <FlowVeil key="veil" />}
           {stage === "picker" && <PickerSheet key="picker" onPick={pick} />}
           {stage === "confirm" && (

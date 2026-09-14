@@ -505,9 +505,54 @@ export function ResultCard({ filled }: { filled: boolean }) {
 
 /* 1558's headline and the light behind it. Separate from ResultCard so
  * the card can stay mounted across the two beats while this arrives. */
+/* 1558's light — a shaft down the middle and a scatter of stars across
+ * the top, over the same dark veil the three beats before it are on.
+ *
+ * Both are the node's own art. The shaft is image 26, a 1024×1536 bitmap
+ * laid in at 410×614 from the top edge on `exclusion` at 30%, and the
+ * stars are Group 1991427648, a set of four-point sparkles with Figma's
+ * blur filters baked in. Neither is redrawable by hand: the shaft is a
+ * photographic falloff and the sparkles carry per-star blur radii.
+ *
+ * EXCLUSION IS WHY IT HAS TO STAY DARK. exclusion(a, b) = a + b − 2ab,
+ * so against a near-black backdrop it returns very nearly the source and
+ * the shaft reads as light arriving. Against the white ground an earlier
+ * pass put here it inverts toward its own negative and the shaft goes
+ * grey and muddy — the blend mode and the dark veil are one decision,
+ * not two.
+ *
+ * THE LIGHT ARRIVES, IT IS NOT ALREADY THERE. The shaft grows downward
+ * from the top edge as the card fills in, which is what ties the two
+ * together: something was added, and the screen brightened because of it.
+ * Held static it reads as a backdrop the card happens to be sitting on.
+ */
 export function SuccessAura() {
   return (
     <>
+      {/* The shaft.
+       *
+       * transformOrigin at the top edge so it extends DOWN into the
+       * screen rather than growing from its own middle, which would read
+       * as a glow swelling rather than as light coming in.
+       *
+       * THE RAYS MOVE. The bitmap is one fixed fan of light, and a fixed
+       * fan is a texture — once it has arrived there is nothing to look
+       * at. Two copies of it counter-rotating a degree or so about the
+       * top edge, each breathing its own width on its own period, and the
+       * rays slide through each other: where they cross, exclusion adds
+       * and a brighter ray appears for a moment, then drifts apart again.
+       *
+       * PERIODS ARE SET BY HOW LONG THE BEAT LASTS, not by what looks
+       * good in isolation. This screen is on for about two and a half
+       * seconds. The first pass ran the rays on 9 and 11 second loops,
+       * which is a lovely drift on a page you sit with and is, over a
+       * beat this short, a still image — the fan would move perhaps two
+       * tenths of a degree before the screen changed. Everything is at a
+       * third of that now, so a full sweep completes while you are
+       * watching. The amplitudes stay tiny (about 1.5° and 6% of width)
+       * and the periods stay coprime, so the pattern still never visibly
+       * repeats and no single ray can be watched travelling. It should
+       * read as light that is alive, not as a graphic being animated. */}
       <motion.div
         className="pointer-events-none absolute"
         style={{
@@ -516,14 +561,75 @@ export function SuccessAura() {
           width: 410,
           height: 614,
           zIndex: 6,
-          background:
-            "radial-gradient(60% 42% at 50% 18%, rgba(255,255,255,0.55) 0%, rgba(255,255,255,0.12) 48%, rgba(255,255,255,0) 100%)",
+          mixBlendMode: "exclusion",
+          transformOrigin: "50% 0%",
         }}
-        initial={{ opacity: 0 }}
-        animate={{ opacity: 1 }}
+        initial={{ opacity: 0, scaleY: 0.55 }}
+        animate={{ opacity: 0.3, scaleY: 1 }}
         exit={{ opacity: 0 }}
-        transition={{ duration: 0.7, ease: IN_EASE }}
-      />
+        transition={{ duration: 0.9, ease: IN_EASE }}
+      >
+        {[
+          { rot: [-1.2, 1.2, -1.2], sx: [1, 1.06, 1], op: [1, 0.82, 1], d: 3.1, d2: 2.3 },
+          { rot: [1.6, -1.6, 1.6], sx: [1.04, 0.97, 1.04], op: [0.55, 0.9, 0.55], d: 3.7, d2: 2.6 },
+        ].map((r, i) => (
+          <motion.div
+            key={i}
+            className="absolute inset-0"
+            style={{ transformOrigin: "50% 0%" }}
+            animate={{ rotate: r.rot, scaleX: r.sx, opacity: r.op }}
+            transition={{
+              rotate: { duration: r.d, repeat: Infinity, ease: "easeInOut" },
+              scaleX: { duration: r.d2, repeat: Infinity, ease: "easeInOut" },
+              opacity: { duration: r.d2 * 1.3, repeat: Infinity, ease: "easeInOut" },
+            }}
+          >
+            <Image
+              src={`${A}/shine.png`}
+              alt=""
+              width={410}
+              height={614}
+              style={{ width: 410, height: 614, maxWidth: "none" }}
+            />
+          </motion.div>
+        ))}
+      </motion.div>
+
+      {/* The stars. Figma's group sits rotated in the frame, so its
+          metadata box is no use for placing it; measured off the render
+          instead, the sparkles span roughly x30–410 across the top band,
+          which is the 320.95 asset carried up to 380.
+
+          ONE copy, not two. An earlier pass drew it twice — mirrored and
+          offset — to fill the corners, and the result was about twenty
+          small sparkles where the reference has eight larger ones. The
+          node is sparse on purpose: a dense field reads as noise or as
+          snow, and what this is meant to say is that something good and
+          singular just happened.
+
+          They twinkle as a group rather than individually, which is all
+          one flattened SVG allows — kept slow and shallow so it reads as
+          atmosphere rather than as a blinking graphic. */}
+      <motion.div
+        className="pointer-events-none absolute"
+        style={{ left: 30, top: 0, width: 380, height: 103.9, zIndex: 6 }}
+        initial={{ opacity: 0, scale: 0.92 }}
+        animate={{ opacity: [0.78, 1, 0.78], scale: 1 }}
+        exit={{ opacity: 0 }}
+        transition={{
+          opacity: { duration: 2.6, repeat: Infinity, ease: "easeInOut" },
+          scale: { duration: 0.9, ease: IN_EASE },
+        }}
+      >
+        <Image
+          src={`${A}/sparkles.svg`}
+          alt=""
+          width={380}
+          height={103.9}
+          style={{ width: 380, height: 103.9, maxWidth: "none" }}
+        />
+      </motion.div>
+
       <motion.p
         className="absolute text-center font-semibold"
         style={{
