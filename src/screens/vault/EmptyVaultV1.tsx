@@ -1,8 +1,7 @@
 "use client";
 
 import Image from "next/image";
-import { motion } from "framer-motion";
-import { Bar, Ruler } from "./skeleton";
+import { Bar, Panel, Ruler } from "./skeleton";
 
 /* Trip Vault, empty — version 1. Figma 13463:7884 (sheet 13463:8332).
  *
@@ -33,7 +32,11 @@ const A = "/assets/vault";
 const SHEET_TOP = 456.07;
 
 const ROWS = [
-  { top: 506.07, label: "Sep 23", o: 1 },
+  /* Figma has the top row at 1. Backed off a little so the shine
+     has somewhere to go — at full alpha the lift is clamped away and
+     row one would be the only one of the three that does not deepen as
+     its turn comes round. */
+  { top: 506.07, label: "Sep 23", o: 0.82 },
   { top: 586.54, label: "Sep 25", o: 0.6 },
   { top: 667, label: "Sep 26", o: 0.42 },
 ] as const;
@@ -73,24 +76,28 @@ export default function EmptyVaultV1({ onUpload }: { onUpload: () => void }) {
         style={{ left: 66.84, top: 754, width: 2.16, height: 3, borderRadius: 10, background: "#d9dbdd", opacity: 0.2 }}
       />
 
+      {/* NO WRAPPER OPACITY. The stack's fade used to sit on a div around
+          each row, which is the same trap the dark cards were in: every
+          child gets multiplied by it, so the third row's shine could only
+          ever reach 42% of itself however bright the glint. Figma's ramp
+          is folded into each element's own alpha instead — the panel at
+          60% of the row's value, the bars and the label at all of it —
+          which leaves the chase free to light every row by the same
+          amount without flattening the depth between them. */}
       {ROWS.map((row, i) => (
-        <motion.div
-          key={row.label}
-          className="absolute inset-0"
-          initial={{ opacity: row.o }}
-          animate={{ opacity: row.o }}
-        >
-          <div
-            className="absolute"
-            style={{
-              left: 100.18,
-              top: row.top,
-              width: 240,
-              height: 60,
-              borderRadius: 16,
-              background: "#f2f2f2",
-              opacity: 0.6,
-            }}
+        <div key={row.label}>
+          <Panel
+            x={100.18}
+            y={row.top}
+            w={240}
+            h={60}
+            r={16}
+            color="#f2f2f2"
+            /* Deepens rather than brightening — see peakOf. On white the
+               panel has nowhere lighter to go. */
+            peakColor="#e4e6e8"
+            base={0.6 * row.o}
+            index={i}
           />
           <p
             className="absolute whitespace-nowrap font-bold uppercase"
@@ -101,13 +108,34 @@ export default function EmptyVaultV1({ onUpload }: { onUpload: () => void }) {
               lineHeight: "10px",
               letterSpacing: "0.8px",
               color: "#b2b2b2",
+              opacity: row.o,
             }}
           >
             {row.label}
           </p>
-          <Bar x={115.18} y={row.top + 29} w={140} h={8} r={50} color="#d9dbdd" index={i} />
-          <Bar x={115.18} y={row.top + 42} w={80} h={8} r={50} color="#d9dbdd" index={i} />
-        </motion.div>
+          <Bar
+            x={115.18}
+            y={row.top + 29}
+            w={140}
+            h={8}
+            r={50}
+            color="#d9dbdd"
+            peakColor="#b9bdc1"
+            base={row.o}
+            index={i}
+          />
+          <Bar
+            x={115.18}
+            y={row.top + 42}
+            w={80}
+            h={8}
+            r={50}
+            color="#d9dbdd"
+            peakColor="#b9bdc1"
+            base={row.o}
+            index={i}
+          />
+        </div>
       ))}
 
       <p

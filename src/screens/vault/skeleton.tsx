@@ -94,6 +94,22 @@ function rgba(hex: string, a: number) {
 const BAR_LIFT = 0.22;
 const PANEL_LIFT = 0.09;
 
+/* ALPHA ALONE IS ENOUGH ON THE DARK CARD AND NOT ON THE LIGHT SHEET.
+ *
+ * On near-black, a light-grey bar going from 24% to 46% is a swing of
+ * fifty levels and the row visibly lights. On the white sheet the bar is
+ * #D9DBDD (217) sitting on a #F2F2F2 panel (242) — twenty-five levels of
+ * range in total — so taking its alpha from .82 to 1 moves it four
+ * levels, and the chase measured correctly while being invisible.
+ *
+ * `peakColor` lets a surface shift the fill's HUE for its pass instead of
+ * only its opacity: on white the bar deepens rather than brightening,
+ * which is the only direction with any room, and the white glint then has
+ * something dark enough to read against. */
+function peakOf(color: string, peakColor: string | undefined, base: number, lift: number) {
+  return rgba(peakColor ?? color, base + lift);
+}
+
 /* One placeholder bar, lit along its own length.
  *
  * `base` is Figma's designed opacity for this bar at rest and is applied
@@ -114,6 +130,7 @@ export function Bar({
      bars sit at 2–16% opacity, so a subtle white inside one is multiplied
      down to nothing. */
   light = "rgba(255,255,255,0.55)",
+  peakColor,
 }: {
   x: number;
   y: number;
@@ -124,6 +141,8 @@ export function Bar({
   base?: number;
   index?: number;
   light?: string;
+  /** Fill to deepen toward during this row's pass — see peakOf. */
+  peakColor?: string;
 }) {
   return (
     /* The bar itself lifts as its streak crosses. The streak alone only
@@ -135,7 +154,11 @@ export function Bar({
       style={{ left: x, top: y, width: w, height: h, borderRadius: r }}
       initial={{ backgroundColor: rgba(color, base) }}
       animate={{
-        backgroundColor: [rgba(color, base), rgba(color, base + BAR_LIFT), rgba(color, base)],
+        backgroundColor: [
+          rgba(color, base),
+          peakOf(color, peakColor, base, BAR_LIFT),
+          rgba(color, base),
+        ],
       }}
       transition={shine(index)}
     >
@@ -172,6 +195,7 @@ export function Panel({
   base = 1,
   index = 0,
   light = "rgba(255,255,255,0.16)",
+  peakColor,
 }: {
   x: number;
   y: number;
@@ -182,6 +206,7 @@ export function Panel({
   base?: number;
   index?: number;
   light?: string;
+  peakColor?: string;
 }) {
   /* 0.09s behind its own bars — enough that the content leads and the box
      follows, not enough to read as two separate events. */
@@ -192,7 +217,11 @@ export function Panel({
       style={{ left: x, top: y, width: w, height: h, borderRadius: r }}
       initial={{ backgroundColor: rgba(color, base) }}
       animate={{
-        backgroundColor: [rgba(color, base), rgba(color, base + PANEL_LIFT), rgba(color, base)],
+        backgroundColor: [
+          rgba(color, base),
+          peakOf(color, peakColor, base, PANEL_LIFT),
+          rgba(color, base),
+        ],
       }}
       transition={t}
     >
