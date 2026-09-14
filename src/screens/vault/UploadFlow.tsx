@@ -2,6 +2,7 @@
 
 import Image from "next/image";
 import { motion } from "framer-motion";
+import BloomFields from "@/components/BloomFields";
 
 /* The four beats between "Upload document" and a document in the vault.
  * Figma section 1146:7099, frames 1555 / 1556 / 1557 / 1558.
@@ -505,25 +506,102 @@ export function ResultCard({ filled }: { filled: boolean }) {
 
 /* 1558's headline and the light behind it. Separate from ResultCard so
  * the card can stay mounted across the two beats while this arrives. */
-export function SuccessAura() {
+/* 1558's ground — and the one place this flow borrows from the payment
+ * beat rather than from its own section.
+ *
+ * Figma draws the success moment on the same near-black veil as the three
+ * beats before it, with a white headline and a shaft of light behind the
+ * card. That is the right IDEA and the wrong colour: the screen you are
+ * about to land on is the white vault, and going dark for the one frame
+ * that announces a success means the flow's brightest moment is its
+ * dimmest. It also throws away a transition this app already owns.
+ *
+ * So the success beat runs the post-payment treatment instead — the same
+ * frosted white veil and the same pastel wash pooled at the bottom edge,
+ * out of components/BloomFields, which is shared with the payment overlay
+ * and the trips handoff precisely so all three cannot drift apart. Same
+ * gesture, third use.
+ *
+ * ORDER MATTERS AND IS NOT OBVIOUS. The fields blend with `multiply`, and
+ * multiply needs something white underneath or it returns black. The
+ * white sheet is therefore not decoration — it is what the wash is
+ * painted onto, and it has to sit between the dark beats' veil and the
+ * colour. Dropping the wash straight onto the dimmed vault turned the
+ * whole bottom of the screen to ink.
+ */
+export function SuccessWash() {
   return (
     <>
+      {/* The frosted veil, brightening the dark the previous three beats
+          were sitting in. Carries its weight in blur rather than in flat
+          white so the vault underneath still reads as shapes — the
+          document is landing IN something, and painting it out entirely
+          would make the card look like it arrived nowhere. */}
       <motion.div
-        className="pointer-events-none absolute"
+        className="pointer-events-none absolute inset-0"
         style={{
-          left: 14.79,
-          top: 0,
-          width: 410,
-          height: 614,
           zIndex: 6,
+          /* Eased off toward the bottom. Every point of white here is
+             colour you cannot see, so it holds full strength where the
+             vault needs muting and gets out of the way over the wash. */
           background:
-            "radial-gradient(60% 42% at 50% 18%, rgba(255,255,255,0.55) 0%, rgba(255,255,255,0.12) 48%, rgba(255,255,255,0) 100%)",
+            "linear-gradient(180deg, rgba(255,255,255,0.84) 0%, rgba(255,255,255,0.80) 38%, rgba(255,255,255,0.60) 72%, rgba(255,255,255,0.44) 100%)",
+          backdropFilter: "blur(30px) saturate(105%)",
+          WebkitBackdropFilter: "blur(30px) saturate(105%)",
         }}
         initial={{ opacity: 0 }}
         animate={{ opacity: 1 }}
         exit={{ opacity: 0 }}
-        transition={{ duration: 0.7, ease: IN_EASE }}
+        transition={{ duration: 0.55, ease: IN_EASE }}
       />
+
+      {/* The wash. Clipped to the shell's own radius, and its container
+          runs far past the bottom edge — at rest the surplus is
+          off-screen and costs nothing, and it is what keeps the lower
+          half covered once the colour rises. */}
+      <motion.div
+        className="pointer-events-none absolute overflow-hidden"
+        style={{ inset: 0, borderRadius: 44, zIndex: 6 }}
+        initial={{ opacity: 0 }}
+        animate={{ opacity: 1 }}
+        exit={{ opacity: 0 }}
+        transition={{ duration: 0.6, ease: IN_EASE }}
+      >
+        <motion.div
+          className="absolute"
+          style={{
+            left: 0,
+            top: 380,
+            width: 440,
+            height: 1240,
+            /* isolation:auto — this wrapper animates opacity, and an
+               animated-opacity group becomes its own stacking context,
+               which would trap the fields' multiply inside it and blend
+               them against nothing. */
+            isolation: "auto",
+            /* Feathered along the top. In the reference the colour has no
+               boundary at all, it just becomes the white screen somewhere
+               around the middle; without this the fields end on a visible
+               line however much they are blurred. */
+            maskImage:
+              "linear-gradient(to bottom, transparent 0px, rgba(0,0,0,0.10) 90px, rgba(0,0,0,0.34) 190px, rgba(0,0,0,0.72) 290px, black 380px, black 100%)",
+            WebkitMaskImage:
+              "linear-gradient(to bottom, transparent 0px, rgba(0,0,0,0.10) 90px, rgba(0,0,0,0.34) 190px, rgba(0,0,0,0.72) 290px, black 380px, black 100%)",
+          }}
+          /* Rises a couple of hundred pixels and stops — the trips
+             handoff's travel, not the payment beat's launch. The launch
+             exists to clear a screen on its way out; here the wash is the
+             ground the next screen is standing on, so it arrives and
+             stays. */
+          initial={{ y: 150, scaleY: 0.94 }}
+          animate={{ y: -40, scaleY: 1 }}
+          transition={{ duration: 1.4, ease: IN_EASE }}
+        >
+          <BloomFields />
+        </motion.div>
+      </motion.div>
+
+      {/* Ink, not white. The headline is over a near-white ground now. */}
       <motion.p
         className="absolute text-center font-semibold"
         style={{
@@ -533,7 +611,7 @@ export function SuccessAura() {
           fontSize: 18,
           lineHeight: "25px",
           letterSpacing: "-0.36px",
-          color: "#ffffff",
+          color: "#0b0b0b",
           zIndex: 7,
         }}
         initial={{ opacity: 0, y: 10 }}

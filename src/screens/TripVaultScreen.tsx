@@ -11,7 +11,7 @@ import {
   FlowVeil,
   PickerSheet,
   ResultCard,
-  SuccessAura,
+  SuccessWash,
 } from "./vault/UploadFlow";
 
 /* Trip Vault (KYC Not Done) — Figma 13463:7884 (v1) and 13554:37134 (v2),
@@ -149,7 +149,10 @@ export default function TripVaultScreen() {
         )}
 
         <AnimatePresence>
-          {flowing && <FlowVeil key="veil" />}
+          {/* The dark veil carries the picker, the confirm sheet and the
+              extract. It hands over to white the moment the document
+              lands — see SuccessWash. */}
+          {flowing && stage !== "success" && <FlowVeil key="veil" />}
           {stage === "picker" && <PickerSheet key="picker" onPick={pick} />}
           {stage === "confirm" && (
             <ConfirmSheet key="confirm" onContinue={confirm} onReupload={() => setStage("picker")} />
@@ -160,7 +163,7 @@ export default function TripVaultScreen() {
           {(stage === "extracting" || stage === "success") && (
             <ResultCard key="card" filled={stage === "success"} />
           )}
-          {stage === "success" && <SuccessAura key="aura" />}
+          {stage === "success" && <SuccessWash key="wash" />}
         </AnimatePresence>
       </div>
 
