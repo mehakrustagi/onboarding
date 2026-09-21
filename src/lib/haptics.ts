@@ -36,7 +36,8 @@ type Trigger =
   | "tunnelEnter"      // Control panel: icon committed, descent begins
   | "tunnelExit"       // Control panel: icon lands on the far platform
   | "holdCharge"       // Profile: holding the pass down to open explore
-  | "holdExpand";      // Profile: the hold completes and the pass opens
+  | "holdExpand"       // Profile: the hold completes and the pass opens
+  | "gradientSplit";   // Native AI button: tap parts the liquid gradient
 
 const PATTERNS: Record<Trigger, number | number[]> = {
   orbLand: 12,
@@ -117,6 +118,10 @@ const PATTERNS: Record<Trigger, number | number[]> = {
   ],
   // The pass opens: a firm double, distinct from every tick before it.
   holdExpand: [24, 40, 44],
+  /* The Native AI button being struck. One sharp hit for the impact, then
+     a shorter, softer tail for the water closing back over it — the same
+     two-beat shape the animation has. */
+  gradientSplit: [16, 90, 8],
 };
 
 /* Stops any pattern in flight. navigator.vibrate(0) cancels the queue,
