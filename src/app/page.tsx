@@ -36,6 +36,11 @@ const SCREENS = [
     label: "Liquid glass button",
     note: "Bead lens on tap",
   },
+  {
+    href: "/loyalty",
+    label: "Loyalty",
+    note: "Radial dial → points",
+  },
 ] as const;
 
 export default function Home() {

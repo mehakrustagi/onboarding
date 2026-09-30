@@ -526,7 +526,13 @@ export function ResultCard({ filled }: { filled: boolean }) {
  * together: something was added, and the screen brightened because of it.
  * Held static it reads as a backdrop the card happens to be sitting on.
  */
-export function SuccessAura() {
+/* Just the light — the shaft and nothing else.
+ *
+ * Split out of SuccessAura so the loyalty screen can reuse the rays
+ * without also inheriting this flow's headline and star field, which
+ * belong to 1558 and not to it. SuccessAura is unchanged in behaviour:
+ * it renders this and then adds its own two layers on top. */
+export function LightShaft() {
   return (
     <>
       {/* The shaft.
@@ -594,6 +600,14 @@ export function SuccessAura() {
           </motion.div>
         ))}
       </motion.div>
+    </>
+  );
+}
+
+export function SuccessAura() {
+  return (
+    <>
+      <LightShaft />
 
       {/* The stars. Figma's group sits rotated in the frame, so its
           metadata box is no use for placing it; measured off the render

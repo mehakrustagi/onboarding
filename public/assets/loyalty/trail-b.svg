@@ -1,0 +1,19 @@
+<svg preserveAspectRatio="none" overflow="visible" style="display: block;" width="8" height="55.2529" viewBox="0 0 8 55.2529" fill="none" xmlns="http://www.w3.org/2000/svg">
+<g id="Group 1991429030">
+<g id="Line 263 (Stroke)" filter="url(#filter0_f_0_4)">
+<path d="M3.5 4.00195C3.5 3.72581 3.72386 3.50195 4 3.50195C4.27614 3.50195 4.5 3.72581 4.5 4.00195L4.5 51.7529C4.5 52.0291 4.27614 52.2529 4 52.2529C3.72386 52.2529 3.5 52.0291 3.5 51.7529L3.5 4.00195Z" fill="url(#paint0_linear_0_4)"/>
+</g>
+<path id="Star 4" d="M4 0L5.08036 2.91964L8 4L5.08036 5.08036L4 8L2.91964 5.08036L0 4L2.91964 2.91964L4 0Z" fill="#24B251"/>
+</g>
+<defs>
+<filter id="filter0_f_0_4" x="0.499998" y="0.501953" width="7" height="54.751" filterUnits="userSpaceOnUse" color-interpolation-filters="sRGB">
+<feFlood flood-opacity="0" result="BackgroundImageFix"/>
+<feBlend mode="normal" in="SourceGraphic" in2="BackgroundImageFix" result="shape"/>
+<feGaussianBlur stdDeviation="1.5" result="effect1_foregroundBlur_0_4"/>
+</filter>
+<linearGradient id="paint0_linear_0_4" x1="4" y1="3.50195" x2="4" y2="52.2529" gradientUnits="userSpaceOnUse">
+<stop stop-color="#1B9442"/>
+<stop offset="1" stop-color="#1B9442" stop-opacity="0"/>
+</linearGradient>
+</defs>
+</svg>
