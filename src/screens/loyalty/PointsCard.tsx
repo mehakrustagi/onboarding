@@ -33,31 +33,73 @@ import {
  * it is exact at any size and costs one 759-byte request.
  */
 
-/* The charge texture plays at double speed. The source loop is a leisurely
- * 2.03s drift, which is right for a card sitting still and too slow under a
- * beat where points are arriving every second or so — at 1× the sparks
- * appear to be hanging in the air rather than being drawn upward. */
-const CHARGE_RATE = 2;
+/* Playback rate. Ran at 2× for a pass and came back halved by eye: at
+ * double speed the sparks read as noise crossing the card rather than as
+ * motes lifting off it, and they stopped agreeing with the stream outside
+ * the card, whose particles take 1.4–1.7s to make the same journey. The
+ * source loop is 2.03s, so 1× is the file's own tempo. */
+const CHARGE_RATE = 1;
 
-/* Opacity, and why it is not simply a number.
+/* How this layer is exposed, which is nearly all of the work.
  *
- * Figma specifies 18%, and 18% is very nearly invisible over gold on a
- * phone — the sparks are small, low-contrast and moving, so faint is the
- * one thing they cannot be. But raising the opacity alone does not make
- * the sparks brighter, it makes the WHOLE FRAME more present, and the
- * frame is mostly a flat mid-grey field: at 42% it desaturated the top
- * half of the card to a muddy grey-gold.
+ * MEASURE THE MEDIA BEFORE FILTERING IT. Figma renders node 1514:3408 as
+ * a flat grey card, and a grey source is what an earlier pass here
+ * assumed — so it was crushed with `brightness(0.5) contrast(2.6)` to
+ * knock an imagined grey field back to black. Sampling the actual frames
+ * says the opposite: over the part of the frame this keeps, the median
+ * luminance is 2/255 and the BRIGHTEST pixel is 23. The source is nearly
+ * black already, the sparks are the 14–23 tail, and halving that put them
+ * at 0. The layer was mathematically invisible, and no opacity would ever
+ * have rescued it.
  *
- * So the layer is crushed first and then screened. `brightness(0.5)
- * contrast(2.6)` drives the grey field down near black while leaving the
- * sparks bright, and `screen` adds light without ever darkening — near
- * black it contributes nothing, so the gold passes through untouched, and
- * where a spark is it adds almost all of it. The sparks end up far more
- * visible than at any plain opacity, and the card stays gold.
+ * So it is boosted hard, not crushed. A band-by-band profile of the source
+ * says how hard: over everything this keeps, the median is 2 and the peak
+ * is 23. (All of that file's real brightness — the 226–252 range — is the
+ * burned-in text and wash between 78% and 100%, which the mask removes.)
+ * ×12 takes a spark to 255 and the background to 24; `screen` then adds
+ * light and never darkens, so the background contributes about +11 over
+ * gold, which reads as a faint warming, and a spark blows to white.
  *
- * The opacity is then high, because it is no longer carrying a grey
- * rectangle — only the highlights survive the crush. */
-const CHARGE_OPACITY = 0.85;
+ * ×7 was the first attempt and measured a uniform +6 with no peaks at all
+ * — the background lift exactly, and no visible sparks. These are sparse
+ * and small enough that "is it working" cannot be judged from one frame;
+ * sample the brightest pixel over several.
+ *
+ * Opacity is full, because after the mask and the exposure this layer is
+ * sparks and almost nothing else. */
+const CHARGE_OPACITY = 1;
+/* Exposure and colour.
+ *
+ * GAIN. ×12 was the exposure that first made the sparks read at all. It
+ * matters more than it looks, because the gain multiplies the near-black
+ * background too — every step up is also a uniform warming of the whole
+ * card, and at ×12 the median across the upper card measured 149 against
+ * 149 idle. 10.56 is ×12 less 20% (dimmer) plus 10% (less transparent),
+ * which are the same lever here: with `screen` over an opaque card there
+ * is no transparency separate from how much light the layer adds.
+ *
+ * COLOUR. The source's sparks measure hue 120° at 94% saturation — pure,
+ * hot green — where this screen's conversion green is 138–139°. They read
+ * as LIME on the card, and the reason is the blend: 120° carries almost no
+ * blue, and screening a blue-less green onto gold (already high in red)
+ * can only travel toward yellow.
+ *
+ * SO THE ROTATION IS NOT 19° — IT IS 54°. Correcting the source to our
+ * hue is the obvious move and it is wrong: rotating the SOURCE by 19° put
+ * the on-card result at 64°, barely a third of the way there, because what
+ * the eye sees is the screen of the spark ONTO the gold, not the spark
+ * itself. Solving the composite instead — hue-rotate, then the saturate
+ * matrix, then `screen` over the card's measured gold (196,150,58) —
+ * predicts 49.5°, and MEASURING it says 54°: the boosted sparks clip
+ * against the green channel's ceiling, which the model does not account
+ * for. The curve is steep either side (52° → 107°, 56° → 149°), so this
+ * is worth re-measuring rather than nudging by eye if the gain changes.
+ *
+ * Measured, not predicted: 54° lands at 139.3° over two runs, against the
+ * wash's 139°. Saturation stays higher than the wash's, which is correct —
+ * these are specular highlights and are meant to be hotter than the
+ * surface they sit on. */
+const CHARGE_FILTER = "brightness(10.56) hue-rotate(54deg) saturate(0.95)";
 
 /* Figma's bleed on the wash art, resolved to pixels once. */
 const WASH_ART = {
@@ -370,7 +412,7 @@ export default function PointsCard({
             height: "100%",
             objectFit: "cover",
             opacity: CHARGE_OPACITY,
-            filter: "brightness(0.5) contrast(2.6)",
+            filter: CHARGE_FILTER,
             mixBlendMode: "screen",
             /* MASKED OFF BELOW 60%, and this is not optional.
             
