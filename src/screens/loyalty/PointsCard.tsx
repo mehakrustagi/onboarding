@@ -3,7 +3,7 @@
 import Image from "next/image";
 import { motion, useReducedMotion } from "framer-motion";
 import GlowingEdge from "./GlowingEdge";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import {
   ASSETS,
   CARD,
@@ -32,6 +32,32 @@ import {
  * move them again. The SVG carries `preserveAspectRatio="none"`, so stretching
  * it is exact at any size and costs one 759-byte request.
  */
+
+/* The charge texture plays at double speed. The source loop is a leisurely
+ * 2.03s drift, which is right for a card sitting still and too slow under a
+ * beat where points are arriving every second or so — at 1× the sparks
+ * appear to be hanging in the air rather than being drawn upward. */
+const CHARGE_RATE = 2;
+
+/* Opacity, and why it is not simply a number.
+ *
+ * Figma specifies 18%, and 18% is very nearly invisible over gold on a
+ * phone — the sparks are small, low-contrast and moving, so faint is the
+ * one thing they cannot be. But raising the opacity alone does not make
+ * the sparks brighter, it makes the WHOLE FRAME more present, and the
+ * frame is mostly a flat mid-grey field: at 42% it desaturated the top
+ * half of the card to a muddy grey-gold.
+ *
+ * So the layer is crushed first and then screened. `brightness(0.5)
+ * contrast(2.6)` drives the grey field down near black while leaving the
+ * sparks bright, and `screen` adds light without ever darkening — near
+ * black it contributes nothing, so the gold passes through untouched, and
+ * where a spark is it adds almost all of it. The sparks end up far more
+ * visible than at any plain opacity, and the card stays gold.
+ *
+ * The opacity is then high, because it is no longer carrying a grey
+ * rectangle — only the highlights survive the crush. */
+const CHARGE_OPACITY = 0.85;
 
 /* Figma's bleed on the wash art, resolved to pixels once. */
 const WASH_ART = {
@@ -111,6 +137,23 @@ export default function PointsCard({
 }) {
   const shown = useCountUp(balance, counting, 900);
   const reduced = useReducedMotion() ?? false;
+
+  /* `playbackRate` has no JSX prop — it is a property on the element, not
+     an attribute — so it has to be set imperatively once the element
+     exists. Also re-applied on `loadedmetadata`: several browsers reset
+     the rate to 1 when new media loads, so setting it only on mount
+     silently reverts the moment the source is ready. */
+  const videoRef = useRef<HTMLVideoElement>(null);
+  useEffect(() => {
+    const v = videoRef.current;
+    if (!v) return;
+    const apply = () => {
+      v.playbackRate = CHARGE_RATE;
+    };
+    apply();
+    v.addEventListener("loadedmetadata", apply);
+    return () => v.removeEventListener("loadedmetadata", apply);
+  }, [pulsing]);
 
   return (
     <div
@@ -297,99 +340,68 @@ export default function PointsCard({
         />
       </motion.div>
 
-      {/* THE ACTIVATION SWEEP — the WorldPass card's property, rebuilt.
+      {/* THE CHARGE TEXTURE — Figma 1514:3408, the card's charging fill.
 
-          `Card3D` takes an `activatePulse` motion value documented as
-          making "the dot pattern briefly glow as a bright band passes from
-          card top to bottom", and Screen5 still drives it (0 → 1 over
-          1.6s, ease [0.4, 0, 0.4, 1]). The prop is now vestigial there —
-          that component's body was reduced to a flat black slab and no
-          longer reads it — so there was nothing to import and this is a
-          rebuild rather than a reuse. The timing and easing are kept.
+          A 2s h264 loop of sparks drifting up the card, laid over the gold
+          at 18% while the points arrive. It is the node's own media: the
+          frame renders flat grey through `get_design_context` because the
+          fill is a VIDEO, and the only way to get it is `export_video`.
 
-          TWO PARTS, because the sweep alone is just a gradient moving:
+          Mounted only while charging rather than hidden at opacity 0. A
+          video element left in the tree decodes frames for the whole life
+          of the screen to show nothing, and starting it at the commit also
+          means the loop always begins at its first frame instead of
+          wherever it happened to be.
 
-          1. A soft band travelling top → bottom on `screen`, lifting
-             whatever it crosses.
-          2. The DOT FIELD flaring as the band reaches it. That is the
-             detail that made the original read as a surface being
-             energised rather than lit — the texture answers the light.
-             The dots sit at y 20–61 of a 210px card, so the flare is
-             timed to the fifth of the sweep where the band is over them.
-             Timed rather than masked: a moving mask on a second copy of
-             the art costs a repaint of the whole layer every frame, to
-             land the same twentieth of a second. */}
-      <motion.div
-        aria-hidden
-        className="pointer-events-none absolute inset-0"
-        style={{ mixBlendMode: "screen", opacity: charge }}
-      >
-        <motion.div
-          className="absolute"
+          NO TOP-TO-BOTTOM SWEEP. A pass here rebuilt `Card3D`'s
+          `activatePulse` — a bright band walking from the card's top edge
+          to its bottom, with the dot field flaring as it passed. It was
+          removed: this screen's light already travels UPWARD, from the
+          gem through the bottom edge into the card, and a second light
+          walking down it contradicted that at the exact moment the
+          direction is the point. */}
+      {pulsing && !reduced && (
+        <video
+          aria-hidden
+          className="pointer-events-none absolute inset-0"
+          ref={videoRef}
           style={{
-            left: "-10%",
-            width: "120%",
-            height: 74,
-            background:
-              "linear-gradient(180deg, rgba(140,255,184,0) 0%, rgba(190,255,214,0.55) 45%, rgba(140,255,184,0.28) 62%, rgba(36,178,81,0) 100%)",
-            filter: "blur(9px)",
-          }}
-          initial={{ top: "-40%" }}
-          animate={pulsing ? { top: ["-40%", "115%"] } : { top: "-40%" }}
-          transition={
-            pulsing
-              ? {
-                  top: {
-                    duration: 1.6,
-                    repeat: Infinity,
-                    repeatDelay: 0.55,
-                    /* Screen5's own curve for this pulse. */
-                    ease: [0.4, 0, 0.4, 1],
-                  },
-                }
-              : { duration: 0.3 }
-          }
-        />
-      </motion.div>
+            width: "100%",
+            height: "100%",
+            objectFit: "cover",
+            opacity: CHARGE_OPACITY,
+            filter: "brightness(0.5) contrast(2.6)",
+            mixBlendMode: "screen",
+            /* MASKED OFF BELOW 60%, and this is not optional.
+            
+               Node 1514:3408 is not a bare texture — it is the whole
+               charging card, so the export has Figma's own "+1,800 pts"
+               and its green wash BURNED INTO THE FRAMES at 80% down. Laid
+               over our card at full height that put a second, frozen
+               amount directly under the live one, which read as doubled
+               text.
 
-      {/* The dot field answering the sweep. A second copy of 1503:1186 at
-          full brightness, flashed on as the band crosses it. */}
-      <motion.div
-        aria-hidden
-        className="pointer-events-none absolute"
-        style={{
-          right: 20,
-          top: CARD_DOTS.y,
-          width: CARD_DOTS.w,
-          height: CARD_DOTS.h,
-          mixBlendMode: "screen",
-        }}
-        initial={{ opacity: 0 }}
-        animate={pulsing ? { opacity: [0, 0, 0.9, 0, 0] } : { opacity: 0 }}
-        transition={
-          pulsing
-            ? {
-                opacity: {
-                  duration: 1.6,
-                  repeat: Infinity,
-                  repeatDelay: 0.55,
-                  /* Peaks a fifth of the way down, which is where the band
-                     is level with the dots. */
-                  times: [0, 0.13, 0.21, 0.34, 1],
-                  ease: "easeInOut",
-                },
-              }
-            : { duration: 0.3 }
-        }
-      >
-        <Image
-          src={`${ASSETS}/card-dots.svg`}
-          alt=""
-          width={CARD_DOTS.w}
-          height={CARD_DOTS.h}
-          style={{ width: "100%", height: "100%", filter: "brightness(2.4)" }}
+               Only the drifting sparks in the upper part of the frame are
+               wanted here: the wash and the amount are already drawn, in
+               the right colour and with the right number. The gradient
+               fades rather than cuts so the sparks thin out instead of
+               ending on a line. */
+            maskImage:
+              "linear-gradient(180deg, #000 0%, #000 52%, rgba(0,0,0,0.35) 66%, transparent 74%)",
+            WebkitMaskImage:
+              "linear-gradient(180deg, #000 0%, #000 52%, rgba(0,0,0,0.35) 66%, transparent 74%)",
+          }}
+          src={`${ASSETS}/charge.mp4`}
+          /* All four are load-bearing for autoplay: browsers refuse to
+             start an unmuted video without a gesture, and iOS refuses to
+             play inline at all without `playsInline` — it would otherwise
+             take the video fullscreen the moment Convert was tapped. */
+          autoPlay
+          muted
+          loop
+          playsInline
         />
-      </motion.div>
+      )}
 
       {/* NO EXPANDING RIPPLE, and no card-wide wave.
 
