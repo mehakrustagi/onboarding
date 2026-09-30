@@ -15,6 +15,7 @@ const ROUTES = [
   { href: "/thinking-mode", label: "Thinking mode" },
   { href: "/trips", label: "Trips" },
   { href: "/trip-vault", label: "Trip vault" },
+  { href: "/loyalty", label: "Loyalty" },
 ] as const;
 
 export default function ScreenHeader({

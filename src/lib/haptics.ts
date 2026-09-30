@@ -36,7 +36,13 @@ type Trigger =
   | "tunnelEnter"      // Control panel: icon committed, descent begins
   | "tunnelExit"       // Control panel: icon lands on the far platform
   | "holdCharge"       // Profile: holding the pass down to open explore
-  | "holdExpand";      // Profile: the hold completes and the pass opens
+  | "holdExpand"       // Profile: the hold completes and the pass opens
+  | "gradientSplit"    // Native AI button: tap parts the liquid gradient
+  | "dialDetent"       // Loyalty: the radial slider crosses one tick
+  | "dialMajor"        // Loyalty: it crosses a labelled (every 5th) tick
+  | "dialLimit"        // Loyalty: the slider is held against 0 or the max
+  | "convertCommit"    // Loyalty: Convert to Pts tapped — the pull begins
+  | "pointsLanded";    // Loyalty: the points arrive in the card
 
 const PATTERNS: Record<Trigger, number | number[]> = {
   orbLand: 12,
@@ -117,6 +123,42 @@ const PATTERNS: Record<Trigger, number | number[]> = {
   ],
   // The pass opens: a firm double, distinct from every tick before it.
   holdExpand: [24, 40, 44],
+  /* The Native AI button being struck. One sharp hit for the impact, then
+     a shorter, softer tail for the water closing back over it — the same
+     two-beat shape the animation has. */
+  gradientSplit: [16, 90, 8],
+  /* The dial. This is the one place in the app where the haptic fires
+     dozens of times a second, so it is the one place where the pattern
+     has to be as small as the API can express.
+
+     1ms. Not a typo, and not the same as nothing: Android rounds a
+     vibrate up to the motor's minimum spin-up, so a 1 reads as the
+     shortest possible tap rather than as silence. Anything longer and
+     consecutive detents run together into a continuous buzz — which is
+     the failure mode that makes a ratchet feel like a broken motor
+     instead of a row of ridges.
+
+     Every value below is deliberately near the floor. The dial's job is
+     to feel like a physical wheel with detents under the thumb, and a
+     real detent is a tiny mechanical event, not a notification. */
+  dialDetent: 1,
+  /* Every fifth detent, the one that would carry a number on a real
+     dial. Doubling the duration rather than adding a second pulse: a
+     two-pulse pattern cannot complete before the next detent arrives at
+     speed, so it would be silently truncated exactly when the dial is
+     moving fastest. */
+  dialMajor: 3,
+  /* The end of travel. A short double, which is the only pattern here
+     the thumb can consciously identify — it has to say "this is not
+     another detent, there is nothing past this". */
+  dialLimit: [7, 26, 12],
+  /* The button is struck and the pull starts. Deliberately the same
+     shape as gradientSplit (the pill IS that material) but heavier, so
+     the commit reads as a bigger event than a tap. */
+  convertCommit: [22, 80, 14],
+  /* The points arrive. A soft swell rather than a hit: this is the end
+     of something travelling, so it lands rather than strikes. */
+  pointsLanded: [10, 40, 18, 40, 30],
 };
 
 /* Stops any pattern in flight. navigator.vibrate(0) cancels the queue,

@@ -26,6 +26,21 @@ const SCREENS = [
     label: "Profile",
     note: "WorldPass card",
   },
+  {
+    href: "/native-ai-button",
+    label: "Native AI button",
+    note: "Liquid gradient",
+  },
+  {
+    href: "/liquid-glass-button",
+    label: "Liquid glass button",
+    note: "Bead lens on tap",
+  },
+  {
+    href: "/loyalty",
+    label: "Loyalty",
+    note: "Radial dial → points",
+  },
 ] as const;
 
 export default function Home() {

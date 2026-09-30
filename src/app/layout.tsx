@@ -1,5 +1,10 @@
 import type { Metadata } from "next";
-import { Inter, Doto, Libre_Barcode_39_Extended_Text } from "next/font/google";
+import {
+  Inter,
+  Doto,
+  Libre_Barcode_39_Extended_Text,
+  Playfair_Display,
+} from "next/font/google";
 import "./globals.css";
 
 const inter = Inter({
@@ -24,6 +29,18 @@ const barcode = Libre_Barcode_39_Extended_Text({
   subsets: ["latin"],
 });
 
+// Stand-in for Denton, which the loyalty frames set their numerals and the
+// "Using ₹0 / ₹12,800" line in. Denton is a licensed face and is not in this
+// project, so the closest freely-available match is used instead: both are
+// high-contrast display serifs with vertical stress and ball terminals, and
+// the figures — which is nearly all this font renders here — are very close.
+// If the real Denton is ever licensed, swap this one declaration for a local
+// @font-face and every call site follows, since they all read --font-denton.
+const denton = Playfair_Display({
+  variable: "--font-denton",
+  subsets: ["latin"],
+});
+
 export const metadata: Metadata = {
   title: "Atlys — Onboarding",
   description: "Atlys onboarding experience",
@@ -33,7 +50,7 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
   return (
     <html
       lang="en"
-      className={`${inter.variable} ${doto.variable} ${barcode.variable} h-full antialiased`}
+      className={`${inter.variable} ${doto.variable} ${barcode.variable} ${denton.variable} h-full antialiased`}
     >
       <body className="min-h-full">{children}</body>
     </html>
