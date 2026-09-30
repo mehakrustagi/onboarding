@@ -2,6 +2,7 @@
 
 import Image from "next/image";
 import { motion, useReducedMotion } from "framer-motion";
+import GlowingEdge from "./GlowingEdge";
 import { useEffect, useState } from "react";
 import {
   ASSETS,
@@ -471,6 +472,51 @@ export default function PointsCard({
         +{delta.toLocaleString("en-IN")} pts
       </motion.p>
 
+      {/* THE COMET GLARE — the specular sheet that comes with the tilt.
+      
+          Aceternity's `CometCard` pairs its 3D tilt with a glare, and the
+          pairing is the point: a card that tilts without one reads as a
+          flat rectangle being rotated, because a real surface changes how
+          it catches light as it turns. This is that highlight.
+
+          It is NOT driven by a pointer. The original tracks the mouse;
+          this screen is playing a scripted sequence that nobody is
+          hovering, so the glare runs on its own clock, on periods that are
+          coprime with the tilt's so the two never lock into a loop you can
+          predict. `overlay` rather than `screen` — on gold, screen blows
+          the highlight out to white, where overlay keeps the metal in it. */}
+      <motion.div
+        aria-hidden
+        className="pointer-events-none absolute inset-0"
+        /* 0.5, not 0.85. At full strength the sweep lifted the whole
+           card toward a flat pale yellow and the gradient's depth went
+           with it — the glare is meant to travel ACROSS the gold, not
+           replace it. */
+        style={{ mixBlendMode: "overlay", opacity: pulsing ? 0.5 : 0 }}
+        initial={{ opacity: 0 }}
+        transition={{ opacity: { duration: 0.4 } }}
+      >
+        <motion.div
+          className="absolute"
+          style={{
+            top: "-60%",
+            height: "220%",
+            width: "34%",
+            background:
+              "linear-gradient(90deg, rgba(255,255,255,0) 0%, rgba(255,255,255,0.8) 50%, rgba(255,255,255,0) 100%)",
+            filter: "blur(16px)",
+            rotate: -22,
+          }}
+          initial={{ left: "-20%" }}
+          animate={pulsing ? { left: ["-25%", "85%", "-25%"] } : { left: "-25%" }}
+          transition={
+            pulsing
+              ? { left: { duration: 3.7, repeat: Infinity, ease: "easeInOut" } }
+              : { duration: 0.4 }
+          }
+        />
+      </motion.div>
+
       {/* 1503:2729/2730 — the diagonal sheen on the settled card. Two
           copies of one blurred bar on `soft-light`, which is why it
           brightens the gold without bleaching it: soft-light leaves the
@@ -515,6 +561,10 @@ export default function PointsCard({
           />
         </motion.div>
       )}
+      {/* The lit edge. Last, so it draws over everything the card
+          contains — a rim light that went under the artwork would be
+          hidden by it along three of its four sides. */}
+      <GlowingEdge radius={CARD.radius} charge={charge} />
     </div>
   );
 }

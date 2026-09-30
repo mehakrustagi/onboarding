@@ -2,8 +2,10 @@
 
 import Image from "next/image";
 import { motion, useReducedMotion } from "framer-motion";
+import Strike from "./Strike";
 import {
   ASSETS,
+  CARD,
   GEM,
   GEM_GLOW,
   STREAM,
@@ -75,6 +77,9 @@ import {
  * The glint is masked to the gem's own alpha, so it is light ON the stone
  * rather than a streak floating over it. */
 const GLINT_S = 6.2;
+
+/* The card's bottom edge — where the stream lands and the strikes fire. */
+const STRIKE_Y = CARD.y + CARD.h;
 
 export default function GemColumn({
   /** 0 at rest, 1 while the points are flowing through. */
@@ -302,6 +307,31 @@ export default function GemColumn({
           </motion.div>
         );
       })}
+
+      {/* THE STRIKES — each arrival hitting the card's bottom edge.
+
+          One per lane, fired on that lane's own cadence: the first at the
+          particle's delay plus its travel time, then once per cycle. No
+          collision detection is needed for the same reason the original's
+          version needs it and this one does not — Aceternity's beams fall
+          on their own schedule and have to be watched for, where this
+          screen scheduled every arrival itself and already knows when
+          each one lands.
+
+          Drawn at the card's bottom edge, above the card (see the layer's
+          z-index) so the burst can throw debris up ONTO the gold rather
+          than being clipped behind it. */}
+      <div className="absolute inset-0" style={{ top: STRIKE_Y }}>
+        {STREAM.map((p, i) => (
+          <Strike
+            key={`strike-${p.k}-${i}`}
+            dx={p.dx}
+            delay={p.delay + p.dur}
+            period={p.dur}
+            active={flowing && !reduced}
+          />
+        ))}
+      </div>
 
       {/* 1503:2019 — the silver one below. It is the only trail travelling
           INTO the gem rather than out of it, which is what sells the gem as
