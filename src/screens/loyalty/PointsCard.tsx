@@ -115,14 +115,27 @@ export default function PointsCard({
       className="relative overflow-hidden"
       style={{ width, height: CARD.h, borderRadius: CARD.radius }}
     >
-      {/* The gold face. */}
+      {/* The gold face.
+
+          IT BRIGHTENS AS IT CHARGES. Very small numbers — 5% brightness,
+          9% saturation at full — because this is the surface the balance
+          is printed on, and anything stronger starts bleaching numerals
+          that have to stay readable through the whole beat.
+          The point is that the card itself responds, not just that
+          something green is drawn on top of it. */}
       <Image
         src={`${ASSETS}/card-face.svg`}
         alt=""
         width={CARD.w}
         height={CARD.h}
         priority
-        style={{ position: "absolute", inset: 0, width: "100%", height: "100%" }}
+        style={{
+          position: "absolute",
+          inset: 0,
+          width: "100%",
+          height: "100%",
+          filter: `brightness(${1 + charge * 0.05}) saturate(${1 + charge * 0.09})`,
+        }}
       />
 
       {/* 1503:1186 — the dot field. Exported already rotated 180°, so it is
@@ -281,6 +294,123 @@ export default function PointsCard({
           }}
         />
       </motion.div>
+
+      {/* THE CHARGE — the green arriving and spreading across the face.
+
+          The stream lands at the card's bottom centre, so that is where
+          this starts: three rings leaving the point of contact, staggered
+          on the same ~1.5s cadence the particles arrive on. Each is a
+          RING, not a filled blob, because a filled shape growing outward
+          reads as a light being turned up where a band leaving the impact
+          reads as something travelling away from it.
+
+          THEY DIE AS THEY SPREAD, and that is the whole difference
+          between this and a card that just goes green. A first pass held
+          each ring at constant opacity for its whole travel: three bright
+          bands crossing the full card at once, the gold buried under
+          them, and the reference has green only across the bottom third.
+          Fading each ring out as it expands is both what the design shows
+          and what the physics says — energy entering a surface at a point
+          dissipates as its wavefront lengthens.
+
+          `screen` blending, so the rings add light to the gold rather
+          than painting over it.
+
+          The OUTER div carries `opacity: charge` and the inner one does
+          the animating. Folding `charge` into the animated keyframes
+          instead would restart the animation on every one of the ~37
+          renders the charge ramp produces. */}
+      {[0, 1, 2].map((i) => (
+        <div
+          key={i}
+          aria-hidden
+          className="pointer-events-none absolute inset-0"
+          style={{ opacity: charge, mixBlendMode: "screen" }}
+        >
+          <motion.div
+            className="absolute"
+            style={{
+              left: "50%",
+              bottom: 0,
+              width: CARD.w,
+              height: CARD.w,
+              x: "-50%",
+              y: "40%",
+              borderRadius: "50%",
+              /* Transparent core, a narrow bright band, soft outer edge.
+                 The band is ~12% of the radius — any wider and it stops
+                 being a wave and becomes a glow with a hole in it. */
+              background:
+                "radial-gradient(closest-side, rgba(68,232,116,0) 52%, rgba(68,232,116,0.30) 64%, rgba(36,178,81,0.11) 76%, rgba(36,178,81,0) 90%)",
+            }}
+            initial={{ scale: 0.12, opacity: 0 }}
+            animate={pulsing ? { scale: [0.12, 1], opacity: [0, 1, 0] } : { scale: 0.12, opacity: 0 }}
+            /* Full config per property — a per-property transition
+               REPLACES the inherited one rather than merging, so omitting
+               `duration` or `repeat` here runs the wave once and stops. */
+            transition={
+              pulsing
+                ? {
+                    scale: {
+                      duration: 1.5,
+                      repeat: Infinity,
+                      delay: i * 0.5,
+                      /* easeOut — fastest at the instant of impact, then
+                         slowing as it crosses the card. The deceleration
+                         is what reads as energy moving through a surface
+                         rather than a circle being animated. */
+                      ease: "easeOut",
+                    },
+                    opacity: {
+                      duration: 1.5,
+                      repeat: Infinity,
+                      delay: i * 0.5,
+                      /* Up almost immediately, then a long fade to nothing
+                         well before the ring reaches the top of the card. */
+                      times: [0, 0.16, 1],
+                      ease: "easeOut",
+                    },
+                  }
+                : { duration: 0.3 }
+            }
+          />
+        </div>
+      ))}
+
+      {/* The contact flash — the moment of the hit, at the bottom edge.
+          Every wave needs a strike at its origin or it appears out of
+          nothing. Kept small and low so it reinforces the wash already
+          pooled there instead of becoming a second light source. */}
+      <div
+        aria-hidden
+        className="pointer-events-none absolute inset-0"
+        style={{ opacity: charge, mixBlendMode: "screen" }}
+      >
+        <motion.div
+          className="absolute"
+          style={{
+            left: "50%",
+            bottom: -12,
+            width: 124,
+            height: 28,
+            x: "-50%",
+            borderRadius: "50%",
+            background:
+              "radial-gradient(closest-side, rgba(190,255,214,0.6) 0%, rgba(68,232,116,0.28) 55%, rgba(68,232,116,0) 100%)",
+            filter: "blur(7px)",
+          }}
+          initial={{ scale: 0.6, opacity: 0.35 }}
+          animate={pulsing ? { scale: [0.6, 1.2, 0.6], opacity: [0.35, 1, 0.35] } : { scale: 0.6, opacity: 0.35 }}
+          transition={
+            pulsing
+              ? {
+                  scale: { duration: 1.5, repeat: Infinity, ease: "easeOut" },
+                  opacity: { duration: 1.5, repeat: Infinity, ease: "easeOut" },
+                }
+              : { duration: 0.3 }
+          }
+        />
+      </div>
 
       {/* 1503:1184 / 1503:1183 — the balance. */}
       <div
