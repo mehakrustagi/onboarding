@@ -3,7 +3,8 @@
 import { useEffect, useRef, useState } from "react";
 import { motion, useMotionValue, useReducedMotion } from "framer-motion";
 
-/* A lit border that follows the pointer around the card's edge.
+/* A lit border that follows the pointer around the card's edge, while the
+ * card is taking the points — and only then.
  *
  * The MECHANIC is Aceternity UI's `GlowingEffect`, and it is worth stating
  * plainly what that mechanic is, because it is not a border-colour
@@ -61,6 +62,12 @@ export default function GlowingEdge({
   charge: number;
   width?: number;
 }) {
+  /* The rim exists only once the CTA has been struck. At rest the card is
+     the card — 1503:1176 has no lit edge, and a rotating rim light sitting
+     on an idle screen turns a peak moment into wallpaper. `charge` is 0
+     until commit and ramps back to 0 on the drop, so it gates this for
+     free at both ends. */
+  const active = charge > 0.001;
   const reduced = useReducedMotion() ?? false;
   const ref = useRef<HTMLDivElement>(null);
   /* The rotation lives in a CSS CUSTOM PROPERTY, not in React state, and
@@ -77,7 +84,10 @@ export default function GlowingEdge({
   const [near, setNear] = useState(false);
 
   useEffect(() => {
-    if (reduced) return;
+    /* No loop while the rim is off. Left running it would spin a request
+       animation frame for the life of the screen to drive something with
+       zero opacity. */
+    if (reduced || !active) return;
     let raf = 0;
     let last = performance.now();
     let pointerAngle: number | null = null;
@@ -136,11 +146,12 @@ export default function GlowingEdge({
       window.removeEventListener("pointermove", onMove);
       cancelAnimationFrame(raf);
     };
-  }, [reduced, start]);
+  }, [reduced, start, active]);
 
-  /* Faint at rest, brighter with the charge, brighter again under the
-     pointer — the three states stack rather than replacing each other. */
-  const intensity = 0.3 + charge * 0.6 + (near ? 0.25 : 0);
+  /* Entirely charge-driven, so it fades up with the conversion and back
+     out with it. The pointer only ever adds on top of that — it can
+     brighten a rim that is already lit, never light one that is not. */
+  const intensity = charge * (0.85 + (near ? 0.3 : 0));
 
   /* The ring. `repeating-conic-gradient` with the sweep starting at
      `--start` is the original's construction; the stops are this screen's
@@ -171,8 +182,13 @@ export default function GlowingEdge({
       style={
         /* framer writes the custom property here every frame; both rings
            below read it, so one value drives both with a single write. */
-        { borderRadius: radius, "--edge-angle": start } as React.CSSProperties
+        {
+          borderRadius: radius,
+          "--edge-angle": start,
+          opacity: active ? 1 : 0,
+        } as React.CSSProperties
       }
+      transition={{ opacity: { duration: 0.45 } }}
     >
       {/* The bloom — the same ring, thicker and blurred, sitting under the
           crisp one. A single hairline reads as a stroke; it is the soft

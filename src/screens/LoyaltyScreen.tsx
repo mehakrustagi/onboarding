@@ -67,12 +67,20 @@ const IN_EASE = [0.22, 1, 0.36, 1] as const;
 
 type Beat = "idle" | "pulling" | "dropping" | "settled";
 
-/* How long the pull runs before the screen starts to fall. Long enough for
- * three staggered trails to each complete a pass — at ~1.2s per trail with
- * the last starting at 0.67s, anything under about 1.8s cuts the third one
- * off mid-flight, which reads as the animation being interrupted rather
- * than finishing. */
-const PULL_MS = 2100;
+/* How long the pull runs before the screen starts to fall.
+ *
+ * The floor is ~1.8s: the stream's last particle starts at 1.12s and takes
+ * 1.7s, so anything shorter cuts it off mid-flight and reads as the
+ * animation being interrupted rather than finishing.
+ *
+ * 2520 is 20% above the 2100 that floor produced, and the extra is
+ * deliberate rather than slack. This is the peak of the screen — the
+ * points arriving, the card charging, the rings crossing it, the rim
+ * lighting — and every one of those is a LOOP, so a longer beat does not
+ * slow anything down, it simply lets each cycle land more times. Going the
+ * other way and stretching the loops instead would make the same moment
+ * feel sluggish rather than bigger. */
+const PULL_MS = 2520;
 const DROP_MS = 950;
 
 /* The card's travel, from the two nodes. */
