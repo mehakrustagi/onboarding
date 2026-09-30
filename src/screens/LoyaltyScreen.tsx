@@ -5,6 +5,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { AnimatePresence, motion, useMotionValue, useReducedMotion } from "framer-motion";
 import { haptic } from "@/lib/haptics";
 import { primeTicker } from "@/lib/tick";
+import { requestGyro, useCardTilt } from "./loyalty/useCardTilt";
 import MyTripLayer from "./trips/MyTripLayer";
 import { LightShaft } from "./vault/UploadFlow";
 import PointsCard from "./loyalty/PointsCard";
@@ -117,6 +118,10 @@ export default function LoyaltyScreen() {
      React's client output (51.551). The extra renders are contained by
      memoising `RadialDial`. */
   const [charge, setCharge] = useState(0);
+  /* The card's lean. Driven by the phone's own orientation where that is
+     available and permitted, and by a timer everywhere else — the card
+     reads two motion values and never needs to know which. */
+  const { rotateX, rotateY } = useCardTilt(beat === "pulling");
   /* Mirrors `charge` so a new ramp knows where to start from without
      depending on it. Written only from inside the ramp and the reset —
      never during render, which React forbids and which would in any case
@@ -168,6 +173,11 @@ export default function LoyaltyScreen() {
   const commit = useCallback(() => {
     if (beat !== "idle" || rupees <= 0) return;
     primeTicker();
+    /* The one user gesture this flow guarantees, and iOS only honours a
+       motion-permission request from inside one. Fire-and-forget: the
+       timed driver is already running, so a denial or an unsupported
+       browser changes nothing that is on screen. */
+    void requestGyro();
     setCommitted(rupees);
     setBeat("pulling");
     haptic("convertCommit");
@@ -449,6 +459,11 @@ export default function LoyaltyScreen() {
               height: CARD.h,
               transformOrigin: "50% 50%",
               zIndex: 5,
+              /* For the tilt below. `perspective` has to be on an ANCESTOR
+                 of the rotating element — set on the element itself it
+                 does nothing and the card turns flat, like a sheet of
+                 paper rather than a slab. */
+              perspective: 900,
             }}
             animate={
               beat === "dropping" || done
@@ -459,15 +474,40 @@ export default function LoyaltyScreen() {
                belongs to the stage above, not to the card. */
             transition={{ duration: reduced ? 0 : DROP_MS / 1000, ease: IN_EASE }}
           >
-            <PointsCard
-              balance={OPENING_BALANCE + points}
-              delta={points}
-              charge={charge}
-              pulsing={beat === "pulling"}
-              sheen={done}
-              counting={beat !== "idle"}
-              width={CARD.w}
-            />
+            {/* THE TILT — `Card3D`'s lean, off the phone instead of a
+                mouse.
+
+                The WorldPass card tracks the cursor; this one has no
+                cursor to track and is playing a scripted sequence nobody
+                is hovering. `useCardTilt` prefers the device's real
+                orientation and falls back to its own clock, writing the
+                same two motion values either way — so nothing here
+                branches on which driver won.
+
+                The ±12° range and the 220/22 spring come straight from
+                `Card3D`, because they are already tuned and they are why
+                that card reads as a slab. On a card this size anything
+                past about 12° stops being a lean and starts being the
+                card flying. */}
+            <motion.div
+              style={{
+                width: "100%",
+                height: "100%",
+                transformStyle: "preserve-3d",
+                rotateX,
+                rotateY,
+              }}
+            >
+              <PointsCard
+                balance={OPENING_BALANCE + points}
+                delta={points}
+                charge={charge}
+                pulsing={beat === "pulling"}
+                sheen={done}
+                counting={beat !== "idle"}
+                width={CARD.w}
+              />
+            </motion.div>
           </motion.div>
 
         </motion.div>

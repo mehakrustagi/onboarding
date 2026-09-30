@@ -44,10 +44,23 @@ const SPANS = Array.from({ length: 14 }, (_, i) => {
      sequence over 14 items. */
   const jitter = ((i * 37) % 11) / 11;
   const radius = 22 + jitter * 26;
+  /* Each particle STARTS a few px out along its own heading, not at the
+     shared origin. All fourteen beginning at exactly (0,0) stacked into
+     one bright blob at the strike point — six lanes of that read as a row
+     of white squares sitting on the card's edge, which is what this looked
+     like before. Emerging already spread means there is never a frame
+     where they are one object. */
+  const from = 5;
   return {
+    x0: Number((Math.cos(angle) * from).toFixed(2)),
+    y0: Number((Math.sin(angle) * from).toFixed(2)),
     dx: Number((Math.cos(angle) * radius).toFixed(2)),
     dy: Number((Math.sin(angle) * radius).toFixed(2)),
     dur: Number((0.55 + jitter * 0.85).toFixed(2)),
+    /* And they do not all leave on the same frame. A burst where every
+       fragment departs simultaneously reads as a shape scaling up; a
+       short spread of departures reads as debris. */
+    lag: Number((jitter * 0.1).toFixed(3)),
   };
 });
 
@@ -120,16 +133,24 @@ export default function Strike({
           key={i}
           className="absolute block"
           style={{
-            left: -1.5,
-            top: -1.5,
-            width: 3,
-            height: 3,
+            left: -1.25,
+            top: -1.25,
+            width: 2.5,
+            height: 2.5,
             borderRadius: 999,
-            background: "linear-gradient(180deg, #8CFFB8 0%, #24B251 100%)",
-            mixBlendMode: "screen",
+            /* A flat green rather than a gradient, and NO `screen`. Screen
+               blending over the lit card edge pushed these to near-white,
+               which is why they read as white dots rather than as green
+               debris — the one colour this screen never uses for the
+               conversion. */
+            background: "#7CF0A8",
           }}
-          initial={{ x: 0, y: 0, opacity: 0 }}
-          animate={active ? { x: s.dx, y: s.dy, opacity: [1, 0] } : { x: 0, y: 0, opacity: 0 }}
+          initial={{ x: s.x0, y: s.y0, opacity: 0 }}
+          animate={
+            active
+              ? { x: s.dx, y: s.dy, opacity: [0, 1, 0] }
+              : { x: s.x0, y: s.y0, opacity: 0 }
+          }
           transition={
             active
               ? {
@@ -137,21 +158,26 @@ export default function Strike({
                     duration: s.dur,
                     repeat: Infinity,
                     repeatDelay: Math.max(0, period - s.dur),
-                    delay,
+                    delay: delay + s.lag,
                     ease: "easeOut",
                   },
                   y: {
                     duration: s.dur,
                     repeat: Infinity,
                     repeatDelay: Math.max(0, period - s.dur),
-                    delay,
+                    delay: delay + s.lag,
                     ease: "easeOut",
                   },
                   opacity: {
                     duration: s.dur,
                     repeat: Infinity,
                     repeatDelay: Math.max(0, period - s.dur),
-                    delay,
+                    delay: delay + s.lag,
+                    /* Fades UP over the first tenth instead of existing at
+                       full brightness on frame one. A particle that simply
+                       appears has a visible birth; one that arrives does
+                       not. */
+                    times: [0, 0.1, 1],
                     ease: "easeOut",
                   },
                 }
