@@ -65,9 +65,22 @@ const CHARGE_RATE = 1;
  * and small enough that "is it working" cannot be judged from one frame;
  * sample the brightest pixel over several.
  *
- * Opacity is full, because after the mask and the exposure this layer is
- * sparks and almost nothing else. */
-const CHARGE_OPACITY = 1;
+ * Opacity is the dial for how present the whole layer is, and it is the
+ * honest one: it scales the sparks and the background lift together,
+ * where the gain changes their ratio. Measured against bare gold (mean
+ * luminance 149), the layer adds +13 at opacity 1, +10 at 0.7, +8.5 at
+ * 0.5 and +7.1 at 0.35 — it flattens out because what is left at that
+ * point is the video's mid-tones rather than its highlights. */
+const CHARGE_OPACITY = 0.5;
+
+/* How far down the card the texture sits. The source fills the frame edge
+ * to edge, which put sparks right up against the top rail where the logo
+ * and the dot field already live; dropped by 26px they sit in the open
+ * middle of the card instead, and the top rail stays clean. The element
+ * keeps its full height and simply overhangs the bottom, where the card's
+ * own `overflow: hidden` trims it — and what overhangs is the part the
+ * mask has already faded out, so nothing is lost. */
+const CHARGE_OFFSET_Y = 26;
 /* Exposure and colour.
  *
  * GAIN. The source is nearly black — over everything this keeps, the
@@ -410,9 +423,11 @@ export default function PointsCard({
       {pulsing && !reduced && (
         <video
           aria-hidden
-          className="pointer-events-none absolute inset-0"
+          className="pointer-events-none absolute"
           ref={videoRef}
           style={{
+            left: 0,
+            top: CHARGE_OFFSET_Y,
             width: "100%",
             height: "100%",
             objectFit: "cover",
