@@ -498,7 +498,7 @@ export default function LoyaltyScreen() {
                 exit={{ opacity: 0 }}
                 transition={{ duration: DROP_MS / 1000, ease: IN_EASE }}
               >
-                <GemColumn lit={charge} flowing={charging} />
+                <GemColumn lit={charge} flowing={charging} spent={Math.min(1, rupees / MAX_RUPEES)} />
               </motion.div>
             )}
           </AnimatePresence>
