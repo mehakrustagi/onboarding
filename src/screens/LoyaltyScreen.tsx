@@ -559,8 +559,7 @@ export default function LoyaltyScreen() {
                 charge={charge}
                 pulsing={charging}
                 sheen={done}
-                counting={beat !== "idle"}
-                width={CARD.w}
+                  width={CARD.w}
               />
             </motion.div>
           </motion.div>
