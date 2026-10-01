@@ -2,7 +2,8 @@
 
 import { motion } from "framer-motion";
 
-/* The impact burst, when a rising point strikes the card's bottom edge.
+/* The impact burst, fired once where a travelling point meets the card's
+ * bottom edge.
  *
  * The SEQUENCE is lifted from Aceternity UI's `BackgroundBeamsWithCollision`
  * — specifically its `Explosion`, which fires where a falling beam meets the
@@ -11,45 +12,44 @@ import { motion } from "framer-motion";
  *   1. A short blurred BAR across the point of contact, fading 0 → 1 → 0.
  *      It is the flash of the hit — the thing that says a surface was
  *      struck at a particular spot.
- *   2. A dozen or so small dots leaving that spot, fanning upward and
- *      outward, each on its OWN duration so they do not arrive as a ring.
- *      They are the debris.
+ *   2. A dozen or so small dots leaving that spot, fanning away from the
+ *      card, each on its OWN duration so they do not arrive as a ring.
  *
  * Nothing else came across. The original is a full-screen beams background
  * with its own container, collision detection by `getBoundingClientRect`,
- * and an indigo/purple palette; none of that is here. This is only the
- * burst, in this screen's green, fired on the cadence the stream already
- * has — so no collision detection is needed. Each particle's arrival time
- * is already known, because this screen scheduled it.
+ * and an indigo/purple palette; none of that is here.
+ *
+ *
+ * ONE-SHOT, NOT A LOOP — and that is a bug fix, not a tidy-up.
+ *
+ * This used to repeat on a cadence mirroring the stream's, which meant
+ * stopping it was done by dropping `repeat` to 0. Changing a running
+ * framer transition RESTARTS it from its first keyframe, so every fragment
+ * jumped back to the impact point and flew out a second time the moment
+ * the dial came to rest. It is now spawned per arrival and removes itself
+ * through `onDone`, so stopping is simply not spawning another — nothing
+ * in flight is ever re-targeted.
  *
  *
  * DIRECTIONS ARE DETERMINISTIC, WHICH IS A DEPARTURE FROM THE ORIGINAL.
- *
- * Aceternity's version computes them with `Math.random()` inside the
- * component body. That is fine in a client-only app and is a hydration
- * mismatch in this one: the server renders one burst and the client
- * renders a different one, and React reports the mismatch on the first
- * paint. The fan below is generated from the index instead — the spread
- * is even where random would clump, and it is identical on both sides.
+ * Aceternity's version computes them with `Math.random()` in the component
+ * body — fine in a client-only app, a hydration mismatch here, since the
+ * server renders one burst and the client another. The fan below is
+ * generated from the index instead: evenly spread where random would
+ * clump, and identical on both sides.
  */
 
-/** Where the burst is drawn relative to the strike point. A fan from −170°
- *  to −10°, i.e. upward and out to both sides, with the radius and the
- *  duration varied by a cheap index hash so no two dots travel together. */
 const SPANS = Array.from({ length: 14 }, (_, i) => {
   const t = i / 13;
   const angle = (-170 + t * 160) * (Math.PI / 180);
-  /* Deterministic stand-in for the original's Math.random(). Any cycle
-     that is coprime with the count works; 37 mod 11 gives a well-spread
-     sequence over 14 items. */
+  /* Deterministic stand-in for Math.random(). Any cycle coprime with the
+     count works; 37 mod 11 spreads well over 14 items. */
   const jitter = ((i * 37) % 11) / 11;
   const radius = 22 + jitter * 26;
-  /* Each particle STARTS a few px out along its own heading, not at the
-     shared origin. All fourteen beginning at exactly (0,0) stacked into
-     one bright blob at the strike point — six lanes of that read as a row
-     of white squares sitting on the card's edge, which is what this looked
-     like before. Emerging already spread means there is never a frame
-     where they are one object. */
+  /* Each starts a few px out along its own heading rather than at the
+     shared origin: fourteen fragments all beginning at exactly (0,0)
+     stack into one bright blob, and six lanes of that read as a row of
+     white squares sitting on the card's edge. */
   const from = 5;
   return {
     x0: Number((Math.cos(angle) * from).toFixed(2)),
@@ -57,47 +57,42 @@ const SPANS = Array.from({ length: 14 }, (_, i) => {
     dx: Number((Math.cos(angle) * radius).toFixed(2)),
     dy: Number((Math.sin(angle) * radius).toFixed(2)),
     dur: Number((0.55 + jitter * 0.85).toFixed(2)),
-    /* And they do not all leave on the same frame. A burst where every
-       fragment departs simultaneously reads as a shape scaling up; a
-       short spread of departures reads as debris. */
+    /* And they do not all leave on the same frame — a burst where every
+       fragment departs at once reads as a shape scaling up, not debris. */
     lag: Number((jitter * 0.1).toFixed(3)),
   };
 });
 
+/** Longest fragment life, so a caller can time the burst out if its
+ *  completion callback never arrives (a backgrounded tab, for instance). */
+export const STRIKE_MS = Math.round(
+  (Math.max(...SPANS.map((s) => s.dur + s.lag)) + 0.1) * 1000,
+);
+
 export default function Strike({
   /** Horizontal offset from the card's centre — the lane the point arrived in. */
   dx,
-  /** When the first strike fires: the particle's own delay plus its travel. */
-  delay,
-  /** The particle's cycle length, so a strike lands on every arrival. */
-  period,
-  active,
-  /** False once the dial rests: the burst already under way finishes, and
-   *  no further one is scheduled. */
-  emitting = true,
   /** True when the energy is leaving the card rather than arriving, so the
-   *  debris is thrown downward — a burst that always fans upward would
+   *  debris is thrown downward: a burst that always fanned upward would
    *  have the fragments travelling back into the surface they just left. */
   flip = false,
+  onDone,
 }: {
   dx: number;
-  delay: number;
-  period: number;
-  active: boolean;
-  emitting?: boolean;
   flip?: boolean;
+  onDone: () => void;
 }) {
   const sy = flip ? -1 : 1;
-  const repeat = emitting ? Infinity : 0;
+
   return (
     <div
       aria-hidden
       className="pointer-events-none absolute"
       style={{ left: `calc(50% + ${dx}px)`, top: 0, width: 0, height: 0 }}
     >
-      {/* The flash. Short and wide — it reads as a line of light along the
-          surface that was hit, not as a glow at a point. `screen` so it
-          adds to the gold underneath instead of covering it. */}
+      {/* The flash. Short and wide — a line of light along the surface that
+          was hit, not a glow at a point. `screen` so it adds to the gold
+          underneath instead of covering it. */}
       <motion.div
         className="absolute"
         style={{
@@ -112,33 +107,12 @@ export default function Strike({
           mixBlendMode: "screen",
         }}
         initial={{ opacity: 0, scaleX: 0.4 }}
-        animate={active ? { opacity: [0, 1, 0], scaleX: [0.4, 1, 1.25] } : { opacity: 0, scaleX: 0.4 }}
-        /* Full config per property: a per-property transition REPLACES the
-           inherited one rather than merging, so omitting duration or
-           repeat here fires the flash once and never again. */
-        transition={
-          active
-            ? {
-                opacity: {
-                  duration: 0.75,
-                  repeat,
-                  repeatDelay: Math.max(0, period - 0.75),
-                  delay,
-                  ease: "easeOut",
-                },
-                scaleX: {
-                  duration: 0.75,
-                  repeat,
-                  repeatDelay: Math.max(0, period - 0.75),
-                  delay,
-                  ease: "easeOut",
-                },
-              }
-            : { duration: 0.2 }
-        }
+        animate={{ opacity: [0, 1, 0], scaleX: [0.4, 1, 1.25] }}
+        transition={{ duration: 0.75, ease: "easeOut" }}
       />
 
-      {/* The debris. */}
+      {/* The debris. The longest-lived fragment reports the burst finished,
+          so the parent can drop it from the list. */}
       {SPANS.map((s, i) => (
         <motion.span
           key={i}
@@ -149,51 +123,20 @@ export default function Strike({
             width: 2.5,
             height: 2.5,
             borderRadius: 999,
-            /* A flat green rather than a gradient, and NO `screen`. Screen
-               blending over the lit card edge pushed these to near-white,
-               which is why they read as white dots rather than as green
-               debris — the one colour this screen never uses for the
-               conversion. */
+            /* Flat green, and no `screen`: screen blending over the lit
+               card edge pushed these to near-white, which read as white
+               dots rather than green debris. */
             background: "#7CF0A8",
           }}
           initial={{ x: s.x0, y: s.y0 * sy, opacity: 0 }}
-          animate={
-            active
-              ? { x: s.dx, y: s.dy * sy, opacity: [0, 1, 0] }
-              : { x: s.x0, y: s.y0 * sy, opacity: 0 }
-          }
-          transition={
-            active
-              ? {
-                  x: {
-                    duration: s.dur,
-                    repeat,
-                    repeatDelay: Math.max(0, period - s.dur),
-                    delay: delay + s.lag,
-                    ease: "easeOut",
-                  },
-                  y: {
-                    duration: s.dur,
-                    repeat,
-                    repeatDelay: Math.max(0, period - s.dur),
-                    delay: delay + s.lag,
-                    ease: "easeOut",
-                  },
-                  opacity: {
-                    duration: s.dur,
-                    repeat,
-                    repeatDelay: Math.max(0, period - s.dur),
-                    delay: delay + s.lag,
-                    /* Fades UP over the first tenth instead of existing at
-                       full brightness on frame one. A particle that simply
-                       appears has a visible birth; one that arrives does
-                       not. */
-                    times: [0, 0.1, 1],
-                    ease: "easeOut",
-                  },
-                }
-              : { duration: 0.2 }
-          }
+          animate={{ x: s.dx, y: s.dy * sy, opacity: [0, 1, 0] }}
+          transition={{
+            duration: s.dur,
+            delay: s.lag,
+            times: [0, 0.1, 1],
+            ease: "easeOut",
+          }}
+          onAnimationComplete={i === SPANS.length - 1 ? onDone : undefined}
         />
       ))}
     </div>

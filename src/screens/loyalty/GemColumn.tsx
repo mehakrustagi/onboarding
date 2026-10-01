@@ -1,6 +1,7 @@
 "use client";
 
 import Image from "next/image";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { motion, useReducedMotion } from "framer-motion";
 import Strike from "./Strike";
 import {
@@ -81,6 +82,15 @@ const GLINT_S = 6.2;
 /* The card's bottom edge — where the stream lands and the strikes fire. */
 const STRIKE_Y = CARD.y + CARD.h;
 
+/* How often a point leaves, in ms. The six lanes take 1.38–1.75s to make
+ * the crossing, so at this rate roughly six or seven are in the air at
+ * once — which is what the reference shows. Faster reads as a jet; slower
+ * and the column visibly empties between points. */
+const SPAWN_MS = 230;
+
+type Spark = { id: number; lane: (typeof STREAM)[number]; up: boolean };
+type StrikeHit = { id: number; dx: number; up: boolean };
+
 export default function GemColumn({
   /** 0 at rest, 1 while the points are flowing through. */
   lit,
@@ -112,11 +122,38 @@ export default function GemColumn({
    *
    * Everything below reads `up` rather than branching twice. */
   const up = flow > 0;
-  /* `repeat` is the gun. Infinity while the dial turns; 0 the moment it
-     stops, which lets the cycle already under way run to its end and then
-     hold there rather than snapping back to the start. */
-  const repeat = emitting ? Infinity : 0;
   const reduced = useReducedMotion() ?? false;
+
+  /* ── The emitter ───────────────────────────────────────────────────── */
+
+  const [sparks, setSparks] = useState<Spark[]>([]);
+  const [strikes, setStrikes] = useState<StrikeHit[]>([]);
+  const nextId = useRef(0);
+  const lane = useRef(0);
+
+  /* Spawns while the dial is turning and stops when it rests. The
+     interval is the ONLY thing `emitting` controls — nothing already in
+     the air is touched, which is the whole point of the rewrite.
+     Re-created when the direction changes, so new points leave the right
+     way without disturbing the ones already travelling. */
+  useEffect(() => {
+    if (!emitting || reduced) return;
+    const spawn = () => {
+      const l = STREAM[lane.current % STREAM.length];
+      lane.current += 1;
+      setSparks((list) => [...list, { id: nextId.current++, lane: l, up }]);
+    };
+    spawn();
+    const t = setInterval(spawn, SPAWN_MS);
+    return () => clearInterval(t);
+  }, [emitting, reduced, up]);
+
+  /* A point finishing is two events: it leaves the stream, and it strikes
+     the edge it reached. */
+  const retire = useCallback((sp: Spark) => {
+    setSparks((list) => list.filter((x) => x.id !== sp.id));
+    setStrikes((list) => [...list, { id: sp.id, dx: sp.lane.dx, up: sp.up }]);
+  }, []);
 
   return (
     <div className="pointer-events-none absolute inset-0" style={{ zIndex: 4 }} aria-hidden>
@@ -287,134 +324,96 @@ export default function GemColumn({
         </motion.div>
       </div>
 
-      {/* THE STREAM — the points being pulled into the card.
- 
-          Three things make this read as magnetism rather than as things
-          drifting upward, and all three are about ACCELERATION:
+      {/* THE STREAM — real particles, spawned and retired.
+      
+          THIS WAS SIX INFINITE LOOPS AND IT COULD NOT BE STOPPED WELL.
+          Looping animations have to be halted by changing their
+          transition, and changing a running framer transition restarts it
+          from the first keyframe — so the moment the dial came to rest
+          every point in the air snapped BACK to its launch position and
+          flew the journey again. Reversing direction had the same fault
+          from the other side: the keyframes swapped under particles that
+          were halfway across, and they were dragged backwards.
 
-          1. `easeIn`, not `easeOut`. This is the one that matters. The
-             earlier pass eased OUT, so every particle arrived slowing
-             down — which is what something does when it runs out of
-             energy, the exact opposite of being pulled. Easing in means
-             each one creeps away from the gem and is moving fastest at
-             the instant it reaches the card.
-          2. THEY RISE STRAIGHT UP, each in its own lane. A pass in
-             between had them converging on the card's centre; it drew a
-             funnel, where 1503:2012 draws a column of separate stars.
-             Vertical also keeps each trail parallel to its own travel,
-             which is what lets the art read as a trail at all — a star
-             moving diagonally behind a vertical streak looks broken.
-          3. They STRETCH as they go. `scaleY` runs 0.8 → 1.25, so a
-             particle elongates as it accelerates, the way a highlight
-             smears when it is moving fast.
+          Each point is now its own element with a one-shot animation. It
+          is spawned, it travels once, it reports done and is removed. Two
+          things follow for free, and both were asked for:
 
-          Two keyframes per property, not four. The previous version drove
-          `y` through a four-stop array with its own `times`, which makes
-          the speed change abruptly at each stop — that is what read as
-          juddery. One ease across one interval is what makes it smooth. */}
-      {STREAM.map((p, i) => {
-        const art = TRAIL_SRC[p.k];
+            stopping   is simply not spawning another. Whatever is in the
+                       air keeps its own animation and lands normally.
+            reversing  only affects points spawned AFTER it. Direction is
+                       captured at spawn, so nothing already travelling is
+                       ever re-aimed.
+
+          The arrival is what fires the strike — `onDone` hands the lane
+          over — so the burst at the card edge is now caused by a point
+          getting there rather than scheduled to coincide with it. */}
+      {sparks.map((sp) => {
+        const art = TRAIL_SRC[sp.lane.k];
+        const travel = STREAM_START_Y - STREAM_END_Y;
         return (
           <motion.div
-            key={`${p.k}-${i}`}
+            key={sp.id}
             className="absolute"
             style={{
-              /* Positioned at the DESTINATION and animated back from the
-                 start, so the thing it converges on is a fixed point in
-                 the layout rather than a number that has to be kept in
-                 sync with the card. */
-              left: 220 - art.w / 2 + p.dx,
+              left: 220 - art.w / 2 + sp.lane.dx,
               top: STREAM_END_Y - art.h,
               width: art.w,
               height: art.h,
               /* The art is an arrow with its tail behind it, so going the
                  other way it has to turn over — otherwise the tail leads
                  and the whole thing reads as moving backwards. */
-              rotate: up ? 0 : 180,
+              rotate: sp.up ? 0 : 180,
             }}
-            initial={{ opacity: 0, y: up ? STREAM_START_Y - STREAM_END_Y : 0, scaleY: 0.8 }}
-            animate={
-              flowing && !reduced
-                ? {
-                    opacity: [0, 0.95, 0.95, 0],
-                    y: up
-                      ? [STREAM_START_Y - STREAM_END_Y, 0]
-                      : [0, STREAM_START_Y - STREAM_END_Y],
-                    scaleY: [0.8, 1.25],
-                  }
-                : { opacity: 0, y: up ? STREAM_START_Y - STREAM_END_Y : 0, scaleY: 0.8 }
-            }
-            /* EVERY per-property transition repeats the duration, delay
-               and repeat. In framer a per-property object REPLACES the
-               inherited config rather than merging into it, so writing
-               `y: { ease: "easeIn" }` beside a top-level `repeat: Infinity`
-               silently dropped the repeat AND the duration from `y` — the
-               stream ran exactly once, landed on its final keyframe
-               (y: 0, opacity: 0) and was invisible from then on. It looked
-               like the trails had never been built. */
-            transition={
-              flowing && !reduced
-                ? {
-                    /* Position and stretch accelerate together. */
-                    y: { duration: p.dur, repeat, delay: p.delay, ease: "easeIn" },
-                    scaleY: { duration: p.dur, repeat, delay: p.delay, ease: "easeIn" },
-                    /* Opacity is on its own clock: up fast so the particle
-                       is visible while it is still slow and legible, and
-                       gone just before it reaches the card so it is
-                       absorbed rather than piling up against the edge. */
-                    opacity: {
-                      duration: p.dur,
-                      repeat,
-                      delay: p.delay,
-                      times: [0, 0.18, 0.72, 1],
-                      ease: "linear",
-                    },
-                  }
-                : { duration: 0.25 }
-            }
+            initial={{ opacity: 0, y: sp.up ? travel : 0, scaleY: 0.8 }}
+            animate={{
+              opacity: [0, 0.95, 0.95, 0],
+              y: sp.up ? 0 : travel,
+              scaleY: 1.25,
+            }}
+            transition={{
+              /* `easeIn`: fastest at the instant it arrives. Easing out
+                 would have each point slowing as it reached the card,
+                 which is what something does when it runs out of energy —
+                 the opposite of being pulled. */
+              y: { duration: sp.lane.dur, ease: "easeIn" },
+              scaleY: { duration: sp.lane.dur, ease: "easeIn" },
+              /* Up fast while it is still slow and legible, gone just
+                 before it lands so it is absorbed rather than piling up
+                 against the edge. */
+              opacity: {
+                duration: sp.lane.dur,
+                times: [0, 0.18, 0.72, 1],
+                ease: "linear",
+              },
+            }}
+            onAnimationComplete={() => retire(sp)}
           >
-            {/* SILVER GOING IN, GREEN COMING OUT.
+            {/* SILVER GOING IN, GREEN COMING OUT — and the other way round
+                on the way back down.
 
-                1503:2012 draws the trails below the gem in silver and the
-                ones above it in green, and the gem is what stands between
-                them — so a point does not simply travel past it, it is
-                CHANGED by it. That is the whole claim the screen makes
-                about what the gem does, and drawing every trail green
-                threw it away.
+                1503:2012 draws the trails below the gem in silver and
+                those above it in green, so a point is CHANGED by the gem
+                rather than merely passing it. That is the whole claim the
+                screen makes about what the gem does.
 
-                Two copies of the same art, cross-faded as the particle
-                crosses the gem — not two different assets. The shapes have
-                to match exactly through the transition or the star appears
-                to swap for a different one mid-flight; a `grayscale`
-                filter changes the colour and nothing else.
-
-                The crossover is at 0.49 of the travel, which is where the
-                gem's centre actually falls: the run is 588 → 320 and the
-                gem sits at 456, so (588 − 456) / (588 − 320) = 0.49. The
-                MOTION IS UNTOUCHED — same duration, delay, easing and
-                path; only opacity is keyed. */}
+                Two copies of the SAME art cross-fading through a
+                `grayscale` filter, never two different assets — the
+                shapes have to match exactly through the transition or the
+                star appears to swap for a different one mid-flight. The
+                crossover sits at 0.49 of the travel, which is where the
+                gem's centre falls: the run is 588 → 320 and the gem is at
+                456, so (588 − 456) / (588 − 320) = 0.49. */}
             <motion.div
               className="absolute inset-0"
               style={{ filter: "grayscale(1) brightness(1.45)" }}
-              initial={{ opacity: up ? 1 : 0 }}
-              animate={
-                flowing && !reduced
-                  ? { opacity: up ? [1, 1, 0, 0] : [0, 0, 1, 1] }
-                  : { opacity: up ? 1 : 0 }
-              }
-              transition={
-                flowing && !reduced
-                  ? {
-                      opacity: {
-                        duration: p.dur,
-                        repeat,
-                        delay: p.delay,
-                        times: [0, 0.42, 0.56, 1],
-                        ease: "linear",
-                      },
-                    }
-                  : { duration: 0.25 }
-              }
+              initial={{ opacity: sp.up ? 1 : 0 }}
+              animate={{ opacity: sp.up ? [1, 1, 0, 0] : [0, 0, 1, 1] }}
+              transition={{
+                duration: sp.lane.dur,
+                times: [0, 0.42, 0.56, 1],
+                ease: "linear",
+              }}
             >
               <Image
                 src={`${ASSETS}/${art.src}`}
@@ -426,25 +425,13 @@ export default function GemColumn({
             </motion.div>
             <motion.div
               className="absolute inset-0"
-              initial={{ opacity: up ? 0 : 1 }}
-              animate={
-                flowing && !reduced
-                  ? { opacity: up ? [0, 0, 1, 1] : [1, 1, 0, 0] }
-                  : { opacity: up ? 0 : 1 }
-              }
-              transition={
-                flowing && !reduced
-                  ? {
-                      opacity: {
-                        duration: p.dur,
-                        repeat,
-                        delay: p.delay,
-                        times: [0, 0.42, 0.56, 1],
-                        ease: "linear",
-                      },
-                    }
-                  : { duration: 0.25 }
-              }
+              initial={{ opacity: sp.up ? 0 : 1 }}
+              animate={{ opacity: sp.up ? [0, 0, 1, 1] : [1, 1, 0, 0] }}
+              transition={{
+                duration: sp.lane.dur,
+                times: [0, 0.42, 0.56, 1],
+                ease: "linear",
+              }}
             >
               <Image
                 src={`${ASSETS}/${art.src}`}
@@ -458,33 +445,29 @@ export default function GemColumn({
         );
       })}
 
-      {/* THE STRIKES — each arrival hitting the card's bottom edge.
-
-          One per lane, fired on that lane's own cadence: the first at the
-          particle's delay plus its travel time, then once per cycle. No
-          collision detection is needed for the same reason the original's
-          version needs it and this one does not — Aceternity's beams fall
-          on their own schedule and have to be watched for, where this
-          screen scheduled every arrival itself and already knows when
-          each one lands.
-
-          Drawn at the card's bottom edge, above the card (see the layer's
-          z-index) so the burst can throw debris up ONTO the gold rather
-          than being clipped behind it. */}
+      {/* THE STRIKES — one per arrival, at the lane it arrived in.
+      
+          No collision detection, for the same reason Aceternity's version
+          needs it and this one does not: their beams fall on their own
+          schedule and have to be watched for, where each of these is
+          handed over by the point that just finished its journey. */}
       <div className="absolute inset-0" style={{ top: STRIKE_Y }}>
-        {STREAM.map((p, i) => (
+        {strikes.map((st) => (
           <Strike
-            key={`strike-${p.k}-${i}`}
-            dx={p.dx}
-            delay={p.delay + p.dur}
-            period={p.dur}
-            active={flowing && !reduced}
-            emitting={emitting}
-            flip={!up}
+            key={st.id}
+            dx={st.dx}
+            flip={!st.up}
+            onDone={() => setStrikes((list) => list.filter((x) => x.id !== st.id))}
           />
         ))}
       </div>
 
+      {/* Emission gates this layer's opacity, never its transition. */}
+      <motion.div
+        className="absolute inset-0"
+        animate={{ opacity: emitting ? 1 : 0 }}
+        transition={{ duration: 0.4, ease: "easeOut" }}
+      >
       {/* 1503:2019 — the silver one below. It is the only trail travelling
           INTO the gem rather than out of it, which is what sells the gem as
           the thing doing the converting: something dull goes in underneath,
@@ -512,10 +495,14 @@ export default function GemColumn({
         transition={
           flowing && !reduced
             ? {
-                y: { duration: 1.42, repeat, delay: 0.16, ease: "easeIn" },
+                /* Loops unconditionally. Stopping it by changing `repeat`
+                   is what restarted the stream's particles from their
+                   launch point, so this one is faded out by the wrapper
+                   above instead and its own cycle is never interrupted. */
+                y: { duration: 1.42, repeat: Infinity, delay: 0.16, ease: "easeIn" },
                 opacity: {
                   duration: 1.42,
-                  repeat,
+                  repeat: Infinity,
                   delay: 0.16,
                   times: [0, 0.3, 1],
                   ease: "linear",
@@ -531,6 +518,7 @@ export default function GemColumn({
           height={TRAIL_BELOW.h}
           style={{ width: "100%", height: "100%" }}
         />
+      </motion.div>
       </motion.div>
     </div>
   );
