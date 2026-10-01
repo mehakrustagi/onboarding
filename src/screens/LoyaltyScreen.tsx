@@ -363,46 +363,62 @@ export default function LoyaltyScreen() {
                   className="pointer-events-none absolute flex items-center justify-center"
                   style={{ left: 0, right: 0, top: SWIPE_Y - 3, zIndex: 3, height: 20 }}
                 >
-                  {[-1, 1].map((dir) => (
-                    <div
-                      key={dir}
-                      className="absolute flex items-center"
-                      style={{ left: `calc(50% ${dir < 0 ? "-" : "+"} ${CHEVRON.outer}px)` }}
+                  {[
+                    /* 1503:1171 / 1172 / 1174 / 1175 — four SEPARATE
+                       assets, each placed at its own CENTRE.
+
+                       BOTH FACTS HERE WERE WRONG BEFORE. The offsets
+                       (±81 and ±89.36) are centres — the export writes
+                       them with `-translate-x-1/2` — and they were being
+                       used as a flex container's left edge, which pushed
+                       the right-hand pair about 18px too far out and
+                       pulled the left-hand pair in. The row was visibly
+                       lopsided against the text.
+
+                       And the two chevrons are not one asset at two
+                       opacities: the INNER one ships with `opacity="0.2"`
+                       baked into the SVG, the OUTER is full white. An
+                       earlier pass guessed 0.55 and 1.0, which left the
+                       faint one nearly three times too bright. */
+                    { x: -89.355, src: "chev-l-outer.svg", flip: true },
+                    { x: -81, src: "chev-l-inner.svg", flip: true },
+                    { x: 81, src: "chev-r-inner.svg", flip: false },
+                    { x: 89.355, src: "chev-r-outer.svg", flip: false },
+                  ].map((c) => (
+                    <motion.div
+                      key={c.src}
+                      className="absolute"
+                      style={{
+                        left: `calc(50% + ${c.x}px)`,
+                        width: CHEVRON.size,
+                        height: CHEVRON.size,
+                        /* framer transforms, never a raw `transform`
+                           string — a hand-written one is silently
+                           overwritten the moment `animate` touches x. */
+                        translateX: "-50%",
+                        rotate: c.flip ? 180 : 0,
+                      }}
+                      animate={reduced ? undefined : { x: Math.sign(c.x) * 2 }}
+                      transition={
+                        reduced
+                          ? undefined
+                          : {
+                              duration: 1.9,
+                              repeat: Infinity,
+                              repeatType: "reverse",
+                              ease: "easeInOut",
+                              /* Outer pair leads, inner follows. */
+                              delay: Math.abs(c.x) > 85 ? 0 : 0.12,
+                            }
+                      }
                     >
-                      {[0, 1].map((k) => (
-                        <motion.div
-                          key={k}
-                          style={{
-                            width: CHEVRON.size,
-                            height: CHEVRON.size,
-                            marginLeft: k === 1 ? -11.6 : 0,
-                            /* `rotate` as a framer transform, NOT a raw
-                               `transform: rotate(180deg)` in style. framer
-                               composes the element's transform from its own
-                               properties, so a hand-written transform string
-                               is silently overwritten the moment `animate`
-                               touches x — which is how the left-hand pair
-                               ended up pointing right. */
-                            rotate: dir < 0 ? 180 : 0,
-                            opacity: k === 0 ? 0.55 : 1,
-                          }}
-                          animate={reduced ? undefined : { x: dir * (k === 0 ? 0 : 2) }}
-                          transition={
-                            reduced
-                              ? undefined
-                              : {
-                                  duration: 1.9,
-                                  repeat: Infinity,
-                                  repeatType: "reverse",
-                                  ease: "easeInOut",
-                                  delay: k * 0.12,
-                                }
-                          }
-                        >
-                          <Image src={`${ASSETS}/chevron.svg`} alt="" width={20} height={20} />
-                        </motion.div>
-                      ))}
-                    </div>
+                      <Image
+                        src={`${ASSETS}/${c.src}`}
+                        alt=""
+                        width={CHEVRON.size}
+                        height={CHEVRON.size}
+                      />
+                    </motion.div>
                   ))}
                   <span
                     className="uppercase"

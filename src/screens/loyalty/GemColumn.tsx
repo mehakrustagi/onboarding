@@ -297,13 +297,79 @@ export default function GemColumn({
                 : { duration: 0.25 }
             }
           >
-            <Image
-              src={`${ASSETS}/${art.src}`}
-              alt=""
-              width={art.w}
-              height={art.h}
-              style={{ width: "100%", height: "100%" }}
-            />
+            {/* SILVER GOING IN, GREEN COMING OUT.
+
+                1503:2012 draws the trails below the gem in silver and the
+                ones above it in green, and the gem is what stands between
+                them — so a point does not simply travel past it, it is
+                CHANGED by it. That is the whole claim the screen makes
+                about what the gem does, and drawing every trail green
+                threw it away.
+
+                Two copies of the same art, cross-faded as the particle
+                crosses the gem — not two different assets. The shapes have
+                to match exactly through the transition or the star appears
+                to swap for a different one mid-flight; a `grayscale`
+                filter changes the colour and nothing else.
+
+                The crossover is at 0.49 of the travel, which is where the
+                gem's centre actually falls: the run is 588 → 320 and the
+                gem sits at 456, so (588 − 456) / (588 − 320) = 0.49. The
+                MOTION IS UNTOUCHED — same duration, delay, easing and
+                path; only opacity is keyed. */}
+            <motion.div
+              className="absolute inset-0"
+              style={{ filter: "grayscale(1) brightness(1.45)" }}
+              initial={{ opacity: 1 }}
+              animate={flowing && !reduced ? { opacity: [1, 1, 0, 0] } : { opacity: 1 }}
+              transition={
+                flowing && !reduced
+                  ? {
+                      opacity: {
+                        duration: p.dur,
+                        repeat: Infinity,
+                        delay: p.delay,
+                        times: [0, 0.42, 0.56, 1],
+                        ease: "linear",
+                      },
+                    }
+                  : { duration: 0.25 }
+              }
+            >
+              <Image
+                src={`${ASSETS}/${art.src}`}
+                alt=""
+                width={art.w}
+                height={art.h}
+                style={{ width: "100%", height: "100%" }}
+              />
+            </motion.div>
+            <motion.div
+              className="absolute inset-0"
+              initial={{ opacity: 0 }}
+              animate={flowing && !reduced ? { opacity: [0, 0, 1, 1] } : { opacity: 0 }}
+              transition={
+                flowing && !reduced
+                  ? {
+                      opacity: {
+                        duration: p.dur,
+                        repeat: Infinity,
+                        delay: p.delay,
+                        times: [0, 0.42, 0.56, 1],
+                        ease: "linear",
+                      },
+                    }
+                  : { duration: 0.25 }
+              }
+            >
+              <Image
+                src={`${ASSETS}/${art.src}`}
+                alt=""
+                width={art.w}
+                height={art.h}
+                style={{ width: "100%", height: "100%" }}
+              />
+            </motion.div>
           </motion.div>
         );
       })}
