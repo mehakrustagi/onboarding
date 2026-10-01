@@ -85,9 +85,12 @@ export default function GemColumn({
   /** 0 at rest, 1 while the points are flowing through. */
   lit,
   flowing,
+  /** 0–1, the share of the available credit the dial has selected. */
+  spent,
 }: {
   lit: number;
   flowing: boolean;
+  spent: number;
 }) {
   const reduced = useReducedMotion() ?? false;
 
@@ -155,6 +158,49 @@ export default function GemColumn({
           width={GEM.w * 4}
           height={GEM.h * 4}
           style={{ position: "absolute", inset: 0, width: "100%", height: "100%" }}
+        />
+
+        {/* THE GEM SPENDS ITSELF.
+        
+            The same artwork again, desaturated, revealed from the bottom
+            up in proportion to how much of the available credit the dial
+            has taken: at half the balance the lower half of the stone has
+            gone to stone-grey, and at the full ₹12,800 none of the green
+            is left. It is the clearest read on the screen of what the
+            number actually MEANS — the dial says ₹6,400, and the gem says
+            "half of what you have".
+
+            Bottom-up because that is how a thing drains. Greying from the
+            top would read as the gem being lit from below rather than
+            being used up.
+
+            A MASK, NOT A CLIP. `clip-path` would cut a hard horizontal
+            line across a faceted stone, which looks like a rendering
+            seam; the 7% gradient band makes the colour leave the crystal
+            gradually, the way the eye expects a material change to.
+            Masking also keeps the gem's own alpha intact, so the grey
+            follows the silhouette instead of filling its bounding box. */}
+        <Image
+          src={`${ASSETS}/gem.png`}
+          alt=""
+          width={GEM.w * 4}
+          height={GEM.h * 4}
+          style={{
+            position: "absolute",
+            inset: 0,
+            width: "100%",
+            height: "100%",
+            /* Desaturated, and lifted a little: a straight `grayscale(1)`
+               on this art reads as a dark smudge rather than stone,
+               because the green it is replacing is much brighter than its
+               own luminance. */
+            filter: "grayscale(1) brightness(1.12)",
+            maskImage: `linear-gradient(180deg, transparent ${Math.max(0, (1 - spent) * 100 - 3.5)}%, #000 ${Math.min(100, (1 - spent) * 100 + 3.5)}%)`,
+            WebkitMaskImage: `linear-gradient(180deg, transparent ${Math.max(0, (1 - spent) * 100 - 3.5)}%, #000 ${Math.min(100, (1 - spent) * 100 + 3.5)}%)`,
+            /* Nothing to show at zero, and the mask alone would still
+               paint a hairline at the very bottom edge. */
+            opacity: spent > 0.001 ? 1 : 0,
+          }}
         />
 
         {/* NO LIT-STATE CROSS-FADE. `gem-lit.png` (frame 2's "image 525")

@@ -66,23 +66,30 @@ import {
 
 const IN_EASE = [0.22, 1, 0.36, 1] as const;
 
-type Beat = "idle" | "pulling" | "dropping" | "settled";
+type Beat = "idle" | "dropping" | "settled";
 
-/* How long the pull runs before the screen starts to fall.
- *
- * The floor is ~1.8s: the stream's last particle starts at 1.12s and takes
- * 1.7s, so anything shorter cuts it off mid-flight and reads as the
- * animation being interrupted rather than finishing.
- *
- * 2520 is 20% above the 2100 that floor produced, and the extra is
- * deliberate rather than slack. This is the peak of the screen — the
- * points arriving, the card charging, the rings crossing it, the rim
- * lighting — and every one of those is a LOOP, so a longer beat does not
- * slow anything down, it simply lets each cycle land more times. Going the
- * other way and stretching the loops instead would make the same moment
- * feel sluggish rather than bigger. */
-const PULL_MS = 2520;
 const DROP_MS = 950;
+
+/* THE CHARGE IS THE DIAL, NOT A BEAT AFTER THE BUTTON.
+ *
+ * This replaced a `pulling` beat: Convert used to start a 2.5s sequence —
+ * points rising, card charging, rim lighting — and only then drop. The
+ * charge is now driven by the dial itself, so the card responds AS you
+ * swipe and Convert simply takes you to the result.
+ *
+ * It reads better for a reason worth stating: the charging was always the
+ * feedback for CHOOSING an amount, not for confirming it. Spending it on a
+ * button press meant the whole middle of the screen sat inert through the
+ * one part the user is actually doing something in, then performed at
+ * them once they had finished. Now the gem, the stream, the wash and the
+ * rim all answer the thumb.
+ *
+ * Intensity scales with the amount rather than switching on, so a large
+ * conversion visibly charges the card harder than a small one — the floor
+ * keeps even ₹50 legible. */
+const CHARGE_FLOOR = 0.4;
+const chargeFor = (rupees: number) =>
+  rupees <= 0 ? 0 : CHARGE_FLOOR + (1 - CHARGE_FLOOR) * Math.min(1, rupees / MAX_RUPEES);
 
 /* The card's travel, from the two nodes. */
 const DROP_Y = CARD_SETTLED.y - CARD.y; // 369.263
@@ -121,7 +128,7 @@ export default function LoyaltyScreen() {
   /* The card's lean. Driven by the phone's own orientation where that is
      available and permitted, and by a timer everywhere else — the card
      reads two motion values and never needs to know which. */
-  const { rotateX, rotateY } = useCardTilt(beat === "pulling");
+  const { rotateX, rotateY } = useCardTilt(beat === "idle" && rupees > 0);
   /* Mirrors `charge` so a new ramp knows where to start from without
      depending on it. Written only from inside the ramp and the reset —
      never during render, which React forbids and which would in any case
@@ -151,8 +158,12 @@ export default function LoyaltyScreen() {
     (to: number, ms: number) => {
       cancelAnimationFrame(rampRaf.current);
       if (reduced) {
+        /* Still scheduled, not written straight out. The dial calls this
+           from an effect, and a synchronous `setState` in an effect body
+           is a cascading render — one frame of delay costs nothing here
+           and keeps both paths on the same clock. */
         chargeRef.current = to;
-        setCharge(to);
+        rampRaf.current = requestAnimationFrame(() => setCharge(to));
         return;
       }
       const from = chargeRef.current;
@@ -170,6 +181,17 @@ export default function LoyaltyScreen() {
     [reduced],
   );
 
+  /* The dial drives the charge. Each detent restarts a short ramp from
+     wherever the last one had reached, so a fast sweep reads as one
+     continuous swell rather than a staircase — `rampCharge` always starts
+     from `chargeRef`, never from zero. 260ms is short enough to keep up
+     with detents arriving every ~45ms at speed and long enough that a
+     single step is not a jump. */
+  useEffect(() => {
+    if (beat !== "idle") return;
+    rampCharge(chargeFor(rupees), 260);
+  }, [rupees, beat, rampCharge]);
+
   const commit = useCallback(() => {
     if (beat !== "idle" || rupees <= 0) return;
     primeTicker();
@@ -179,22 +201,22 @@ export default function LoyaltyScreen() {
        browser changes nothing that is on screen. */
     void requestGyro();
     setCommitted(rupees);
-    setBeat("pulling");
     haptic("convertCommit");
-
-    rampCharge(1, 620);
+    /* Straight to the drop — Convert confirms a choice that has already
+       been made and shown, so there is nothing left to perform before
+       moving on. */
+    setBeat("dropping");
+    /* The green LEAVES with the furniture. Frame 3's card is clean gold —
+       no wash, no "+N pts" — because by then the points have arrived and
+       the green was the arriving, not the result. Holding it would turn a
+       transient into a permanent stain on the card. */
+    rampCharge(0, DROP_MS * 0.8);
 
     timers.current.push(
       setTimeout(() => {
         haptic("pointsLanded");
-        setBeat("dropping");
-        /* The green LEAVES with the furniture. Frame 3's card is clean
-           gold — no wash, no "+N pts" — because by then the points have
-           arrived and the green was the arriving, not the result. Holding
-           it would turn a transient into a permanent stain on the card. */
-        rampCharge(0, DROP_MS * 0.8);
-      }, PULL_MS),
-      setTimeout(() => setBeat("settled"), PULL_MS + DROP_MS),
+        setBeat("settled");
+      }, DROP_MS),
     );
   }, [beat, rampCharge, rupees]);
 
@@ -210,8 +232,25 @@ export default function LoyaltyScreen() {
     setBeat("idle");
   }, [value]);
 
-  const points = committed * PTS_PER_RUPEE;
-  const showFurniture = beat === "idle" || beat === "pulling";
+  /* LIVE WHILE THE DIAL IS LIVE, FROZEN AFTERWARDS.
+   *
+   * Both numbers on the card — the balance and the "+N pts" under it —
+   * preview the dial as you swipe, so the card shows what you are about
+   * to get rather than sitting at its opening figure until the button is
+   * pressed. That is the other half of moving the charge onto the dial:
+   * the light responds, and so should the figures it is lighting.
+   *
+   * It switches to `committed` the moment the beat does. The dial is
+   * disabled by then, but an inertia glide can still be settling and
+   * emitting detents, and the success copy quotes this number — so the
+   * amount has to stop moving at exactly the frame the screen starts
+   * claiming it. */
+  const points = (beat === "idle" ? rupees : committed) * PTS_PER_RUPEE;
+  const showFurniture = beat === "idle";
+  /* Everything that answers the dial: the stream, the gem's light, the
+     card's wash and tilt and rim. Live while an amount is selected and
+     the dial is still the thing on screen. */
+  const charging = beat === "idle" && rupees > 0;
   const done = beat === "settled";
 
   return (
@@ -459,7 +498,7 @@ export default function LoyaltyScreen() {
                 exit={{ opacity: 0 }}
                 transition={{ duration: DROP_MS / 1000, ease: IN_EASE }}
               >
-                <GemColumn lit={charge} flowing={beat === "pulling"} />
+                <GemColumn lit={charge} flowing={charging} spent={Math.min(1, rupees / MAX_RUPEES)} />
               </motion.div>
             )}
           </AnimatePresence>
@@ -518,10 +557,9 @@ export default function LoyaltyScreen() {
                 balance={OPENING_BALANCE + points}
                 delta={points}
                 charge={charge}
-                pulsing={beat === "pulling"}
+                pulsing={charging}
                 sheen={done}
-                counting={beat !== "idle"}
-                width={CARD.w}
+                  width={CARD.w}
               />
             </motion.div>
           </motion.div>

@@ -3,7 +3,7 @@
 import Image from "next/image";
 import { motion, useReducedMotion } from "framer-motion";
 import GlowingEdge from "./GlowingEdge";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef } from "react";
 import {
   ASSETS,
   CARD,
@@ -127,44 +127,22 @@ const WASH_ART = {
   top: -CARD_WASH.h * 1.1726,
 };
 
-/* The balance ticks up rather than cutting. It is the number the whole
- * screen is about, and a cut gives the eye nothing to follow — you are told
- * the total changed instead of watching it change. */
-function useCountUp(target: number, run: boolean, ms: number) {
-  const [n, setN] = useState(target);
-  const reduced = useReducedMotion() ?? false;
-
-  useEffect(() => {
-    /* No `setN` on this path. When the count is not running the hook
-       returns `target` directly (see the return below), so there is
-       nothing to synchronise — and writing state straight from an effect
-       body is a cascading render the compiler is right to reject. */
-    if (!run || reduced) return;
-    let raf = 0;
-    const from = n;
-    const delta = target - from;
-    if (delta === 0) return;
-    const t0 = performance.now();
-    const step = (t: number) => {
-      const p = Math.min(1, (t - t0) / ms);
-      /* easeOutCubic — fast at first, then settling. A linear count reads
-         as a stopwatch; this reads as an amount arriving. */
-      const e = 1 - Math.pow(1 - p, 3);
-      setN(Math.round(from + delta * e));
-      if (p < 1) raf = requestAnimationFrame(step);
-    };
-    raf = requestAnimationFrame(step);
-    return () => cancelAnimationFrame(raf);
-    /* `n` is deliberately not a dependency: it is the starting point,
-       captured once when the run begins, and listing it would restart the
-       animation on every frame it sets. */
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [target, run, reduced, ms]);
-
-  /* Idle, or reduced motion: the number IS the target, with no state in
-     the path at all. Only a live count reads from `n`. */
-  return run && !reduced ? n : target;
-}
+/* NO COUNT-UP ON THE BALANCE, and the reason is worth keeping.
+ *
+ * This used to tick from the opening balance to the new one when the
+ * conversion was confirmed, which was right when the card sat at 23,545
+ * until the button was pressed. Now the balance PREVIEWS the dial, so by
+ * the time Convert is tapped the figure on the card is already the final
+ * one — and the counter made it jump BACKWARDS to 23,545 and climb again,
+ * re-animating a number the user had just finished choosing.
+ *
+ * (The mechanism, since it is an easy trap to walk back into: the hook
+ * returned the live target while idle and its own state once running, and
+ * that state had been sitting at the mount value the whole time the
+ * preview was moving.)
+ *
+ * There is nothing left to count. The number follows the thumb and then
+ * stops. */
 
 export default function PointsCard({
   balance,
@@ -177,7 +155,6 @@ export default function PointsCard({
   pulsing,
   /** The diagonal sheen of 1503:2729 — only on the settled frame. */
   sheen,
-  counting,
   width,
 }: {
   balance: number;
@@ -192,10 +169,8 @@ export default function PointsCard({
   charge: number;
   pulsing: boolean;
   sheen: boolean;
-  counting: boolean;
   width: number;
 }) {
-  const shown = useCountUp(balance, counting, 900);
   const reduced = useReducedMotion() ?? false;
 
   /* `playbackRate` has no JSX prop — it is a property on the element, not
@@ -547,7 +522,7 @@ export default function PointsCard({
             fontVariantNumeric: "lining-nums",
           }}
         >
-          {shown.toLocaleString("en-IN")}
+          {balance.toLocaleString("en-IN")}
         </span>
         <span
           style={{
