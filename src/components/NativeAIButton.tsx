@@ -120,14 +120,22 @@ const MIN_WIDTH: Record<NonNullable<NativeAIButtonProps["size"]>, number | undef
    dial. It scales travel and swell only, never the periods: slowing the
    periods to calm it down makes the button read as sluggish, where a
    shorter throw at the same tempo just reads as a calmer liquid. */
-const BG_MOTION = 0.8;
+const BG_MOTION = 0.55;
 
+/* CALMED, ~45% OF THE FORMER TRAVEL ON ~35% LONGER PERIODS.
+ *
+ * The note below still holds and is the reason this is a reduction rather
+ * than a removal: the hotspots must still CROSS, or the pill stops making
+ * new colour and becomes five blobs bobbing. At these amplitudes they
+ * still pass through one another, just slowly enough that the button sits
+ * quietly in a screen rather than performing in one. Periods stay
+ * prime-ish so the five never re-align. */
 const FIELDS = [
-  { drift: 44, lift: 15, swell: 1.28, dur: 3.4 }, // blue, leftmost — leads right
-  { drift: -38, lift: 17, swell: 1.32, dur: 4.1 },
-  { drift: 46, lift: 14, swell: 1.26, dur: 4.9 },
-  { drift: -42, lift: 18, swell: 1.3, dur: 5.7 },
-  { drift: -40, lift: 16, swell: 1.24, dur: 6.5 }, // gold, rightmost — leads left
+  { drift: 24, lift: 8, swell: 1.15, dur: 4.6 }, // blue, leftmost — leads right
+  { drift: -21, lift: 9, swell: 1.17, dur: 5.5 },
+  { drift: 25, lift: 8, swell: 1.14, dur: 6.6 },
+  { drift: -23, lift: 10, swell: 1.16, dur: 7.7 },
+  { drift: -22, lift: 9, swell: 1.13, dur: 8.8 }, // gold, rightmost — leads left
 ] as const;
 
 function idleDrift(index: number, layer: number, reduced: boolean) {
@@ -168,11 +176,18 @@ function splitTransform(blob: Blob, burst: NonNullable<Burst>, width: number) {
   const side = delta === 0 ? 1 : Math.sign(delta);
   const proximity = Math.max(0, 1 - Math.abs(delta) / 0.85);
   const force = 0.35 + 0.65 * proximity;
+  /* HALF THE FORMER THROW. These were tuned on their own showcase route,
+     where the button IS the subject and a hard split is the point. Used as
+     an ordinary CTA at the bottom of a screen whose subject is elsewhere,
+     that much displacement reads as the button malfunctioning rather than
+     responding — the colour flew most of the pill's width and pinched to
+     well under half its height on every tap. Everything here is roughly
+     halved; the SHAPE of the effect is unchanged, only its size. */
   return {
-    x: side * width * 0.34 * force,
-    y: -6 * proximity * side,
-    scaleX: 1 - 0.42 * proximity,
-    scaleY: 1 + 0.5 * proximity,
+    x: side * width * 0.17 * force,
+    y: -3 * proximity * side,
+    scaleX: 1 - 0.22 * proximity,
+    scaleY: 1 + 0.26 * proximity,
     /* The colour brightens on its way out, and by the same `force` that
        throws it — so the hotspots nearest the tap travel furthest AND
        light up hardest, and the far ones barely change. Saturate does the
@@ -180,8 +195,8 @@ function splitTransform(blob: Blob, burst: NonNullable<Burst>, width: number) {
        luminance alone walks them toward white and the palette goes pale
        exactly when it should be at its most intense. Brightness comes
        along at a fraction of it, for the bloom. */
-    filter: `saturate(${(1 + 0.85 * force).toFixed(3)}) brightness(${(
-      1 + 0.16 * force
+    filter: `saturate(${(1 + 0.42 * force).toFixed(3)}) brightness(${(
+      1 + 0.08 * force
     ).toFixed(3)})`,
   };
 }
@@ -189,11 +204,15 @@ function splitTransform(blob: Blob, burst: NonNullable<Burst>, width: number) {
 /** Out: fast and sharp — the surface is struck, not eased.
  *  Back: slack and underdamped, so the two halves slap together and
  *  wobble before they settle. The asymmetry is the whole effect. */
-const PART_SPRING = { type: "spring" as const, stiffness: 520, damping: 26, mass: 0.7 };
-const REJOIN_SPRING = { type: "spring" as const, stiffness: 95, damping: 12, mass: 1.2 };
+const PART_SPRING = { type: "spring" as const, stiffness: 320, damping: 30, mass: 0.7 };
+/* Damping 12 → 20. The slack return was the loudest part of the tap: the
+   two halves slapped together and rang for most of a second. It still
+   returns softer than it leaves — the asymmetry is the effect — but it
+   settles now instead of wobbling. */
+const REJOIN_SPRING = { type: "spring" as const, stiffness: 95, damping: 20, mass: 1.2 };
 
 /** How long the halves stay apart before the water closes back over. */
-const HOLD_MS = 200;
+const HOLD_MS = 150;
 
 /* ── Hotspots ───────────────────────────────────────────────────────────── */
 
@@ -376,6 +395,21 @@ export type NativeAIButtonProps = {
   leftIcon?: ReactNode;
   rightIcon?: ReactNode;
   disabled?: boolean;
+  /** Fixed pill width. `size` only sets a MINIMUM, so a button that must
+   *  span a known box — a full-width CTA — needs this. */
+  width?: number;
+  /** The ground the colour sits on.
+   *
+   *  "glass" is the Figma component: no fill at all, so the page shows
+   *  through and tints the result. It is the right surface on a light
+   *  background and unreadable on a dark one — the label is black, and
+   *  black on a dark scrim through 10% white is not a contrast anyone
+   *  should ship.
+   *
+   *  "solid" puts white underneath, which is what the loyalty node
+   *  (1503:1117) specifies and why that screen's CTA reads pastel rather
+   *  than saturated. Same component, same motion, same colour field. */
+  surface?: "glass" | "solid";
   onClick?: () => void;
   className?: string;
   style?: CSSProperties;
@@ -389,6 +423,8 @@ export default function NativeAIButton({
   leftIcon,
   rightIcon,
   disabled = false,
+  width: fixedWidth,
+  surface = "glass",
   onClick,
   className,
   style,
@@ -497,6 +533,10 @@ export default function NativeAIButton({
           className="relative flex h-[48px] items-center justify-center gap-[5px] overflow-hidden rounded-[60px] px-[20px] disabled:opacity-50"
           style={{
             minWidth,
+            width: fixedWidth,
+            /* The white ground, when asked for. Behind everything — the
+               hotspots, the glass and the label all sit on top of it. */
+            background: surface === "solid" ? "#FFFFFF" : undefined,
             WebkitTapHighlightColor: "transparent",
             /* The glass bloom. Can't be measured off the node render —
                Figma crops that to the pill's own 200×48 bounds, so every
@@ -557,7 +597,17 @@ export default function NativeAIButton({
                 from outside the pill and eats the edge. */}
             <span
               className="absolute inset-0"
-              style={{ filter: `url(#${lensId})` }}
+              style={{
+                filter: `url(#${lensId})`,
+                /* No density change for the solid surface. An earlier pass
+                   scaled the hotspots down here, having measured the solid
+                   pill at mean luminance 132 against the reference's 219 —
+                   but that reading was of the button DISABLED at ₹0, where
+                   `disabled:opacity-50` halves the whole pill over a dark
+                   scrim. Enabled, it measures 228 against 219 with the
+                   hotspots untouched. Measure the state you are actually
+                   comparing. */
+              }}
             >
             {[0, 1].map((layer) => (
               <Hotspots
@@ -633,12 +683,16 @@ export default function NativeAIButton({
                 left: `${(burst?.fraction ?? 0.5) * 100}%`,
                 top: "-50%",
                 height: "200%",
-                width: "15%",
+                width: "10%",
                 x: "-50%",
                 borderRadius: "50%",
+                /* Dimmer and narrower than it was (0.85 → 0.5, 15% → 10%).
+                   The cleft is the brightest thing on the button and it
+                   appeared on every tap; at full strength it flashed
+                   white through the colour rather than parting it. */
                 background:
-                  "radial-gradient(closest-side, rgba(255,255,255,0.85) 0%, rgba(255,255,255,0.38) 55%, rgba(255,255,255,0) 100%)",
-                filter: "blur(9px)",
+                  "radial-gradient(closest-side, rgba(255,255,255,0.5) 0%, rgba(255,255,255,0.22) 55%, rgba(255,255,255,0) 100%)",
+                filter: "blur(8px)",
               }}
               initial={false}
               animate={parting ? { opacity: 1, scaleX: 1 } : { opacity: 0, scaleX: 0.25 }}

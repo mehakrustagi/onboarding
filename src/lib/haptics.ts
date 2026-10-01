@@ -126,7 +126,7 @@ const PATTERNS: Record<Trigger, number | number[]> = {
   /* The Native AI button being struck. One sharp hit for the impact, then
      a shorter, softer tail for the water closing back over it — the same
      two-beat shape the animation has. */
-  gradientSplit: [16, 90, 8],
+  gradientSplit: [10, 70, 5],
   /* The dial. This is the one place in the app where the haptic fires
      dozens of times a second, so it is the one place where the pattern
      has to be as small as the API can express.
