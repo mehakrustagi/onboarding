@@ -85,13 +85,37 @@ export default function GemColumn({
   /** 0 at rest, 1 while the points are flowing through. */
   lit,
   flowing,
+  /** True only while the dial is actually turning. When it goes false the
+   *  layer keeps animating (`flowing` lingers) so whatever is already in
+   *  flight can land, but no new cycle begins. */
+  emitting,
   /** 0–1, the share of the available credit the dial has selected. */
   spent,
+  /** +1 while the dial is taking credit, −1 while it is giving it back. */
+  flow,
 }: {
   lit: number;
   flowing: boolean;
+  emitting: boolean;
   spent: number;
+  flow: 1 | -1;
 }) {
+  /* THE ENERGY RUNS BOTH WAYS.
+   *
+   * Scrolling the dial back is not "less of the same animation", it is the
+   * opposite event: credit returning to the gem. So the stream reverses
+   * end to end — the particles start at the card and fall to below the
+   * gem, the arrows turn over to point the way they are going, and the
+   * silver/green crossfade swaps, so a point leaves the card green and is
+   * grey by the time it is under the stone. Which is the same rule as
+   * forward travel, read backwards: the gem is what changes them.
+   *
+   * Everything below reads `up` rather than branching twice. */
+  const up = flow > 0;
+  /* `repeat` is the gun. Infinity while the dial turns; 0 the moment it
+     stops, which lets the cycle already under way run to its end and then
+     hold there rather than snapping back to the start. */
+  const repeat = emitting ? Infinity : 0;
   const reduced = useReducedMotion() ?? false;
 
   return (
@@ -303,16 +327,22 @@ export default function GemColumn({
               top: STREAM_END_Y - art.h,
               width: art.w,
               height: art.h,
+              /* The art is an arrow with its tail behind it, so going the
+                 other way it has to turn over — otherwise the tail leads
+                 and the whole thing reads as moving backwards. */
+              rotate: up ? 0 : 180,
             }}
-            initial={{ opacity: 0, y: STREAM_START_Y - STREAM_END_Y, scaleY: 0.8 }}
+            initial={{ opacity: 0, y: up ? STREAM_START_Y - STREAM_END_Y : 0, scaleY: 0.8 }}
             animate={
               flowing && !reduced
                 ? {
                     opacity: [0, 0.95, 0.95, 0],
-                    y: [STREAM_START_Y - STREAM_END_Y, 0],
+                    y: up
+                      ? [STREAM_START_Y - STREAM_END_Y, 0]
+                      : [0, STREAM_START_Y - STREAM_END_Y],
                     scaleY: [0.8, 1.25],
                   }
-                : { opacity: 0, y: STREAM_START_Y - STREAM_END_Y, scaleY: 0.8 }
+                : { opacity: 0, y: up ? STREAM_START_Y - STREAM_END_Y : 0, scaleY: 0.8 }
             }
             /* EVERY per-property transition repeats the duration, delay
                and repeat. In framer a per-property object REPLACES the
@@ -326,15 +356,15 @@ export default function GemColumn({
               flowing && !reduced
                 ? {
                     /* Position and stretch accelerate together. */
-                    y: { duration: p.dur, repeat: Infinity, delay: p.delay, ease: "easeIn" },
-                    scaleY: { duration: p.dur, repeat: Infinity, delay: p.delay, ease: "easeIn" },
+                    y: { duration: p.dur, repeat, delay: p.delay, ease: "easeIn" },
+                    scaleY: { duration: p.dur, repeat, delay: p.delay, ease: "easeIn" },
                     /* Opacity is on its own clock: up fast so the particle
                        is visible while it is still slow and legible, and
                        gone just before it reaches the card so it is
                        absorbed rather than piling up against the edge. */
                     opacity: {
                       duration: p.dur,
-                      repeat: Infinity,
+                      repeat,
                       delay: p.delay,
                       times: [0, 0.18, 0.72, 1],
                       ease: "linear",
@@ -366,14 +396,18 @@ export default function GemColumn({
             <motion.div
               className="absolute inset-0"
               style={{ filter: "grayscale(1) brightness(1.45)" }}
-              initial={{ opacity: 1 }}
-              animate={flowing && !reduced ? { opacity: [1, 1, 0, 0] } : { opacity: 1 }}
+              initial={{ opacity: up ? 1 : 0 }}
+              animate={
+                flowing && !reduced
+                  ? { opacity: up ? [1, 1, 0, 0] : [0, 0, 1, 1] }
+                  : { opacity: up ? 1 : 0 }
+              }
               transition={
                 flowing && !reduced
                   ? {
                       opacity: {
                         duration: p.dur,
-                        repeat: Infinity,
+                        repeat,
                         delay: p.delay,
                         times: [0, 0.42, 0.56, 1],
                         ease: "linear",
@@ -392,14 +426,18 @@ export default function GemColumn({
             </motion.div>
             <motion.div
               className="absolute inset-0"
-              initial={{ opacity: 0 }}
-              animate={flowing && !reduced ? { opacity: [0, 0, 1, 1] } : { opacity: 0 }}
+              initial={{ opacity: up ? 0 : 1 }}
+              animate={
+                flowing && !reduced
+                  ? { opacity: up ? [0, 0, 1, 1] : [1, 1, 0, 0] }
+                  : { opacity: up ? 0 : 1 }
+              }
               transition={
                 flowing && !reduced
                   ? {
                       opacity: {
                         duration: p.dur,
-                        repeat: Infinity,
+                        repeat,
                         delay: p.delay,
                         times: [0, 0.42, 0.56, 1],
                         ease: "linear",
@@ -441,6 +479,8 @@ export default function GemColumn({
             delay={p.delay + p.dur}
             period={p.dur}
             active={flowing && !reduced}
+            emitting={emitting}
+            flip={!up}
           />
         ))}
       </div>
@@ -460,21 +500,22 @@ export default function GemColumn({
           top: TRAIL_BELOW.y,
           width: TRAIL_BELOW.w,
           height: TRAIL_BELOW.h,
+          rotate: up ? 0 : 180,
         }}
-        initial={{ opacity: 0, y: 72 }}
+        initial={{ opacity: 0, y: up ? 72 : -30 }}
         animate={
           flowing && !reduced
-            ? { opacity: [0, 0.8, 0], y: [72, -30] }
-            : { opacity: 0, y: 72 }
+            ? { opacity: [0, 0.8, 0], y: up ? [72, -30] : [-30, 72] }
+            : { opacity: 0, y: up ? 72 : -30 }
         }
         /* Full config per property — see the note on the stream above. */
         transition={
           flowing && !reduced
             ? {
-                y: { duration: 1.42, repeat: Infinity, delay: 0.16, ease: "easeIn" },
+                y: { duration: 1.42, repeat, delay: 0.16, ease: "easeIn" },
                 opacity: {
                   duration: 1.42,
-                  repeat: Infinity,
+                  repeat,
                   delay: 0.16,
                   times: [0, 0.3, 1],
                   ease: "linear",

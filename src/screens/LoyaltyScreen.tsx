@@ -81,15 +81,20 @@ const DROP_MS = 950;
  * feedback for CHOOSING an amount, not for confirming it. Spending it on a
  * button press meant the whole middle of the screen sat inert through the
  * one part the user is actually doing something in, then performed at
- * them once they had finished. Now the gem, the stream, the wash and the
- * rim all answer the thumb.
+ * them once they had finished.
  *
- * Intensity scales with the amount rather than switching on, so a large
- * conversion visibly charges the card harder than a small one — the floor
- * keeps even ₹50 legible. */
-const CHARGE_FLOOR = 0.4;
-const chargeFor = (rupees: number) =>
-  rupees <= 0 ? 0 : CHARGE_FLOOR + (1 - CHARGE_FLOOR) * Math.min(1, rupees / MAX_RUPEES);
+ * IT IS ON OR OFF, NOT PROPORTIONAL. An earlier pass scaled the intensity
+ * with the amount, so ₹100 lit the card faintly and ₹12,800 lit it fully.
+ * That was wrong, and the reason is worth keeping: the green is the card
+ * RECEIVING, and receiving does not have a volume — a small conversion is
+ * not a dim event, it is the same event with a smaller number on it.
+ * Scaling it also made the card look underpowered for most of the dial's
+ * range, since most selections are nowhere near the maximum.
+ *
+ * What DOES scale with the amount is the gem, which greys in proportion to
+ * the credit taken. That is the right place for proportion: the gem is a
+ * quantity being spent, where the card is an event happening. */
+const chargeFor = (rupees: number) => (rupees > 0 ? 1 : 0);
 
 /* The card's travel, from the two nodes. */
 const DROP_Y = CARD_SETTLED.y - CARD.y; // 369.263
@@ -125,6 +130,57 @@ export default function LoyaltyScreen() {
      React's client output (51.551). The extra renders are contained by
      memoising `RadialDial`. */
   const [charge, setCharge] = useState(0);
+  /* Which way the energy is travelling: +1 while the dial is taking more
+     credit, −1 while it is giving it back. Derived in the dial's own
+     callback rather than in an effect on `rupees` — an effect would have
+     to `setState` from its body, and the direction is a property of the
+     EVENT (this detent was lower than the last), not of the value. */
+  const [flow, setFlow] = useState<1 | -1>(1);
+  const lastValue = useRef(0);
+
+  /* TRANSFER ONLY HAPPENS WHILE THE DIAL IS MOVING.
+   *
+   * Credit moves between the gem and the card because you are moving it.
+   * Hold the dial still and the stream should stop — what is left is a
+   * STATE, not an event: this much is selected, the gem is this far spent,
+   * the card holds this much charge. A stream that keeps running on a
+   * stationary dial says points are still arriving when nothing is
+   * happening, which is the one thing it must not say.
+   *
+   * 300ms of quiet ends it. That has to outlast the gap between detents —
+   * they arrive every ~45ms during a drag and keep coming through the
+   * inertia glide, so the transfer runs for exactly as long as the ruler
+   * is actually turning, including the glide, and stops when it rests. */
+  const [moving, setMoving] = useState(false);
+  const moveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  /* STOPPING MEANS STOPPING THE GUN, NOT THE BULLETS.
+   *
+   * When the dial rests, no new stars are launched — but the ones already
+   * in the air keep going and land. Cutting them where they were would
+   * leave points hanging in mid-flight between the gem and the card, which
+   * is worse than not stopping at all: it reads as the animation being
+   * switched off rather than the transfer finishing.
+   *
+   * So `moving` gates EMISSION and `settling` keeps the layer animating
+   * long enough for the last launched particle to complete its travel.
+   * 1800ms covers the slowest of them (1.75s) with a little margin. */
+  const [settling, setSettling] = useState(false);
+  const tailTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const TAIL_MS = 1800;
+
+  const handleValue = useCallback((v: number) => {
+    if (v > lastValue.current) setFlow(1);
+    else if (v < lastValue.current) setFlow(-1);
+    lastValue.current = v;
+    setRupees(v);
+    setMoving(true);
+    setSettling(true);
+    if (moveTimer.current) clearTimeout(moveTimer.current);
+    if (tailTimer.current) clearTimeout(tailTimer.current);
+    moveTimer.current = setTimeout(() => setMoving(false), 300);
+    tailTimer.current = setTimeout(() => setSettling(false), 300 + TAIL_MS);
+  }, []);
   /* The card's lean. Driven by the phone's own orientation where that is
      available and permitted, and by a timer everywhere else — the card
      reads two motion values and never needs to know which. */
@@ -140,6 +196,8 @@ export default function LoyaltyScreen() {
   useEffect(
     () => () => {
       timers.current.forEach(clearTimeout);
+      if (moveTimer.current) clearTimeout(moveTimer.current);
+      if (tailTimer.current) clearTimeout(tailTimer.current);
       cancelAnimationFrame(rampRaf.current);
     },
     [],
@@ -201,6 +259,10 @@ export default function LoyaltyScreen() {
        browser changes nothing that is on screen. */
     void requestGyro();
     setCommitted(rupees);
+    if (moveTimer.current) clearTimeout(moveTimer.current);
+    if (tailTimer.current) clearTimeout(tailTimer.current);
+    setMoving(false);
+    setSettling(false);
     haptic("convertCommit");
     /* Straight to the drop — Convert confirms a choice that has already
        been made and shown, so there is nothing left to perform before
@@ -228,6 +290,12 @@ export default function LoyaltyScreen() {
     setCharge(0);
     setCommitted(0);
     setRupees(0);
+    lastValue.current = 0;
+    setFlow(1);
+    if (moveTimer.current) clearTimeout(moveTimer.current);
+    if (tailTimer.current) clearTimeout(tailTimer.current);
+    setMoving(false);
+    setSettling(false);
     value.set(0);
     setBeat("idle");
   }, [value]);
@@ -247,10 +315,17 @@ export default function LoyaltyScreen() {
    * claiming it. */
   const points = (beat === "idle" ? rupees : committed) * PTS_PER_RUPEE;
   const showFurniture = beat === "idle";
-  /* Everything that answers the dial: the stream, the gem's light, the
-     card's wash and tilt and rim. Live while an amount is selected and
-     the dial is still the thing on screen. */
+  /* The card's CHARGE is a state — it holds whatever the dial has
+     selected, whether or not the dial is moving. The TRANSFER is an
+     event, and only runs while the ruler actually turns. The wash level,
+     the lit rim, the gem's depletion and the card's brightness all follow
+     the first; the stream, the strikes and the card's charging texture
+     follow the second. */
   const charging = beat === "idle" && rupees > 0;
+  /* Launching new points. */
+  const emitting = charging && moving;
+  /* Still animating, so whatever is already in flight can land. */
+  const transferring = charging && (moving || settling);
   const done = beat === "settled";
 
   return (
@@ -346,7 +421,7 @@ export default function LoyaltyScreen() {
                 exit={{ opacity: 0 }}
                 transition={{ duration: DROP_MS / 1000, ease: IN_EASE }}
               >
-                <RadialDial value={value} onValue={setRupees} interactive={beat === "idle"} />
+                <RadialDial value={value} onValue={handleValue} interactive={beat === "idle"} />
 
                 {/* 1503:1143 — "Using ₹0 / ₹12,800". The chosen amount is
                     white and the rest is grey, so the number you are
@@ -498,7 +573,13 @@ export default function LoyaltyScreen() {
                 exit={{ opacity: 0 }}
                 transition={{ duration: DROP_MS / 1000, ease: IN_EASE }}
               >
-                <GemColumn lit={charge} flowing={charging} spent={Math.min(1, rupees / MAX_RUPEES)} />
+                <GemColumn
+                lit={charge}
+                flowing={transferring}
+                emitting={emitting}
+                spent={Math.min(1, rupees / MAX_RUPEES)}
+                flow={flow}
+              />
               </motion.div>
             )}
           </AnimatePresence>
@@ -557,7 +638,7 @@ export default function LoyaltyScreen() {
                 balance={OPENING_BALANCE + points}
                 delta={points}
                 charge={charge}
-                pulsing={charging}
+                pulsing={emitting}
                 sheen={done}
                   width={CARD.w}
               />

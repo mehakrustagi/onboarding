@@ -72,12 +72,23 @@ export default function Strike({
   /** The particle's cycle length, so a strike lands on every arrival. */
   period,
   active,
+  /** False once the dial rests: the burst already under way finishes, and
+   *  no further one is scheduled. */
+  emitting = true,
+  /** True when the energy is leaving the card rather than arriving, so the
+   *  debris is thrown downward — a burst that always fans upward would
+   *  have the fragments travelling back into the surface they just left. */
+  flip = false,
 }: {
   dx: number;
   delay: number;
   period: number;
   active: boolean;
+  emitting?: boolean;
+  flip?: boolean;
 }) {
+  const sy = flip ? -1 : 1;
+  const repeat = emitting ? Infinity : 0;
   return (
     <div
       aria-hidden
@@ -110,14 +121,14 @@ export default function Strike({
             ? {
                 opacity: {
                   duration: 0.75,
-                  repeat: Infinity,
+                  repeat,
                   repeatDelay: Math.max(0, period - 0.75),
                   delay,
                   ease: "easeOut",
                 },
                 scaleX: {
                   duration: 0.75,
-                  repeat: Infinity,
+                  repeat,
                   repeatDelay: Math.max(0, period - 0.75),
                   delay,
                   ease: "easeOut",
@@ -145,32 +156,32 @@ export default function Strike({
                conversion. */
             background: "#7CF0A8",
           }}
-          initial={{ x: s.x0, y: s.y0, opacity: 0 }}
+          initial={{ x: s.x0, y: s.y0 * sy, opacity: 0 }}
           animate={
             active
-              ? { x: s.dx, y: s.dy, opacity: [0, 1, 0] }
-              : { x: s.x0, y: s.y0, opacity: 0 }
+              ? { x: s.dx, y: s.dy * sy, opacity: [0, 1, 0] }
+              : { x: s.x0, y: s.y0 * sy, opacity: 0 }
           }
           transition={
             active
               ? {
                   x: {
                     duration: s.dur,
-                    repeat: Infinity,
+                    repeat,
                     repeatDelay: Math.max(0, period - s.dur),
                     delay: delay + s.lag,
                     ease: "easeOut",
                   },
                   y: {
                     duration: s.dur,
-                    repeat: Infinity,
+                    repeat,
                     repeatDelay: Math.max(0, period - s.dur),
                     delay: delay + s.lag,
                     ease: "easeOut",
                   },
                   opacity: {
                     duration: s.dur,
-                    repeat: Infinity,
+                    repeat,
                     repeatDelay: Math.max(0, period - s.dur),
                     delay: delay + s.lag,
                     /* Fades UP over the first tenth instead of existing at
