@@ -247,10 +247,10 @@ export default function PointsCard({
           top: CARD_LOGO.y,
           width: CARD_LOGO.w,
           height: CARD_LOGO.h,
-          /* The box now carries the artwork's own aspect, so there is
-             nothing to fit — `fill` maps it one to one. Left explicit so
-             a later change to the box cannot silently start stretching
-             it again. */
+          /* `fill`, deliberately: the source PNG is drawn vertically
+             stretched and the node's box is what squashes it back to
+             true. `contain` here would preserve the PNG's own distorted
+             aspect and render the lockup at two-thirds the width. */
           objectFit: "fill",
         }}
       />

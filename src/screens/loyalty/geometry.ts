@@ -64,21 +64,25 @@ export const CARD_SETTLED = {
 
 /** 1503:1185 / 1527:3755 — the Maharaja Club lockup, top-left of the card.
  *
- *  THE HEIGHT IS NOT FIGMA'S, DELIBERATELY. The node is 98.676 × 22.34,
- *  an aspect of 4.42, and the artwork it holds is 1024 × 363 — an aspect
- *  of 2.82. Figma resolves that by STRETCHING: measured on its own render
- *  of 1527:3746 the lockup comes out 97 × 22, so the emblem is an oval
- *  rather than a circle and the letterforms are 1.56× too wide.
+ *  THE BOX IS THE NODE'S, AND THE ARTWORK IS STRETCHED INTO IT ON PURPOSE.
  *
- *  Matching the node exactly would mean shipping that distortion. Keeping
- *  the node's WIDTH and deriving the height from the source instead —
- *  98.676 × 363 / 1024 = 34.98 — gives the lockup at the size the design
- *  intends with the proportions the artwork actually has.
+ *  The node is 98.676 × 22.34 (aspect 4.42) and the PNG inside it is
+ *  1024 × 363 (aspect 2.82), which looks like Figma distorting the asset.
+ *  It is the other way round: the SOURCE is drawn vertically stretched —
+ *  its emblem is a tall oval, 190 × 285 — and the node's box is what
+ *  squashes it back to a round emblem and correctly proportioned
+ *  letterforms.
  *
- *  (An earlier pass used `object-fit: contain` inside the 22.34 box. That
- *  is undistorted but fits by height, so the lockup rendered 58px wide
- *  against Figma's 97 — correct shape, two-thirds the size.) */
-export const CARD_LOGO = { x: 20, y: 20, w: 98.676, h: 34.98 } as const;
+ *  Measured on the design's own full-size card render: the lockup lands at
+ *  98.04 × 21.88 card units at (20.13, 20.42), i.e. the node, to within a
+ *  third of a pixel.
+ *
+ *  A pass in between derived the height from the source instead (98.676 ×
+ *  363 / 1024 = 34.98) on the assumption that the PNG held true
+ *  proportions. It does not, and the result was a lockup half as tall
+ *  again as it should be with a stretched-looking emblem. Do not "fix" the
+ *  aspect here again without measuring a render first. */
+export const CARD_LOGO = { x: 20, y: 20, w: 98.676, h: 22.34 } as const;
 /** 1503:1186 — the dot field, top-right. Drawn rotated 180° in Figma; the
  *  asset is exported already rotated, so it is placed as-is. */
 export const CARD_DOTS = { x: 157.627, y: 20, w: 137.786, h: 41.207 } as const;
