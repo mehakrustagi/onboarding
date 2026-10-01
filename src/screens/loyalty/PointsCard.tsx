@@ -70,36 +70,41 @@ const CHARGE_RATE = 1;
 const CHARGE_OPACITY = 1;
 /* Exposure and colour.
  *
- * GAIN. ×12 was the exposure that first made the sparks read at all. It
- * matters more than it looks, because the gain multiplies the near-black
- * background too — every step up is also a uniform warming of the whole
- * card, and at ×12 the median across the upper card measured 149 against
- * 149 idle. 10.56 is ×12 less 20% (dimmer) plus 10% (less transparent),
- * which are the same lever here: with `screen` over an opaque card there
- * is no transparency separate from how much light the layer adds.
+ * GAIN. The source is nearly black — over everything this keeps, the
+ * median luminance is 2/255 and the peak is 23. (All of that file's real
+ * brightness, the 226–252 range, is the burned-in text and wash between
+ * 78% and 100%, which the mask removes.) So it has to be boosted, and the
+ * gain multiplies the near-black background along with the sparks: every
+ * step up is also a uniform warming of the whole card. ×5.28 is half of
+ * the ×10.56 that preceded it, which was overpowering the gold.
  *
- * COLOUR. The source's sparks measure hue 120° at 94% saturation — pure,
- * hot green — where this screen's conversion green is 138–139°. They read
- * as LIME on the card, and the reason is the blend: 120° carries almost no
- * blue, and screening a blue-less green onto gold (already high in red)
- * can only travel toward yellow.
+ * COLOUR, AND THE THING THAT CANNOT BE DONE HERE.
  *
- * SO THE ROTATION IS NOT 19° — IT IS 54°. Correcting the source to our
- * hue is the obvious move and it is wrong: rotating the SOURCE by 19° put
- * the on-card result at 64°, barely a third of the way there, because what
- * the eye sees is the screen of the spark ONTO the gold, not the spark
- * itself. Solving the composite instead — hue-rotate, then the saturate
- * matrix, then `screen` over the card's measured gold (196,150,58) —
- * predicts 49.5°, and MEASURING it says 54°: the boosted sparks clip
- * against the green channel's ceiling, which the model does not account
- * for. The curve is steep either side (52° → 107°, 56° → 149°), so this
- * is worth re-measuring rather than nudging by eye if the gain changes.
+ * The source sparks are hue 120° at 94% saturation; this screen's green is
+ * 139°. Matching them on the card is not a tuning problem, it is ruled out
+ * by the blend: `screen` only ADDS light, so it can never reduce the
+ * gold's red channel, and gold is mostly red. Screening even a pure
+ * #24B251 onto the card's measured gold (196,150,58) computes to
+ * rgb(204,223,121) — hue 71°, a yellow-green. Every rotation at a sane
+ * gain measured somewhere between 53° and 69°.
  *
- * Measured, not predicted: 54° lands at 139.3° over two runs, against the
- * wash's 139°. Saturation stays higher than the wash's, which is correct —
- * these are specular highlights and are meant to be hotter than the
- * surface they sit on. */
-const CHARGE_FILTER = "brightness(10.56) hue-rotate(54deg) saturate(0.95)";
+ * An earlier pass appeared to reach 139° with hue-rotate(54deg), and that
+ * was an artefact worth recording: at ×10.56 the sparks CLIPPED against
+ * the green ceiling and the hue was being set by what survived, not by the
+ * colour. That is also exactly why they looked like a blown-out cyan haze
+ * swallowing the card — the measurement said 139° while the card said
+ * something was wrong.
+ *
+ * So the sparks are desaturated instead of recoloured. At saturate(0.35)
+ * they land near the gold's own hue and read as LIGHT ON METAL rather than
+ * as a second colour arguing with the wash. The green on this card comes
+ * from the wash at the bottom edge, where the points actually arrive;
+ * these are highlights, and highlights take the colour of the surface.
+ *
+ * Making them genuinely #24B251 would mean compositing them normally
+ * rather than additively, which needs real alpha — a canvas pass turning
+ * the video's luminance into an alpha channel. Doable, not done. */
+const CHARGE_FILTER = "brightness(5.28) hue-rotate(54deg) saturate(0.35)";
 
 /* Figma's bleed on the wash art, resolved to pixels once. */
 const WASH_ART = {
