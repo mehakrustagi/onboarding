@@ -88,6 +88,25 @@ const STRIKE_Y = CARD.y + CARD.h;
  * and the column visibly empties between points. */
 const SPAWN_MS = 230;
 
+/* THE RETURN TRIP IS SHORTER THAN THE OUTWARD ONE.
+ *
+ * Taking credit is the committed gesture: a point travels the whole way
+ * from below the gem up into the card. Giving it back is a correction, and
+ * it should feel like one — at the full span and duration it outlasted the
+ * swipe that caused it and read as a second, equally weighty event going
+ * the other way.
+ *
+ * 62% of the distance and 72% of the time. The distance still carries a
+ * point past the gem (the gem sits 136 of the 268 units below the card
+ * edge, and 62% of 268 is 166), which it must: the whole point of the
+ * journey is being changed by the stone on the way. */
+const RETURN_SPAN = 0.62;
+const RETURN_TIME = 0.72;
+
+/** Where the gem sits along the run, in the same units as the travel —
+ *  the stream spans 588 → 320 and the gem's centre is at 456. */
+const GEM_AT = 456 - STREAM_END_Y;
+
 type Spark = { id: number; lane: (typeof STREAM)[number]; up: boolean };
 type StrikeHit = { id: number; dx: number; up: boolean };
 
@@ -350,7 +369,21 @@ export default function GemColumn({
           getting there rather than scheduled to coincide with it. */}
       {sparks.map((sp) => {
         const art = TRAIL_SRC[sp.lane.k];
-        const travel = STREAM_START_Y - STREAM_END_Y;
+        const full = STREAM_START_Y - STREAM_END_Y;
+        const travel = sp.up ? full : full * RETURN_SPAN;
+        const dur = sp.lane.dur * (sp.up ? 1 : RETURN_TIME);
+        /* Where in the journey the gem is crossed, which is where the
+           colour changes. It is NOT the same fraction both ways: going up
+           the point starts below the gem and reaches it 49% of the way
+           in, while coming down it starts at the card and the gem is most
+           of the trip away — and on a shortened run, further still. */
+        const cross = sp.up ? (full - GEM_AT) / full : GEM_AT / travel;
+        const fade: [number, number, number, number] = [
+          0,
+          Math.max(0.02, cross - 0.07),
+          Math.min(0.98, cross + 0.07),
+          1,
+        ];
         return (
           <motion.div
             key={sp.id}
@@ -376,13 +409,13 @@ export default function GemColumn({
                  would have each point slowing as it reached the card,
                  which is what something does when it runs out of energy —
                  the opposite of being pulled. */
-              y: { duration: sp.lane.dur, ease: "easeIn" },
-              scaleY: { duration: sp.lane.dur, ease: "easeIn" },
+              y: { duration: dur, ease: "easeIn" },
+              scaleY: { duration: dur, ease: "easeIn" },
               /* Up fast while it is still slow and legible, gone just
                  before it lands so it is absorbed rather than piling up
                  against the edge. */
               opacity: {
-                duration: sp.lane.dur,
+                duration: dur,
                 times: [0, 0.18, 0.72, 1],
                 ease: "linear",
               },
@@ -409,11 +442,7 @@ export default function GemColumn({
               style={{ filter: "grayscale(1) brightness(1.45)" }}
               initial={{ opacity: sp.up ? 1 : 0 }}
               animate={{ opacity: sp.up ? [1, 1, 0, 0] : [0, 0, 1, 1] }}
-              transition={{
-                duration: sp.lane.dur,
-                times: [0, 0.42, 0.56, 1],
-                ease: "linear",
-              }}
+              transition={{ duration: dur, times: fade, ease: "linear" }}
             >
               <Image
                 src={`${ASSETS}/${art.src}`}
@@ -427,11 +456,7 @@ export default function GemColumn({
               className="absolute inset-0"
               initial={{ opacity: sp.up ? 0 : 1 }}
               animate={{ opacity: sp.up ? [0, 0, 1, 1] : [1, 1, 0, 0] }}
-              transition={{
-                duration: sp.lane.dur,
-                times: [0, 0.42, 0.56, 1],
-                ease: "linear",
-              }}
+              transition={{ duration: dur, times: fade, ease: "linear" }}
             >
               <Image
                 src={`${ASSETS}/${art.src}`}

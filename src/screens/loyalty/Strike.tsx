@@ -12,8 +12,8 @@ import { motion } from "framer-motion";
  *   1. A short blurred BAR across the point of contact, fading 0 → 1 → 0.
  *      It is the flash of the hit — the thing that says a surface was
  *      struck at a particular spot.
- *   2. A dozen or so small dots leaving that spot, fanning away from the
- *      card, each on its OWN duration so they do not arrive as a ring.
+ *   2. A few small dots leaving that spot, fanning away from the card,
+ *      each on its OWN duration so they do not arrive as a ring.
  *
  * Nothing else came across. The original is a full-screen beams background
  * with its own container, collision detection by `getBoundingClientRect`,
@@ -39,17 +39,29 @@ import { motion } from "framer-motion";
  * clump, and identical on both sides.
  */
 
-const SPANS = Array.from({ length: 14 }, (_, i) => {
-  const t = i / 13;
-  const angle = (-170 + t * 160) * (Math.PI / 180);
-  /* Deterministic stand-in for Math.random(). Any cycle coprime with the
-     count works; 37 mod 11 spreads well over 14 items. */
-  const jitter = ((i * 37) % 11) / 11;
-  const radius = 22 + jitter * 26;
+/* SIX FRAGMENTS, NOT FOURTEEN.
+ *
+ * The count is per BURST, and bursts overlap: a point arrives roughly
+ * every 230ms while each burst lives about 1.5s, so six or seven are on
+ * screen at any moment. Fourteen fragments each made that eighty-odd dots
+ * below the card edge — a spray, where the beat only ever needed a few
+ * sparks coming off an impact.
+ *
+ * The throw is shorter too (14–28px against 22–48), so the debris stays
+ * near the edge it came from instead of raining down the screen, and the
+ * fan is narrower — the widest fragments were travelling almost
+ * horizontally, which reads as scattering rather than as a strike. */
+const SPANS = Array.from({ length: 6 }, (_, i) => {
+  const t = i / 5;
+  const angle = (-148 + t * 116) * (Math.PI / 180);
+  /* Deterministic stand-in for Math.random(). Coprime with the count, so
+     the radii and durations do not fall into a visible pattern. */
+  const jitter = ((i * 7) % 5) / 5;
+  const radius = 14 + jitter * 14;
   /* Each starts a few px out along its own heading rather than at the
-     shared origin: fourteen fragments all beginning at exactly (0,0)
-     stack into one bright blob, and six lanes of that read as a row of
-     white squares sitting on the card's edge. */
+     shared origin. Fragments all beginning at exactly (0,0) stack into one
+     bright blob on the frame they appear, and six lanes doing that at once
+     read as a row of dots sitting on the card's edge. */
   const from = 5;
   return {
     x0: Number((Math.cos(angle) * from).toFixed(2)),
@@ -96,13 +108,13 @@ export default function Strike({
       <motion.div
         className="absolute"
         style={{
-          left: -30,
-          top: -3,
-          width: 60,
-          height: 5,
+          left: -22,
+          top: -2,
+          width: 44,
+          height: 4,
           borderRadius: 999,
           background:
-            "linear-gradient(90deg, rgba(68,232,116,0) 0%, rgba(150,255,190,0.95) 50%, rgba(68,232,116,0) 100%)",
+            "linear-gradient(90deg, rgba(68,232,116,0) 0%, rgba(150,255,190,0.7) 50%, rgba(68,232,116,0) 100%)",
           filter: "blur(3px)",
           mixBlendMode: "screen",
         }}
@@ -118,10 +130,10 @@ export default function Strike({
           key={i}
           className="absolute block"
           style={{
-            left: -1.25,
-            top: -1.25,
-            width: 2.5,
-            height: 2.5,
+            left: -1,
+            top: -1,
+            width: 2,
+            height: 2,
             borderRadius: 999,
             /* Flat green, and no `screen`: screen blending over the lit
                card edge pushed these to near-white, which read as white
@@ -129,7 +141,7 @@ export default function Strike({
             background: "#7CF0A8",
           }}
           initial={{ x: s.x0, y: s.y0 * sy, opacity: 0 }}
-          animate={{ x: s.dx, y: s.dy * sy, opacity: [0, 1, 0] }}
+          animate={{ x: s.dx, y: s.dy * sy, opacity: [0, 0.7, 0] }}
           transition={{
             duration: s.dur,
             delay: s.lag,
