@@ -232,7 +232,20 @@ export default function LoyaltyScreen() {
     setBeat("idle");
   }, [value]);
 
-  const points = committed * PTS_PER_RUPEE;
+  /* LIVE WHILE THE DIAL IS LIVE, FROZEN AFTERWARDS.
+   *
+   * Both numbers on the card — the balance and the "+N pts" under it —
+   * preview the dial as you swipe, so the card shows what you are about
+   * to get rather than sitting at its opening figure until the button is
+   * pressed. That is the other half of moving the charge onto the dial:
+   * the light responds, and so should the figures it is lighting.
+   *
+   * It switches to `committed` the moment the beat does. The dial is
+   * disabled by then, but an inertia glide can still be settling and
+   * emitting detents, and the success copy quotes this number — so the
+   * amount has to stop moving at exactly the frame the screen starts
+   * claiming it. */
+  const points = (beat === "idle" ? rupees : committed) * PTS_PER_RUPEE;
   const showFurniture = beat === "idle";
   /* Everything that answers the dial: the stream, the gem's light, the
      card's wash and tilt and rim. Live while an amount is selected and
