@@ -69,9 +69,10 @@ const CHARGE_RATE = 1;
  * honest one: it scales the sparks and the background lift together,
  * where the gain changes their ratio. Measured against bare gold (mean
  * luminance 149), the layer adds +13 at opacity 1, +10 at 0.7, +8.5 at
- * 0.5 and +7.1 at 0.35 — it flattens out because what is left at that
- * point is the video's mid-tones rather than its highlights. */
-const CHARGE_OPACITY = 0.5;
+ * 0.5 and +7.1 at 0.35 — it flattens out down there because what is left
+ * is the video's mid-tones rather than its highlights, which is why this
+ * is the lever to reach for and the gain is not. 0.45 is 0.5 less 10%. */
+const CHARGE_OPACITY = 0.45;
 
 /* How far down the card the texture sits. The source fills the frame edge
  * to edge, which put sparks right up against the top rail where the logo
@@ -246,8 +247,11 @@ export default function PointsCard({
           top: CARD_LOGO.y,
           width: CARD_LOGO.w,
           height: CARD_LOGO.h,
-          objectFit: "contain",
-          objectPosition: "bottom",
+          /* `fill`, deliberately: the source PNG is drawn vertically
+             stretched and the node's box is what squashes it back to
+             true. `contain` here would preserve the PNG's own distorted
+             aspect and render the lockup at two-thirds the width. */
+          objectFit: "fill",
         }}
       />
 
