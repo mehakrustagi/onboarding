@@ -10,7 +10,7 @@ import MyTripLayer from "./trips/MyTripLayer";
 import { LightShaft } from "./vault/UploadFlow";
 import PointsCard from "./loyalty/PointsCard";
 import RadialDial from "./loyalty/RadialDial";
-import ConvertPill from "./loyalty/ConvertPill";
+import NativeAIButton from "@/components/NativeAIButton";
 import GemColumn from "./loyalty/GemColumn";
 import {
   ASSETS,
@@ -18,6 +18,7 @@ import {
   CARD_SETTLED,
   CHEVRON,
   CLOSE,
+  CTA,
   MAX_RUPEES,
   OPENING_BALANCE,
   PTS_PER_RUPEE,
@@ -549,7 +550,35 @@ export default function LoyaltyScreen() {
                   </span>
                 </div>
 
-                <ConvertPill onClick={commit} disabled={beat !== "idle" || rupees <= 0} />
+                {/* THE SHARED PILL, not a local one.
+ 
+                  This was `ConvertPill`, a copy of the same material built
+                  because the Figma node puts a WHITE base under the colour
+                  where `NativeAIButton` deliberately has none. One button
+                  used in two places is worth more than that difference —
+                  it is the same component in the product, and a second
+                  implementation is a second thing to keep in step.
+
+                  `surface="solid"` keeps the white ground 1503:1117
+                  specifies. Without it the pill is glass over a dark
+                  scrim with a black label on top, which measured and
+                  looked unreadable — the Figma node has that white base
+                  for a reason, and it is now a prop on the shared
+                  component rather than a reason to fork it. */}
+              <NativeAIButton
+                label="Convert to Pts"
+                size="custom"
+                width={CTA.w}
+                surface="solid"
+                dropShadowEllipse={false}
+                leftIcon={
+                  <Image src={`${ASSETS}/loop.svg`} alt="" width={18} height={18} />
+                }
+                onClick={commit}
+                disabled={beat !== "idle" || rupees <= 0}
+                className="absolute"
+                style={{ left: CTA.x, top: CTA.y, zIndex: 8 }}
+              />
               </motion.div>
             )}
           </AnimatePresence>
