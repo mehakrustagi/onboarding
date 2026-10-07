@@ -7,7 +7,6 @@ export default function ProfilePage() {
       <ScreenHeader
         title="Profile"
         description="WorldPass card on its pedestal, with the next card peeking in from the right. Built block by block — content cards below are still shells."
-        active="/profile"
       />
       <ProfileScreen />
     </main>

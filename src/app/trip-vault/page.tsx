@@ -7,7 +7,6 @@ export default function TripVaultPage() {
       <ScreenHeader
         title="Trip Vault (KYC Not Done)"
         description="The vault before anything is in it, drawn as a loading state that is not loading — two versions of the empty screen, and the upload flow that fills it: picker, confirm, extract, and the booking landing in Tuesday's row."
-        active="/trip-vault"
       />
       <TripVaultScreen />
     </main>

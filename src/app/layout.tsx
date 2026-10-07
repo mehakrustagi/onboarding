@@ -6,6 +6,7 @@ import {
   Playfair_Display,
 } from "next/font/google";
 import "./globals.css";
+import RouteSwitcher from "@/components/RouteSwitcher";
 
 const inter = Inter({
   variable: "--font-inter",
@@ -52,7 +53,15 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
       lang="en"
       className={`${inter.variable} ${doto.variable} ${barcode.variable} ${denton.variable} h-full antialiased`}
     >
-      <body className="min-h-full">{children}</body>
+      <body className="min-h-full">
+        {children}
+        {/* Mounted here rather than per page so a new route under `app/` is
+            navigable the moment it exists. It is `fixed`, so unlike the bar
+            it replaced it takes no layout space and no page had to make
+            room for it — and it renders after `children` so it is last in
+            the tab order rather than the first thing a keyboard hits. */}
+        <RouteSwitcher />
+      </body>
     </html>
   );
 }

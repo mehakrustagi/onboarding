@@ -7,7 +7,6 @@ export default function LoyaltyPage() {
       <ScreenHeader
         title="Loyalty"
         description="Convert rupees to Maharaja points. Swipe the radial dial — it has detents you can feel and hear — then Convert pulls the points up through the gem and into the card, and the whole screen settles down onto the result."
-        active="/loyalty"
       />
       <LoyaltyScreen />
     </main>
