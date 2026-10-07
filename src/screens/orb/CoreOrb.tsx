@@ -590,8 +590,20 @@ export default function CoreOrb({
         style={{
           width: orb,
           height: orb,
-          /* OrbV2's own base, verbatim. */
-          background: "linear-gradient(to bottom, #181818, #525edf)",
+          /* NEUTRAL, not OrbV2's own base.
+             That base runs #181818 to #525edf and put a blue cast through
+             the bottom half of everything — the grains at the foot of the
+             sphere came out tinted rather than their own colour. This is
+             the same shape of gradient, dark at the top and lifting toward
+             the bottom so the sphere still reads as lit from below, with
+             the hue taken out. All of the colour in here is now the
+             grains', which are carrying the orb's palette anyway.
+
+             It cannot go to nothing, which is the one thing worth knowing:
+             every stroke in the overlay SVG is white or a gradient to
+             white, so a transparent interior is a white page with
+             invisible glass on it. Something dark has to be behind it. */
+          background: "linear-gradient(to bottom, #111112, #343438)",
         }}
         aria-hidden
       >
