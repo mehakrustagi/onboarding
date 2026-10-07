@@ -8,16 +8,22 @@ import OrbV2 from "@/components/OrbV2";
 /* Variant 6 — halo.
  *
  * Four masked rings turning behind the orb at different speeds and in
- * different directions, in gold and silver, with the orb breathing and
- * glowing at the centre of them. No text.
+ * different directions, with the orb breathing inside a small warm glow.
+ * No text.
+ *
+ * The rings are the original's and are left alone. Everything that moves
+ * other than their rotation belongs to the ORB: it breathes by under 3%,
+ * and the glow around it swells on a slower cycle so the two are never in
+ * step. A halo that pulses with the thing it surrounds stops being a halo
+ * and becomes one object inflating.
  *
  * The ring stack is adapted from a loader component, with three changes
  * forced by this project:
  *
  *   motion       imports come from `framer-motion`, not `motion/react`.
- *   colour       the original is monochrome with a dark-mode twin — eight
- *                elements, four of them hidden. The page here is light and
- *                stays light, so there is one set, in gold and silver.
+ *   colour       the original's monochrome is kept; only its dark-mode
+ *                twin is dropped — four more elements that are never drawn
+ *                on a page that is always light.
  *   structure    the four rings are a table rather than four hand-written
  *                blocks. They differ only in six values, and written out
  *                longhand the fifth one would be written by copying the
@@ -29,21 +35,29 @@ import OrbV2 from "@/components/OrbV2";
  * without a size keyword resolves to `farthest-corner`, so on a square box
  * 100% is the half-DIAGONAL, and a stop written at 35% actually lands at
  * 0.247 of the box width. The rings therefore sit between 0.49 and 0.91 of
- * the box across, which is why the box has to be about 2.1 times the orb
+ * the box across, which is why the box has to be about twice the orb
  * for the innermost ring to clear it. Change the box ratio and the rings
  * move relative to the orb; change a percentage and they move too. */
 
 /** Default orb diameter. */
 const ORB_DEFAULT = 211;
 
-/* The box is this much bigger than the orb. See the note above — it is the
-   one number that decides whether the rings clear the orb or cut it. */
-const FIELD_K = 2.1;
+/* The box is this much bigger than the orb, and it is the one number that
+   decides where the rings sit relative to it — see the note above on what
+   the mask percentages actually resolve to. At 2.05 the innermost ring sits
+   right on the orb's rim and the outermost reaches 1.86 of it, which is as
+   tight as this stack goes before the inner ring starts cutting the orb. */
+const FIELD_K = 2.05;
 
-const GOLD = "232, 192, 122";
-const GOLD_BRIGHT = "244, 212, 135";
-const SILVER = "176, 184, 200";
-const SILVER_BRIGHT = "236, 240, 248";
+/* The rings are the ORIGINAL's, unchanged: monochrome, at its opacities,
+ * masks, periods, directions and eases. The only thing dropped is the
+ * dark-mode twin — four more elements that are never drawn on a page that
+ * is always light.
+ *
+ * Nothing here pulses. The breathing belongs to the orb; rings that also
+ * swell turn the whole thing into one object inflating, and the point of a
+ * halo is that it is separate from what it is around. */
+const INK = "0, 0, 0";
 
 type Ring = {
   /** The conic sweep: where it starts and what it fades through. */
@@ -60,33 +74,33 @@ type Ring = {
 
 const RINGS: Ring[] = [
   {
-    paint: `conic-gradient(from 0deg, transparent 0deg, rgb(${SILVER_BRIGHT}) 70deg, rgb(${SILVER}) 110deg, transparent 180deg)`,
+    paint: `conic-gradient(from 0deg, transparent 0deg, rgb(${INK}) 90deg, transparent 180deg)`,
     mask: [35, 37, 39, 41],
-    opacity: 0.95,
+    opacity: 0.8,
     dur: 3,
     dir: 1,
     linear: true,
   },
   {
-    paint: `conic-gradient(from 0deg, transparent 0deg, rgb(${GOLD_BRIGHT}) 110deg, rgba(${GOLD}, 0.6) 240deg, transparent 360deg)`,
+    paint: `conic-gradient(from 0deg, transparent 0deg, rgb(${INK}) 120deg, rgba(${INK}, 0.5) 240deg, transparent 360deg)`,
     mask: [42, 44, 48, 50],
-    opacity: 0.95,
+    opacity: 0.9,
     dur: 2.5,
     dir: 1,
     linear: false,
   },
   {
-    paint: `conic-gradient(from 180deg, transparent 0deg, rgba(${SILVER}, 0.85) 45deg, transparent 90deg)`,
+    paint: `conic-gradient(from 180deg, transparent 0deg, rgba(${INK}, 0.6) 45deg, transparent 90deg)`,
     mask: [52, 54, 56, 58],
-    opacity: 0.6,
+    opacity: 0.35,
     dur: 4,
     dir: -1,
     linear: false,
   },
   {
-    paint: `conic-gradient(from 270deg, transparent 0deg, rgba(${GOLD}, 0.7) 20deg, transparent 40deg)`,
+    paint: `conic-gradient(from 270deg, transparent 0deg, rgba(${INK}, 0.4) 20deg, transparent 40deg)`,
     mask: [61, 62, 63, 64],
-    opacity: 0.7,
+    opacity: 0.5,
     dur: 3.5,
     dir: 1,
     linear: true,
@@ -170,34 +184,35 @@ export default function HaloOrb({
         </motion.div>
       ))}
 
-      {/* The glow the orb sits in. Gold at the centre falling to nothing
-          well inside the innermost ring, so the two never touch — a glow
-          that reaches the rings reads as fog rather than as light coming
-          off the orb. */}
+      {/* THE GLOW, and it is the only thing in here that breathes.
+          Small — it reaches barely past the orb's own edge, where before it
+          ran out to 1.55 of it and read as a second object. Faint, warm,
+          and on a long slow cycle, so what you notice is the orb being lit
+          from inside rather than a halo being switched on and off. */}
       <motion.div
         className="absolute left-1/2 top-1/2 rounded-full"
         style={{
-          width: orb * 1.55,
-          height: orb * 1.55,
-          marginLeft: -(orb * 1.55) / 2,
-          marginTop: -(orb * 1.55) / 2,
-          background: `radial-gradient(circle, rgba(${GOLD_BRIGHT}, 0.5) 0%, rgba(${GOLD}, 0.22) 42%, rgba(${GOLD}, 0) 68%)`,
+          width: orb * 1.16,
+          height: orb * 1.16,
+          marginLeft: -(orb * 1.16) / 2,
+          marginTop: -(orb * 1.16) / 2,
+          background: `radial-gradient(circle, rgba(255, 236, 206, 0.55) 0%, rgba(246, 214, 164, 0.22) 46%, rgba(240, 206, 150, 0) 72%)`,
         }}
         initial={{ opacity: 1, scale: 1 }}
         animate={
           reduced
             ? { opacity: thinking ? 1 : 0, scale: 1 }
-            : { opacity: thinking ? 1 : 0, scale: [1, 1.09, 1] }
+            : { opacity: thinking ? 1 : 0, scale: [1, 1.06, 1] }
         }
         transition={
           reduced
             ? { duration: 0 }
             : {
                 opacity: fade,
-                /* Slower than the orb's own breath, so the glow swells
-                   slightly behind it rather than with it. The two moving in
-                   lockstep reads as one object scaling. */
-                scale: { duration: 3.4, ease: BREATHE, repeat: Infinity },
+                /* Slower than the orb's own breath, so it swells slightly
+                   behind rather than with it. Moving in lockstep, the two
+                   read as one object scaling. */
+                scale: { duration: 3.6, ease: BREATHE, repeat: Infinity },
               }
         }
       />
@@ -206,11 +221,11 @@ export default function HaloOrb({
         className="absolute left-1/2 top-1/2"
         style={{ marginLeft: -orb / 2, marginTop: -orb / 2 }}
         initial={{ scale: 1 }}
-        animate={reduced || !thinking ? { scale: 1 } : { scale: [1, 1.045, 1] }}
+        animate={reduced || !thinking ? { scale: 1 } : { scale: [1, 1.028, 1] }}
         transition={
           reduced
             ? { duration: 0 }
-            : { duration: 2.6, ease: BREATHE, repeat: Infinity }
+            : { duration: 2.8, ease: BREATHE, repeat: Infinity }
         }
       >
         <OrbV2 size={orb} />
