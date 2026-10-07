@@ -48,9 +48,13 @@ function rimWidthFor(orbD: number) {
   return Math.max(0.7, 1.6 * (orbD / ORB_DEFAULT));
 }
 
-/** Degrees per second, at full speed. Opposite signs. */
-const INNER_SPEED = 46;
-const OUTER_SPEED = -29;
+/* Degrees per second, at full speed. Opposite signs, and the two are
+   deliberately not a simple ratio — 69 against 43.5 means the rims come
+   back into the same relative position only rarely, so the pair never
+   settles into a pattern you can anticipate.
+   Both are 50% up on where they started. */
+const INNER_SPEED = 69;
+const OUTER_SPEED = -43.5;
 
 /** Seconds to spin up, and to glide to rest. */
 const SPIN_UP_S = 0.8;

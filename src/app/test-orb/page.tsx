@@ -52,7 +52,12 @@ const VARIANTS = [
   {
     id: "core",
     title: "Core",
-    render: <CoreOrb />,
+    render: <CoreOrb tunable />,
+  },
+  {
+    id: "core-glass",
+    title: "Core in glass",
+    render: <CoreOrb skin="glass" tunable />,
   },
   {
     id: "halo",

@@ -164,6 +164,7 @@ const ORB_TREATMENTS = [
   { id: "mush", label: "Swirl" },
   { id: "rims", label: "Rims" },
   { id: "core", label: "Core" },
+  { id: "core-glass", label: "Core glass" },
   { id: "halo", label: "Halo" },
 ] as const;
 
@@ -674,6 +675,8 @@ function AgentOrb({
             <RimOrb orb={size} controls={false} />
           ) : treatment === "core" ? (
             <CoreOrb orb={size} controls={false} />
+          ) : treatment === "core-glass" ? (
+            <CoreOrb orb={size} controls={false} skin="glass" />
           ) : treatment === "halo" ? (
             <HaloOrb orb={size} controls={false} />
           ) : (
