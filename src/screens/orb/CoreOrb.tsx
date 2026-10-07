@@ -89,50 +89,113 @@ type Grain = {
   seed: number;
 };
 
-function clamp255(v: number) {
-  return v < 0 ? 0 : v > 255 ? 255 : v | 0;
+/* COLOUR IS REBUILT IN HSL, NOT ADJUSTED IN RGB.
+ *
+ * Three passes at this failed for the same reason, and it is worth stating
+ * plainly: a large part of the orb is NEUTRAL. The glare across its upper
+ * left and the wash through its middle are near-grey, and a grey has no
+ * chroma — so saturating it does nothing, scaling it does nothing but
+ * change how light the grey is, and the centre of the sphere stayed a pale
+ * wash however hard either dial was turned. You cannot make a grey shine by
+ * multiplying it.
+ *
+ * So each grain is taken apart and reassembled:
+ *
+ *   hue          kept from the source pixel where the pixel actually has a
+ *                colour, and otherwise taken from WHERE THE GRAIN SITS on
+ *                the sphere, interpolated along a ramp that runs violet →
+ *                magenta → burnt orange → amber. The neutral middle picks
+ *                up the hues of the regions around it instead of going
+ *                grey, and the orb's own colour structure survives wherever
+ *                it had one.
+ *   saturation   forced, not scaled. The whole point is that it no longer
+ *                depends on how much colour the source happened to have.
+ *   lightness    pushed into a dark band, which is what makes a grain read
+ *                against white at all. The source's own lightness still
+ *                modulates within that band, so the orb's light and shade
+ *                are still legible — they are just both dark now.
+ *
+ * Dark and saturated is what reads as jewelled. Light and saturated only
+ * ever reads as pastel, which is where the first three passes ended up. */
+
+/** Hue stops, in degrees, as the grain's angle goes once round. */
+const HUES = [272, 316, 368, 396];
+
+/** Forced saturation, and the lightness band. */
+const SAT = 0.6;
+const L_LO = 0.3;
+const L_HI = 0.53;
+
+/** Below this much chroma a pixel is treated as having no hue of its own. */
+const NEUTRAL = 0.16;
+
+function rgbToHsl(r: number, g: number, b: number) {
+  const rr = r / 255;
+  const gg = g / 255;
+  const bb = b / 255;
+  const max = Math.max(rr, gg, bb);
+  const min = Math.min(rr, gg, bb);
+  const l = (max + min) / 2;
+  const d = max - min;
+  if (d === 0) return { h: 0, s: 0, l };
+  const s = l > 0.5 ? d / (2 - max - min) : d / (max + min);
+  let h: number;
+  if (max === rr) h = ((gg - bb) / d + (gg < bb ? 6 : 0)) / 6;
+  else if (max === gg) h = ((bb - rr) / d + 2) / 6;
+  else h = ((rr - gg) / d + 4) / 6;
+  return { h, s, l };
 }
 
-/* Luminance is REMAPPED INTO A BAND, not just saturated.
- *
- * The orb is lit, so a large part of it — the glare across its upper left
- * and the pale wash at its lower right — is within a few percent of white.
- * As a solid surface that is fine. As five thousand separate grains on a
- * white page it is a hole: those grains are the colour of the paper, so the
- * sphere came out with its middle missing and a bright rind around the
- * edge, which is the opposite of how a lit ball should read.
- *
- * Squeezing luminance into [LO, HI] guarantees no grain can land near the
- * page, and no grain can go to black either. It is done by scaling all
- * three channels by the same factor, so the hue and the chroma ratio are
- * untouched — only how light the grain is changes. Saturation is applied
- * after, around the NEW luminance, or the remap would wash out what it had
- * just preserved. */
-const LO = 80;
-const HI = 172;
-const SAT = 1.8;
-
-/* HI is the number that matters, and it wants to be lower than it looks
-   like it should. At 196 nothing was white any more and the hole was gone,
-   but a quarter of the sphere still sat close enough to the page to read as
-   cream, so the whole thing came out dusty. Dropping the ceiling to 172
-   costs the orb its glare — which, as five thousand dots on white, was
-   never surviving anyway — and buys every grain a colour you can name. SAT
-   then has room to work, because chroma on a mid-tone has somewhere to go
-   and chroma on a near-white does not. */
-
-function shade(r: number, g: number, b: number) {
-  const lum = r * 0.299 + g * 0.587 + b * 0.114;
-  const target = LO + (lum / 255) * (HI - LO);
-  const k = target / Math.max(lum, 1);
-  const nr = r * k;
-  const ng = g * k;
-  const nb = b * k;
-  return `rgb(${clamp255(target + (nr - target) * SAT)},${clamp255(
-    target + (ng - target) * SAT,
-  )},${clamp255(target + (nb - target) * SAT)})`;
+function hue2rgb(p: number, q: number, t: number) {
+  let tt = t;
+  if (tt < 0) tt += 1;
+  if (tt > 1) tt -= 1;
+  if (tt < 1 / 6) return p + (q - p) * 6 * tt;
+  if (tt < 1 / 2) return q;
+  if (tt < 2 / 3) return p + (q - p) * (2 / 3 - tt) * 6;
+  return p;
 }
 
+function hslToRgb(h: number, s: number, l: number) {
+  if (s === 0) {
+    const v = Math.round(l * 255);
+    return [v, v, v] as const;
+  }
+  const q = l < 0.5 ? l * (1 + s) : l + s - l * s;
+  const p = 2 * l - q;
+  return [
+    Math.round(hue2rgb(p, q, h + 1 / 3) * 255),
+    Math.round(hue2rgb(p, q, h) * 255),
+    Math.round(hue2rgb(p, q, h - 1 / 3) * 255),
+  ] as const;
+}
+
+/** Hue for a grain with no colour of its own, from where it sits. */
+function rampHue(t: number) {
+  const n = HUES.length;
+  const f = t * n;
+  const i = Math.floor(f) % n;
+  const j = (i + 1) % n;
+  const k = f - Math.floor(f);
+  /* The stops run past 360 deliberately, so the interpolation from amber
+     back round to violet goes the short way through red rather than
+     reversing through the whole wheel. */
+  const a = HUES[i];
+  const b = HUES[j] < a ? HUES[j] + 360 : HUES[j];
+  return (((a + (b - a) * k) % 360) + 360) % 360 / 360;
+}
+
+/** `px`/`py` are the grain's home position on the unit disc. */
+function shade(r: number, g: number, b: number, px: number, py: number) {
+  const src = rgbToHsl(r, g, b);
+  const t = (Math.atan2(py, px) + Math.PI) / (Math.PI * 2);
+  const h = src.s < NEUTRAL ? rampHue(t) : src.h;
+  const l = L_LO + (L_HI - L_LO) * src.l;
+  const [R, G, B] = hslToRgb(h, SAT, l);
+  return `rgb(${R},${G},${B})`;
+}
+
+/** Smooth 0→1. */
 function easeInOut(t: number) {
   return t < 0.5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2;
 }
@@ -219,7 +282,7 @@ export default function CoreOrb({
           x,
           y,
           z,
-          fill: shade(data[o], data[o + 1], data[o + 2]),
+          fill: shade(data[o], data[o + 1], data[o + 2], x, y),
           seed: Math.random() * Math.PI * 2,
         });
       }
