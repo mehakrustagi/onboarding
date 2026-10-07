@@ -111,6 +111,11 @@ const AMP = 1.16;
 const FLASH_AT = 0.14;
 const FLASH_S = 0.62;
 
+/* How deep the band is that grains are compressed into when they meet the
+   glass, as a fraction of the orb. Too thin and it is a drawn border again;
+   too thick and the sphere looks like it is dissolving into its own edge. */
+const COLLIDE_BAND = 0.055;
+
 /** How far the cloud draws in on itself just before it lands. */
 const GATHER_PULL = 0.055;
 
@@ -591,30 +596,39 @@ export default function CoreOrb({
              the same cue the dark field used to get from dimming. */
           let a = Math.min(1, (0.22 + depth * 0.7) * (1 + fl * 1.1));
 
-          /* COLLISION WITH THE GLASS.
-             Letting the circle clip them is not the same thing: a clipped
-             grain is a grain that went through the wall and had its outer
-             half deleted, which reads as the sphere being cropped. Here a
-             grain that would cross the wall is STOPPED at it — pushed back
-             along its own radius until its edge rests on the inside of the
-             glass — so it slides along the surface instead of leaving.
-             That is what builds the bright band at the rim: the ones that
-             are pressing outward pile up there rather than disappearing.
-             `hit` is how far it would have overshot, normalised, and it
-             drives the response — a grain that lands harder sits a little
-             wider and a little stronger, which is the flattening you see
-             when something soft meets something hard. */
+          /* COLLISION WITH THE GLASS, as a SOFT COMPRESSION.
+             Clipping is wrong — a clipped grain went through the wall and
+             had its outer half deleted, so the sphere reads as cropped and
+             the grains pressing hardest are the ones that vanish.
+             Snapping them to the wall is also wrong, and less obviously so.
+             The projection crowds enormous numbers of grains toward the
+             limb, so putting every overshooting one at exactly `wall` lands
+             them all on a single radius: a solid one-grain-thick ring that
+             reads as a drawn border rather than as particles.
+             So they are squeezed into a BAND instead. Everything past the
+             soft limit is compressed asymptotically into the last few
+             percent of the radius — nothing reaches the wall, the density
+             rises smoothly toward it, and no two grains are forced onto the
+             same circle. */
           if (glass) {
             const dx = sx - C;
             const dy = sy - C;
             const d = Math.sqrt(dx * dx + dy * dy);
             const wall = Math.max(0, orb / 2 - rad);
-            if (d > wall && d > 0) {
-              const hit = Math.min(1, (d - wall) / (orb * 0.07));
-              sx = C + (dx / d) * wall;
-              sy = C + (dy / d) * wall;
-              rad *= 1 + hit * 0.3;
-              a = Math.min(1, a * (1 + hit * 0.55));
+            const band = orb * COLLIDE_BAND;
+            const soft = Math.max(0, wall - band);
+            if (d > soft && d > 0) {
+              const over = d - soft;
+              /* Approaches `soft + band` — the wall — without reaching it. */
+              const squashed = soft + band * (1 - Math.exp(-over / band));
+              const k = squashed / d;
+              sx = C + dx * k;
+              sy = C + dy * k;
+              /* Gentle. The response used to be strong enough to light the
+                 ring on its own, which was half of why it read as a line. */
+              const hit = Math.min(1, over / band);
+              rad *= 1 + hit * 0.1;
+              a = Math.min(1, a * (1 + hit * 0.2));
             }
           }
 
