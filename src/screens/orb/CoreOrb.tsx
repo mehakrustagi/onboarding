@@ -572,18 +572,46 @@ export default function CoreOrb({
              drawn larger, which is the whole reason this reads as a volume
              and not as a disc of dots. */
           const p = T.depth / (T.depth - Z);
-          const sx = C + X * R * p;
-          const sy = C + Y * R * p;
+          let sx = C + X * R * p;
+          let sy = C + Y * R * p;
 
           /* Depth: 0 at the far pole, 1 at the near one. */
           const depth = (Z + 1) / 2;
           /* Through the flash the grains swell and brighten, so the cloud
              blooms into the orb rather than being wiped off it. */
-          const rad = baseGrainR * T.size * p * (0.72 + depth * 0.55) * (1 + fl * 0.9);
+          let rad =
+            baseGrainR * T.size * p * (0.72 + depth * 0.55) * (1 + fl * 0.9);
           /* Depth, carried entirely by alpha now. On a white page a faint
              grain fades toward the paper, which is what reads as distance —
              the same cue the dark field used to get from dimming. */
-          const a = Math.min(1, (0.22 + depth * 0.7) * (1 + fl * 1.1));
+          let a = Math.min(1, (0.22 + depth * 0.7) * (1 + fl * 1.1));
+
+          /* COLLISION WITH THE GLASS.
+             Letting the circle clip them is not the same thing: a clipped
+             grain is a grain that went through the wall and had its outer
+             half deleted, which reads as the sphere being cropped. Here a
+             grain that would cross the wall is STOPPED at it — pushed back
+             along its own radius until its edge rests on the inside of the
+             glass — so it slides along the surface instead of leaving.
+             That is what builds the bright band at the rim: the ones that
+             are pressing outward pile up there rather than disappearing.
+             `hit` is how far it would have overshot, normalised, and it
+             drives the response — a grain that lands harder sits a little
+             wider and a little stronger, which is the flattening you see
+             when something soft meets something hard. */
+          if (glass) {
+            const dx = sx - C;
+            const dy = sy - C;
+            const d = Math.sqrt(dx * dx + dy * dy);
+            const wall = Math.max(0, orb / 2 - rad);
+            if (d > wall && d > 0) {
+              const hit = Math.min(1, (d - wall) / (orb * 0.07));
+              sx = C + (dx / d) * wall;
+              sy = C + (dy / d) * wall;
+              rad *= 1 + hit * 0.3;
+              a = Math.min(1, a * (1 + hit * 0.55));
+            }
+          }
 
           ctx.globalAlpha = a;
           ctx.fillStyle = gr.fill;
