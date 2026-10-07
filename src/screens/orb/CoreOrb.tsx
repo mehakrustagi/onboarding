@@ -101,21 +101,10 @@ function grainPlan(orbD: number, dpr: number, density: number) {
   return { count, radius };
 }
 
-/* Perspective: the eye's distance from the sphere's centre in sphere radii.
-   Lower is a wider lens and a more dramatic near/far difference. Below about
-   2.2 the near face balloons and it stops looking like a ball. */
-const EYE = 3.2;
-
-/** Height-field amplitude, as a fraction of the radius. */
-const WOBBLE = 0.13;
-
 /* The largest the wave can get: the three harmonics sum to 1 and the micro
    term adds 0.16. Used to remap it one-sided for the glass skin, so it has
    to track those numbers — change a harmonic and change this. */
 const AMP = 1.16;
-
-/** Degrees per second about the vertical, at full energy. */
-const SPIN = 22;
 
 /* The merge. `FLASH_AT` is where in the condense the cloud is considered
    to have arrived; `FLASH_S` is how long the bloom takes to die. */
@@ -267,20 +256,36 @@ export type CoreTuning = {
   density: number;
   /** Multiplier on the grain radius. */
   size: number;
-  /** Height-field amplitude — how far the surface departs from a sphere. */
+  /** Height-field amplitude, as a fraction of the radius. */
   diffusion: number;
-  /** Degrees per second about the vertical. */
+  /** Degrees per second about the vertical, at full energy. */
   spin: number;
-  /** Eye distance in sphere radii. Lower is a wider lens. */
+  /* Perspective: the eye's distance from the sphere's centre in sphere
+     radii. Lower is a wider lens and a more dramatic near/far difference.
+     Below about 2.2 the near face balloons and it stops looking like a
+     ball. */
   depth: number;
 };
 
+/* The settled look, arrived at on the sliders rather than guessed: packed
+ * tighter and finer than the first pass, turning slower, with a much
+ * shallower height field and a longer lens.
+ *
+ * These ARE the values now — the three standalone constants they replaced
+ * (WOBBLE, SPIN, EYE) are gone rather than left sitting unused above with
+ * notes explaining numbers nothing reads. `density` and `size` stay
+ * multipliers on what `grainPlan` works out, because that calculation has
+ * to track the orb's size and the device pixel ratio and cannot be reduced
+ * to one number.
+ *
+ * Both skins read this, so Core and Core in glass start in the same place
+ * and Reset returns both to it. */
 export const CORE_DEFAULTS: CoreTuning = {
-  density: 1,
-  size: 1,
-  diffusion: WOBBLE,
-  spin: SPIN,
-  depth: EYE,
+  density: 1.7,
+  size: 0.8,
+  diffusion: 0.075,
+  spin: 14,
+  depth: 4.4,
 };
 
 const SLIDERS: {
