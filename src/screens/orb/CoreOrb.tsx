@@ -70,6 +70,14 @@ const WOBBLE = 0.13;
 /** Degrees per second about the vertical, at full energy. */
 const SPIN = 22;
 
+/* The merge. `FLASH_AT` is where in the condense the cloud is considered
+   to have arrived; `FLASH_S` is how long the bloom takes to die. */
+const FLASH_AT = 0.14;
+const FLASH_S = 0.62;
+
+/** How far the cloud draws in on itself just before it lands. */
+const GATHER_PULL = 0.055;
+
 /** Seconds to come apart, and to reform. */
 const OUT_S = 1.1;
 const IN_S = 1.6;
@@ -212,6 +220,7 @@ export default function CoreOrb({
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const orbRef = useRef<HTMLDivElement>(null);
   const fieldRef = useRef<HTMLDivElement>(null);
+  const flashRef = useRef<HTMLDivElement>(null);
 
   const [thinking, setThinking] = useState(true);
   const thinkingRef = useRef(true);
@@ -244,6 +253,12 @@ export default function CoreOrb({
     /* Integrated, not keyframed, so the spin can decelerate to rest from
        wherever it happens to be instead of rewinding to an identity. */
     let spin = 0;
+    /* The merge. `flash` is set to 1 the moment the cloud arrives and then
+       decays on its own clock — it is an event, not a function of energy,
+       because energy passes through the same values on the way out and
+       firing it then would flash the orb as it came APART. */
+    let flash = 0;
+    let prevEnergy = 0;
 
     const img = new window.Image();
     img.src = SOURCE;
@@ -312,13 +327,48 @@ export default function CoreOrb({
         energy = Math.max(0, Math.min(1, energy));
         const e = easeInOut(energy);
 
+        /* Arrival: condensing, and this frame is the one that crossed the
+           threshold. */
+        if (!thinkingRef.current && prevEnergy > FLASH_AT && energy <= FLASH_AT) {
+          flash = 1;
+        }
+        prevEnergy = energy;
+        flash = Math.max(0, flash - dt / FLASH_S);
+        /* Sharp attack, long tail — a linear decay reads as a lamp being
+           turned down rather than as something igniting. */
+        const fl = flash * flash;
+
+        /* GATHER. Over the last third of the condense the cloud draws in on
+           itself slightly and comes back out, so the grains visibly close
+           ranks before they land instead of simply stopping. The bump is
+           zero at both ends, so it cannot disturb the arrival. */
+        const gather = thinkingRef.current
+          ? 0
+          : Math.max(0, Math.min(1, 1 - e / 0.3));
+        const squeeze = 1 - GATHER_PULL * 4 * gather * (1 - gather);
+
         spin += SPIN * e * dt * (Math.PI / 180);
 
-        /* Hand over to the real orb as the sphere reforms. */
+        /* Hand over to the real orb as the sphere reforms.
+           The orb is brought in on the flash rather than on a plain fade:
+           `crisp` still sets the floor, but the flash lifts it the rest of
+           the way at once, so the orb APPEARS in the bloom instead of
+           ghosting up underneath a cloud that is still there. */
         const crisp = Math.max(0, Math.min(1, 1 - e / 0.22));
-        if (orbRef.current) orbRef.current.style.opacity = String(crisp);
+        const orbIn = Math.min(1, crisp + fl * 0.9);
+        if (orbRef.current) orbRef.current.style.opacity = String(orbIn);
         if (fieldRef.current) fieldRef.current.style.opacity = String(1 - crisp);
-        canvas.style.opacity = String(1 - crisp);
+        /* The cloud leaves faster than the orb arrives, so there is a beat
+           of pure bloom between the two rather than a dissolve. */
+        canvas.style.opacity = String(Math.max(0, 1 - crisp - fl * 0.75));
+
+        if (flashRef.current) {
+          flashRef.current.style.opacity = String(fl);
+          /* Expands as it dies — a bloom that holds its size reads as a
+             circle being faded, not as light. */
+          const k = 1 + (1 - flash) * 0.35;
+          flashRef.current.style.transform = `translate(-50%,-50%) scale(${k})`;
+        }
 
         ctx.clearRect(0, 0, SIZE, SIZE);
 
@@ -351,7 +401,7 @@ export default function CoreOrb({
             Math.sin(y2 * 3.1 - t * 0.67) * 0.34 +
             Math.sin(z2 * 2.2 + t * 1.05) * 0.26;
           const micro = Math.sin(t * 3.4 + gr.seed) * 0.16;
-          const h = pulse * (1 + e * WOBBLE * (w + micro));
+          const h = pulse * squeeze * (1 + e * WOBBLE * (w + micro));
 
           const X = x1 * h;
           const Y = y2 * h;
@@ -366,11 +416,13 @@ export default function CoreOrb({
 
           /* Depth: 0 at the far pole, 1 at the near one. */
           const depth = (Z + 1) / 2;
-          const rad = GRAIN_R * p * (0.72 + depth * 0.55);
+          /* Through the flash the grains swell and brighten, so the cloud
+             blooms into the orb rather than being wiped off it. */
+          const rad = GRAIN_R * p * (0.72 + depth * 0.55) * (1 + fl * 0.9);
           /* Depth, carried entirely by alpha now. On a white page a faint
              grain fades toward the paper, which is what reads as distance —
              the same cue the dark field used to get from dimming. */
-          const a = 0.22 + depth * 0.7;
+          const a = Math.min(1, (0.22 + depth * 0.7) * (1 + fl * 1.1));
 
           ctx.globalAlpha = a;
           ctx.fillStyle = gr.fill;
@@ -447,6 +499,24 @@ export default function CoreOrb({
       >
         <OrbV2 size={orb} />
       </div>
+
+      {/* THE BLOOM. Above the orb, below nothing — it is the moment of
+          formation and it should wash over everything. Ships at opacity 0,
+          which is what the loop starts it at too, so the server's markup
+          and the first client frame agree. */}
+      <div
+        ref={flashRef}
+        className="pointer-events-none absolute left-1/2 top-1/2 rounded-full"
+        style={{
+          width: orb * 1.25,
+          height: orb * 1.25,
+          background:
+            "radial-gradient(circle, rgba(255,252,246,0.95) 0%, rgba(255,232,200,0.55) 38%, rgba(255,216,170,0) 72%)",
+          transform: "translate(-50%,-50%)",
+          opacity: 0,
+          zIndex: 2,
+        }}
+      />
 
       <canvas
         ref={canvasRef}
