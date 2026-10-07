@@ -1,5 +1,6 @@
 "use client";
 
+import Image from "next/image";
 import { useEffect, useRef, useState } from "react";
 import { useReducedMotion } from "framer-motion";
 
@@ -235,6 +236,16 @@ function rampHue(t: number) {
 }
 
 /** `px`/`py` are the grain's home position on the unit disc. */
+/* Inside the glass the ground is the orb's own dark base, so the grains go
+ * the other way: lifted toward white rather than pushed into a dark band.
+ * Clamped, so the pale parts of the orb saturate at the limb where the
+ * grains stack up — which is where a real one would blow out anyway. */
+function shadeOnDark(r: number, g: number, b: number) {
+  const k = 1.4;
+  const c = (v: number) => Math.min(255, (v * k) | 0);
+  return `rgb(${c(r)},${c(g)},${c(b)})`;
+}
+
 function shade(r: number, g: number, b: number, px: number, py: number) {
   const src = rgbToHsl(r, g, b);
   const t = (Math.atan2(py, px) + Math.PI) / (Math.PI * 2);
@@ -252,11 +263,27 @@ function easeInOut(t: number) {
 export default function CoreOrb({
   orb = ORB_DEFAULT,
   controls = true,
+  skin = "plain",
 }: {
   orb?: number;
   /** The bench wants the cycle button and the caption; the chat does not. */
   controls?: boolean;
+  /* "plain" is the grain sphere on the open page, with a silver rim and the
+     real orb fading in when it settles.
+
+     "glass" puts the same sphere INSIDE the orb: the orb's own base gradient
+     behind it, its front glass — the SVG line work — over the top, and the
+     photograph that normally sits between them replaced by the grains.
+
+     The two differ in more than their chrome, and they have to. On the page
+     the ground is white, so the grains are dark, saturated and composited
+     normally. Inside the orb the ground is the orb's own near-black base,
+     so they are bright and composited ADDITIVELY — which is the only way
+     grains glow, and it is also what makes the white line work on top read,
+     since white on white is nothing. */
+  skin?: "plain" | "glass";
 }) {
+  const glass = skin === "glass";
   const reduced = useReducedMotion();
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const orbRef = useRef<HTMLDivElement>(null);
@@ -277,8 +304,11 @@ export default function CoreOrb({
     return () => window.clearTimeout(t);
   }, [auto, thinking]);
 
-  /* The cell is bigger than the orb so the wobble has somewhere to go. */
-  const SIZE = Math.round(orb * 1.28);
+  /* On the page the cell is bigger than the orb so the wobble has somewhere
+     to go. Inside the glass there is nowhere to go — the orb's circle IS the
+     boundary — so the cell is the orb and the sphere is drawn smaller
+     instead, with the slack left as room for the wobble. */
+  const SIZE = Math.round(glass ? orb : orb * 1.28);
 
   useEffect(() => {
     const canvas = canvasRef.current;
@@ -344,14 +374,16 @@ export default function CoreOrb({
           x,
           y,
           z,
-          fill: shade(data[o], data[o + 1], data[o + 2], x, y),
+          fill: glass
+            ? shadeOnDark(data[o], data[o + 1], data[o + 2])
+            : shade(data[o], data[o + 1], data[o + 2], x, y),
           seed: Math.random() * Math.PI * 2,
         });
       }
       grains = built;
 
       const C = SIZE / 2;
-      const R = orb / 2;
+      const R = glass ? (orb / 2) * 0.86 : orb / 2;
 
       const start = performance.now();
       let last = start;
@@ -397,12 +429,20 @@ export default function CoreOrb({
            the way at once, so the orb APPEARS in the bloom instead of
            ghosting up underneath a cloud that is still there. */
         const crisp = Math.max(0, Math.min(1, 1 - e / 0.22));
-        const orbIn = Math.min(1, crisp + fl * 0.9);
-        if (orbRef.current) orbRef.current.style.opacity = String(orbIn);
-        if (fieldRef.current) fieldRef.current.style.opacity = String(1 - crisp);
-        /* The cloud leaves faster than the orb arrives, so there is a beat
-           of pure bloom between the two rather than a dissolve. */
-        canvas.style.opacity = String(Math.max(0, 1 - crisp - fl * 0.75));
+        if (glass) {
+          /* Nothing is handed over. The grains ARE the orb's interior in
+             this skin, so when it settles they settle — they do not get
+             faded out from under a photograph that is not there. */
+          canvas.style.opacity = "1";
+        } else {
+          const orbIn = Math.min(1, crisp + fl * 0.9);
+          if (orbRef.current) orbRef.current.style.opacity = String(orbIn);
+          if (fieldRef.current)
+            fieldRef.current.style.opacity = String(1 - crisp);
+          /* The cloud leaves faster than the orb arrives, so there is a
+             beat of pure bloom between the two rather than a dissolve. */
+          canvas.style.opacity = String(Math.max(0, 1 - crisp - fl * 0.75));
+        }
 
         if (flashRef.current) {
           flashRef.current.style.opacity = String(fl);
@@ -413,6 +453,9 @@ export default function CoreOrb({
         }
 
         ctx.clearRect(0, 0, SIZE, SIZE);
+        /* Additive inside the glass: overlapping grains sum, so density
+           becomes brightness and the limb lights itself. */
+        ctx.globalCompositeOperation = glass ? "lighter" : "source-over";
 
         const cosA = Math.cos(spin);
         const sinA = Math.sin(spin);
@@ -464,7 +507,11 @@ export default function CoreOrb({
           /* Depth, carried entirely by alpha now. On a white page a faint
              grain fades toward the paper, which is what reads as distance —
              the same cue the dark field used to get from dimming. */
-          const a = Math.min(1, (0.22 + depth * 0.7) * (1 + fl * 1.1));
+          const a = Math.min(
+            1,
+            (glass ? 0.14 + depth * 0.62 : 0.22 + depth * 0.7) *
+              (1 + fl * 1.1),
+          );
 
           ctx.globalAlpha = a;
           ctx.fillStyle = gr.fill;
@@ -474,6 +521,7 @@ export default function CoreOrb({
         }
 
         ctx.globalAlpha = 1;
+        ctx.globalCompositeOperation = "source-over";
         raf = requestAnimationFrame(frame);
       };
 
@@ -490,7 +538,105 @@ export default function CoreOrb({
       cancelled = true;
       cancelAnimationFrame(raf);
     };
-  }, [reduced, SIZE, orb]);
+  }, [reduced, SIZE, orb, glass]);
+
+  /* Both skins get the same controls, so the button and the caption are
+     written once and wrapped around whichever stack is built. */
+  function wrap(inner: React.ReactNode) {
+    if (!controls) return inner;
+    return (
+      <div className="flex flex-col items-center gap-3">
+        <button
+          type="button"
+          onClick={() => {
+            setAuto(false);
+            setThinking((v) => !v);
+          }}
+          aria-label={thinking ? "Reform" : "Disintegrate"}
+          className="cursor-pointer"
+        >
+          {inner}
+        </button>
+        <p className="text-[12px] text-[#9a9aa2]">
+          {auto ? "Cycling — click to drive it" : thinking ? "Thinking" : "Done"}
+        </p>
+      </div>
+    );
+  }
+
+  /* THE GLASS SKIN.
+   *
+   * The orb's own stack with its middle layer swapped out. `OrbV2` is three
+   * things: a base gradient, a rotated blurred photograph, and an SVG of
+   * white line work over the top. Here the base and the line work are kept
+   * exactly as that component has them, and the photograph is replaced by
+   * the grain sphere.
+   *
+   * The line work HAS to have something dark under it — every stroke in
+   * that SVG is white or a gradient to white, so on an open page it is
+   * invisible. That is why the base gradient stays even though the
+   * "background" is what was asked to go: the background that goes is the
+   * photograph. Take the base as well and the front glass disappears with
+   * it.
+   *
+   * The sphere is drawn at 0.86 of the orb's radius. The circle is a hard
+   * boundary here, and a wobble that reaches it gets sliced flat against
+   * the inside of the glass. */
+  if (glass) {
+    const k = orb / 137.685;
+    return wrap(
+      <div
+        className="relative overflow-hidden rounded-full"
+        style={{
+          width: orb,
+          height: orb,
+          /* OrbV2's own base, verbatim. */
+          background: "linear-gradient(to bottom, #181818, #525edf)",
+        }}
+        aria-hidden
+      >
+        <canvas
+          ref={canvasRef}
+          className="absolute inset-0"
+          style={{ width: SIZE, height: SIZE, display: "block" }}
+        />
+
+        {/* The bloom, inside the glass with everything else. */}
+        <div
+          ref={flashRef}
+          className="pointer-events-none absolute left-1/2 top-1/2 rounded-full"
+          style={{
+            width: orb * 1.1,
+            height: orb * 1.1,
+            background:
+              "radial-gradient(circle, rgba(255,252,246,0.9) 0%, rgba(255,232,200,0.5) 40%, rgba(255,216,170,0) 74%)",
+            transform: "translate(-50%,-50%)",
+            opacity: 0,
+          }}
+        />
+
+        {/* The front glass. Same asset, same geometry, same overhang as
+            OrbV2 — it hangs off the top-left and the parent's clip trims it
+            back to the sphere. `maxWidth: none`, because the CSS reset
+            would otherwise squash art that is oversized on purpose. */}
+        <Image
+          src="/assets/orb-v2/overlay.svg"
+          alt=""
+          width={152.351 * k}
+          height={156.941 * k}
+          style={{
+            position: "absolute",
+            left: -7.614068508148193 * k,
+            top: -9.941974639892578 * k,
+            width: 152.351 * k,
+            height: 156.941 * k,
+            maxWidth: "none",
+            pointerEvents: "none",
+          }}
+        />
+      </div>,
+    );
+  }
 
   const stack = (
     <div className="relative" style={{ width: SIZE, height: SIZE }} aria-hidden>
@@ -568,24 +714,5 @@ export default function CoreOrb({
     </div>
   );
 
-  if (!controls) return stack;
-
-  return (
-    <div className="flex flex-col items-center gap-3">
-      <button
-        type="button"
-        onClick={() => {
-          setAuto(false);
-          setThinking((v) => !v);
-        }}
-        aria-label={thinking ? "Reform" : "Disintegrate"}
-        className="cursor-pointer"
-      >
-        {stack}
-      </button>
-      <p className="text-[12px] text-[#9a9aa2]">
-        {auto ? "Cycling — click to drive it" : thinking ? "Thinking" : "Done"}
-      </p>
-    </div>
-  );
+  return wrap(stack);
 }
