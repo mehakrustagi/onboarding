@@ -22,6 +22,10 @@
 
 export type OrbArt = {
   id: string;
+  /* The frame size this entry's numbers are written in. The ten from the
+     section are 200px frames; the original orb is its own 137.685 and would
+     put its glass in the wrong place measured against anything else. */
+  base?: number;
   /** Figma's export of the whole frame. Base layer and colour source. */
   src: string;
   /** The front glass group on its own. */
@@ -31,10 +35,28 @@ export type OrbArt = {
   glassBox: { left: number; top: number; width: number; height: number };
 };
 
-/** The frame size every number above is expressed in. */
+/** The frame size the section's orbs are expressed in. */
 export const ORB_ART_BASE = 199.9958;
 
 export const ORB_ART: OrbArt[] = [
+  /* The original — node 405:8740, the orb every one of these treatments was
+     built and measured against. It is not in section 424:8997, which is why
+     it was missing from this page when the section was mapped onto it, and
+     it belongs at the front rather than nowhere.
+     Its `src` is the capture of OrbV2's own render that the particles have
+     always been sampled from, so nothing about it is new here. */
+  {
+    id: "orb-0",
+    base: 137.685,
+    src: "/assets/orb-v2/orb-composed.png",
+    glass: "/assets/orb-v2/overlay.svg",
+    glassBox: {
+      left: -7.614068508148193,
+      top: -9.941974639892578,
+      width: 152.351,
+      height: 156.941,
+    },
+  },
   { id: "orb-1", src: "/assets/orbs/orb-1.png", glass: "/assets/orbs/orb-1-glass.svg", glassBox: { left: -11.0599, top: -14.4413, width: 221.2985, height: 227.9663 } },
   { id: "orb-2", src: "/assets/orbs/orb-2.png", glass: "/assets/orbs/orb-2-glass.svg", glassBox: { left: -10.8892, top: -14.4413, width: 210.9886, height: 227.9663 } },
   { id: "orb-3", src: "/assets/orbs/orb-3.png", glass: "/assets/orbs/orb-3-glass.svg", glassBox: { left: -10.7176, top: -14.4413, width: 221.2983, height: 227.9663 } },

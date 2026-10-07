@@ -402,7 +402,22 @@ export default function CoreOrb({
       off.height = SRC_PX;
       const octx = off.getContext("2d", { willReadFrequently: true });
       if (!octx) return;
+      /* THE SOURCE IS BLURRED BEFORE IT IS SAMPLED.
+         The orbs are photographs — a flag, two coins, a gear — and a
+         photograph has hard edges in it. Sampling one grain per pixel
+         carries those edges straight into the cloud, so orb 7 came out with
+         a crease down it where the flag ends and orb 9 with a rim around
+         each coin: abrupt colour changes between neighbouring grains, which
+         read as seams rather than as a gradient.
+         Blurring first throws away the subject and keeps the colour
+         DISTRIBUTION, which is all this ever wanted from the image. Every
+         orb's grains become a smooth field of its own hues, and the
+         transitions between them are continuous by construction.
+         It is a canvas filter, so it costs one draw at build time and
+         nothing per frame. */
+      octx.filter = `blur(${SRC_PX * 0.03}px)`;
       octx.drawImage(img, 0, 0, SRC_PX, SRC_PX);
+      octx.filter = "none";
       const data = octx.getImageData(0, 0, SRC_PX, SRC_PX).data;
 
       /* FIBONACCI SPHERE. `i + 0.5` over the count gives evenly spaced
@@ -698,7 +713,7 @@ export default function CoreOrb({
     /* Geometry is written in the source frame's own units, so an orb from
        the Figma section keys off its 200px frame and OrbV2 off its 137.685.
        Everything below is a multiple of `k`. */
-    const base = art ? ORB_ART_BASE : 137.685;
+    const base = art ? (art.base ?? ORB_ART_BASE) : 137.685;
     const k = orb / base;
     const gb = art?.glassBox ?? {
       left: -7.614068508148193,
