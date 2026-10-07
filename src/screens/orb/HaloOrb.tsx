@@ -21,9 +21,12 @@ import OrbV2 from "@/components/OrbV2";
  * forced by this project:
  *
  *   motion       imports come from `framer-motion`, not `motion/react`.
- *   colour       the original's monochrome is kept; only its dark-mode
- *                twin is dropped — four more elements that are never drawn
- *                on a page that is always light.
+ *   colour       the original's monochrome is kept, but off pure black and
+ *                under a hair of blur — see INK and ringBlurFor. On #000
+ *                the mask boundary has no antialiasing to hide behind and
+ *                the rings read as pixelated.
+ *                Its dark-mode twin is dropped: four more elements that are
+ *                never drawn on a page that is always light.
  *   structure    the four rings are a table rather than four hand-written
  *                blocks. They differ only in six values, and written out
  *                longhand the fifth one would be written by copying the
@@ -39,8 +42,11 @@ import OrbV2 from "@/components/OrbV2";
  * for the innermost ring to clear it. Change the box ratio and the rings
  * move relative to the orb; change a percentage and they move too. */
 
-/** Default orb diameter. */
-const ORB_DEFAULT = 211;
+/* Default orb diameter. 20% under the 211 the other treatments use, so the
+   whole component — rings, glow and orb together — comes in a fifth
+   smaller. Everything in here is a multiple of this, so it is the only
+   number that has to change. */
+const ORB_DEFAULT = 169;
 
 /* The box is this much bigger than the orb, and it is the one number that
    decides where the rings sit relative to it — see the note above on what
@@ -57,7 +63,15 @@ const FIELD_K = 2.05;
  * Nothing here pulses. The breathing belongs to the orb; rings that also
  * swell turn the whole thing into one object inflating, and the point of a
  * halo is that it is separate from what it is around. */
-const INK = "0, 0, 0";
+/* Not pure black.
+ *
+ * The original is monochrome on #000, which against a white page is the
+ * hardest edge available — and the rings are 3px bands with a 2% feather,
+ * so that edge lands on the stair-stepping of the mask and reads as
+ * pixelated rather than as a line. A dark grey carries the same weight with
+ * a fraction of the contrast at the boundary, which is where all of the
+ * harshness was. */
+const INK = "52, 52, 60";
 
 type Ring = {
   /** The conic sweep: where it starts and what it fades through. */
@@ -111,6 +125,20 @@ function ringMask([a, b, c, d]: Ring["mask"]) {
   return `radial-gradient(circle at 50% 50%, transparent ${a}%, black ${b}%, black ${c}%, transparent ${d}%)`;
 }
 
+/* A hair of blur on every ring, and it is doing more than softening.
+ *
+ * The rings are conic gradients cut by a radial mask, and both of those are
+ * rasterised per pixel with no antialiasing across the mask boundary — so
+ * the edge of a ring is a hard step between the painted pixel and nothing,
+ * which is exactly what "pixelated" looks like. Under a pixel of blur the
+ * step becomes a ramp and the ring reads as drawn rather than as sampled.
+ *
+ * Proportional, with a floor: a fixed blur would be invisible at 169 and
+ * would smear the whole ring away at the chat's 26. */
+function ringBlurFor(orbD: number) {
+  return Math.max(0.35, orbD * 0.0055);
+}
+
 /** Seconds for the halo to arrive and to leave. */
 const IN_S = 0.8;
 const OUT_S = 1.3;
@@ -140,6 +168,7 @@ export default function HaloOrb({
   }, [auto, thinking]);
 
   const field = orb * FIELD_K;
+  const ringBlur = ringBlurFor(orb);
   const fade = {
     duration: thinking ? IN_S : OUT_S,
     ease: [0.22, 1, 0.36, 1] as const,
@@ -176,6 +205,7 @@ export default function HaloOrb({
               background: r.paint,
               WebkitMaskImage: ringMask(r.mask),
               maskImage: ringMask(r.mask),
+              filter: `blur(${ringBlur}px)`,
             }}
             initial={{ opacity: r.opacity }}
             animate={{ opacity: thinking ? r.opacity : 0 }}
