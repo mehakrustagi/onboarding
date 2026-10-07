@@ -108,7 +108,9 @@ export default function GradientOrb({
   /* The silver lining sits OUTSIDE the orb's clip, so it needs its own box
      and its own ring mask. Width is a flat 2px rather than a fraction —
      a proportional rim is a third of a pixel on the 26px chat orb. */
-  const RIM_W = 2;
+  /* Proportional with a floor, like every other stroke here — a flat width
+     is a hairline on the bench and a band in the chat. */
+  const RIM_W = Math.max(0.7, 2 * (orb / ORB_DEFAULT));
   const rimD = orb * 1.035;
   const rimMask = `radial-gradient(circle closest-side, transparent calc(100% - ${RIM_W}px), #000 100%)`;
 

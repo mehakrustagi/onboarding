@@ -53,11 +53,27 @@ const ORB_DEFAULT = 211;
 const SOURCE = "/assets/orb-v2/orb-composed.png";
 const SRC_PX = 400;
 
-/** Grains. Enough to read as a surface, few enough to hold 60fps. */
-const GRAINS = 5200;
+/* Grains and their size BOTH SCALE WITH THE ORB, and that is not a detail.
+ *
+ * They used to be fixed — 5,200 grains at 0.85px whatever the orb was — so
+ * at the chat's 26px the same five thousand dots were packed into a sphere
+ * an eighth of the width, every one of them proportionally eight times too
+ * fat, and the result was a solid blob with none of the grain structure the
+ * bench version is entirely made of. Anything expressed in absolute pixels
+ * while the thing around it scales will do this.
+ *
+ * Count goes with AREA and radius with LENGTH, which is what keeps the
+ * density and the look constant across sizes. */
+function grainsFor(orbD: number) {
+  const k = orbD / ORB_DEFAULT;
+  return Math.max(260, Math.round(5200 * k * k));
+}
 
-/** Grain radius in CSS px, before depth scaling. */
-const GRAIN_R = 0.85;
+function grainRadiusFor(orbD: number) {
+  /* Floored, because below about a third of a pixel a dot stops being
+     drawn as a dot and starts being a faint smear. */
+  return Math.max(0.33, 0.85 * (orbD / ORB_DEFAULT));
+}
 
 /* Perspective: the eye's distance from the sphere's centre in sphere radii.
    Lower is a wider lens and a more dramatic near/far difference. Below about
@@ -279,8 +295,10 @@ export default function CoreOrb({
       const golden = Math.PI * (3 - Math.sqrt(5));
       const built: Grain[] = [];
       const half = SRC_PX / 2;
-      for (let i = 0; i < GRAINS; i++) {
-        const y = 1 - ((i + 0.5) / GRAINS) * 2;
+      const grainCount = grainsFor(orb);
+      const grainR = grainRadiusFor(orb);
+      for (let i = 0; i < grainCount; i++) {
+        const y = 1 - ((i + 0.5) / grainCount) * 2;
         const rad = Math.sqrt(Math.max(0, 1 - y * y));
         const th = golden * i;
         const x = Math.cos(th) * rad;
@@ -418,7 +436,7 @@ export default function CoreOrb({
           const depth = (Z + 1) / 2;
           /* Through the flash the grains swell and brighten, so the cloud
              blooms into the orb rather than being wiped off it. */
-          const rad = GRAIN_R * p * (0.72 + depth * 0.55) * (1 + fl * 0.9);
+          const rad = grainR * p * (0.72 + depth * 0.55) * (1 + fl * 0.9);
           /* Depth, carried entirely by alpha now. On a white page a faint
              grain fades toward the paper, which is what reads as distance —
              the same cue the dark field used to get from dimming. */

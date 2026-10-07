@@ -40,9 +40,13 @@ const ORB_DEFAULT = 211;
 const INNER_K = 1.26;
 const OUTER_K = 1.5;
 
-/* Hairlines, and NOT scaled with the orb — a rim that is proportional
-   lands at a third of a pixel on the 26px chat orb and vanishes. */
-const RIM_W = 1.6;
+/* Proportional, with a floor. A flat width means the rims read as
+   hairlines at 211px and as heavy bands at the chat's 26px — the same
+   component looking like two different ones, which is the whole complaint
+   this is fixing. */
+function rimWidthFor(orbD: number) {
+  return Math.max(0.7, 1.6 * (orbD / ORB_DEFAULT));
+}
 
 /** Degrees per second, at full speed. Opposite signs. */
 const INNER_SPEED = 46;
@@ -78,12 +82,14 @@ function rimMask(w: number) {
 
 function Rim({
   d,
+  w,
   speed,
   running,
   peak,
   reduced,
 }: {
   d: number;
+  w: number;
   speed: number;
   running: boolean;
   peak: number;
@@ -114,8 +120,8 @@ function Rim({
         marginLeft: -d / 2,
         marginTop: -d / 2,
         background: rimPaint(peak),
-        WebkitMaskImage: rimMask(RIM_W),
-        maskImage: rimMask(RIM_W),
+        WebkitMaskImage: rimMask(w),
+        maskImage: rimMask(w),
         rotate: angle,
       }}
     />
@@ -141,7 +147,8 @@ export default function RimOrb({
     return () => window.clearTimeout(t);
   }, [auto, thinking]);
 
-  const field = orb * OUTER_K + RIM_W * 2;
+  const rimW = rimWidthFor(orb);
+  const field = orb * OUTER_K + rimW * 2;
 
   const stack = (
     <div
@@ -151,6 +158,7 @@ export default function RimOrb({
     >
       <Rim
         d={orb * INNER_K}
+        w={rimW}
         speed={INNER_SPEED}
         running={thinking}
         peak={0.85}
@@ -158,6 +166,7 @@ export default function RimOrb({
       />
       <Rim
         d={orb * OUTER_K}
+        w={rimW}
         speed={OUTER_SPEED}
         running={thinking}
         /* Lighter than the inner one. Equal weights read as a target; the

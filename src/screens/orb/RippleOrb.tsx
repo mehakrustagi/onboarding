@@ -49,10 +49,17 @@ const START_K = 1.06;
    Half again as wide as the orb is enough to read as spreading. */
 const END_K = 1.52;
 
-/* The stroke does NOT scale with the orb. A hairline is a hairline at any
-   size, and scaled down to a 26px orb a proportional stroke would land at a
-   third of a pixel and disappear. */
-const RING_W = 1.5;
+/* The stroke DOES scale, with a floor.
+ *
+ * It used to be a flat 1.5px on the reasoning that a hairline is a hairline
+ * at any size. That is true of chrome and false of this: at 132px the ring
+ * is about 1% of the orb and at the chat's 26px the same 1.5px is 6% of it,
+ * so the same component reads as a hairline on the bench and as a heavy
+ * band in the frame. Proportional keeps the two looking like each other;
+ * the floor keeps the small one from vanishing. */
+function ringWidthFor(orbD: number) {
+  return Math.max(0.7, 1.5 * (orbD / ORB_DEFAULT));
+}
 
 /** One ring's whole life. */
 const PERIOD = 2.6;
@@ -84,7 +91,9 @@ const RING_PAINT =
    grey band with a filled disc behind it rather than a hairline. With
    `closest-side` the ray length is exactly the radius, so `100% - RING_W`
    is the rim minus the stroke, which is the annulus we want. */
-const RING_MASK = `radial-gradient(circle closest-side, transparent calc(100% - ${RING_W}px), #000 calc(100% - ${RING_W}px))`;
+function ringMask(w: number) {
+  return `radial-gradient(circle closest-side, transparent calc(100% - ${w}px), #000 calc(100% - ${w}px))`;
+}
 
 /* Lights up almost at once and is gone by 55% of the travel, holding zero
    through the rest. The ring never reaches its full width at any visible
@@ -101,6 +110,7 @@ export default function RippleOrb({ orb = ORB_DEFAULT }: { orb?: number }) {
   /* Padding proportional to the orb, so a small instance does not carry a
      fixed 16px of dead space that dwarfs it. */
   const FIELD = RING_END + ORB * 0.12;
+  const RING_MASK = ringMask(ringWidthFor(ORB));
 
   /* Gate the PROPS, never the tree. `{!reduced && <motion.div/>}` renders on
      the server and vanishes on the client for anyone with the OS setting

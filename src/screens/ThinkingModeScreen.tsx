@@ -169,8 +169,23 @@ type OrbTreatment = (typeof ORB_TREATMENTS)[number]["id"];
 
 const OrbTreatmentContext = createContext<OrbTreatment>("current");
 
-/* The chat's orb box, from the Figma node. Everything scales off it. */
-const CHAT_ORB = 26;
+/* The chat's orb box. 26 is what the Figma node specifies and what the
+ * built screen uses.
+ *
+ * It is a control rather than a constant because the treatments do not all
+ * survive it. Every stroke and grain in them is proportional to the orb
+ * now, so they LOOK like themselves at any size — but proportional also
+ * means a rim that is 1% of a 211px orb is a quarter of a pixel on a 26px
+ * one, and `core`'s grain count goes with area, so at 26px it is eighty
+ * grains instead of five thousand. Below about 40px, `rims` and `core` are
+ * making a point they do not have the pixels to make.
+ *
+ * So you can see each one at the size the screen gives it and at sizes it
+ * would need, and decide whether the indicator should grow for the thinking
+ * state rather than guessing from the bench. */
+const ORB_SIZES = [26, 44, 64] as const;
+
+const OrbSizeContext = createContext<number>(26);
 
 /* The stages of the flow, in the order the Figma board lays them out. Each
  * one is a section on the "thinking mode animation" page; the sub-CTAs
@@ -194,9 +209,11 @@ export default function ThinkingModeScreen() {
      as a new run for the same reason. */
   const [run, setRun] = useState(0);
   const [treatment, setTreatment] = useState<OrbTreatment>("current");
+  const [orbSize, setOrbSize] = useState<number>(26);
 
   return (
     <OrbTreatmentContext.Provider value={treatment}>
+    <OrbSizeContext.Provider value={orbSize}>
     <div className="flex flex-col items-center gap-3">
       {/* Sub-CTAs — which state of the flow the phone is showing. */}
       <nav className="mb-1 flex flex-wrap items-center justify-center gap-1.5">
@@ -253,6 +270,33 @@ export default function ThinkingModeScreen() {
             </button>
           );
         })}
+
+        {/* Only useful once a treatment is on — the built screen's own orb
+            is 26px by definition. */}
+        {treatment !== "current" && (
+          <>
+            <span className="mx-1 h-3 w-px bg-black/15" aria-hidden />
+            {ORB_SIZES.map((px) => (
+              <button
+                key={px}
+                type="button"
+                aria-current={px === orbSize ? "true" : undefined}
+                onClick={() => {
+                  setOrbSize(px);
+                  setRun((r) => r + 1);
+                }}
+                className={
+                  "rounded-full px-2.5 py-1 text-[12px] tabular-nums transition-colors " +
+                  (px === orbSize
+                    ? "bg-[#0b0b0b] text-white"
+                    : "bg-black/5 text-[#4b4b53] hover:bg-black/10")
+                }
+              >
+                {px}
+              </button>
+            ))}
+          </>
+        )}
       </nav>
 
       <div
@@ -278,6 +322,7 @@ export default function ThinkingModeScreen() {
       </div>
       <p className="text-[12px] text-[#8b8b93]">tap the screen to replay</p>
     </div>
+    </OrbSizeContext.Provider>
     </OrbTreatmentContext.Provider>
   );
 }
@@ -598,6 +643,7 @@ function AgentOrb({
   top?: number;
 }) {
   const treatment = useContext(OrbTreatmentContext);
+  const size = useContext(OrbSizeContext);
 
   /* The two bench treatments are centred on a field WIDER than the orb —
      the ripple needs somewhere for its rings to go, the atoms need somewhere
@@ -609,22 +655,25 @@ function AgentOrb({
     return (
       <motion.div
         className="pointer-events-none absolute"
-        style={{ left: 24 + CHAT_ORB / 2, top: top + CHAT_ORB / 2 }}
+        /* Centred on the SLOT the built orb occupies, whatever size the
+           treatment is drawn at, so a bigger one grows about that point
+           instead of pushing the text. */
+        style={{ left: 24 + 26 / 2, top: top + 26 / 2 }}
         initial={{ opacity: 0 }}
         animate={{ opacity: visible ? 1 : 0 }}
         transition={{ duration: 0.55, ease: IN_EASE }}
       >
         <div className="absolute left-0 top-0 -translate-x-1/2 -translate-y-1/2">
           {treatment === "ripple" ? (
-            <RippleOrb orb={CHAT_ORB} />
+            <RippleOrb orb={size} />
           ) : treatment === "mush" ? (
-            <GradientOrb orb={CHAT_ORB} controls={false} />
+            <GradientOrb orb={size} controls={false} />
           ) : treatment === "rims" ? (
-            <RimOrb orb={CHAT_ORB} controls={false} />
+            <RimOrb orb={size} controls={false} />
           ) : treatment === "core" ? (
-            <CoreOrb orb={CHAT_ORB} controls={false} />
+            <CoreOrb orb={size} controls={false} />
           ) : (
-            <TwirlOrb orb={CHAT_ORB} controls={false} />
+            <TwirlOrb orb={size} controls={false} />
           )}
         </div>
       </motion.div>
