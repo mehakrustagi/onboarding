@@ -5,6 +5,7 @@ import Image from "next/image";
 import RippleOrb from "@/screens/orb/RippleOrb";
 import TwirlOrb from "@/screens/orb/TwirlOrb";
 import CoreOrb from "@/screens/orb/CoreOrb";
+import HaloOrb from "@/screens/orb/HaloOrb";
 import GradientOrb from "@/screens/orb/GradientOrb";
 import RimOrb from "@/screens/orb/RimOrb";
 import { motion } from "framer-motion";
@@ -163,6 +164,7 @@ const ORB_TREATMENTS = [
   { id: "mush", label: "Swirl" },
   { id: "rims", label: "Rims" },
   { id: "core", label: "Core" },
+  { id: "halo", label: "Halo" },
 ] as const;
 
 type OrbTreatment = (typeof ORB_TREATMENTS)[number]["id"];
@@ -672,6 +674,8 @@ function AgentOrb({
             <RimOrb orb={size} controls={false} />
           ) : treatment === "core" ? (
             <CoreOrb orb={size} controls={false} />
+          ) : treatment === "halo" ? (
+            <HaloOrb orb={size} controls={false} />
           ) : (
             <TwirlOrb orb={size} controls={false} />
           )}

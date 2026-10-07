@@ -1,6 +1,7 @@
 import RippleOrb from "@/screens/orb/RippleOrb";
 import TwirlOrb from "@/screens/orb/TwirlOrb";
 import CoreOrb from "@/screens/orb/CoreOrb";
+import HaloOrb from "@/screens/orb/HaloOrb";
 import GradientOrb from "@/screens/orb/GradientOrb";
 import RimOrb from "@/screens/orb/RimOrb";
 import OrbV2 from "@/components/OrbV2";
@@ -51,6 +52,12 @@ const VARIANTS = [
     title: "Core",
     note: "The orb disintegrates into a few thousand fine grains on a real sphere \u2014 a surface plot of itself \u2014 which turns, wobbles on a height field, and glows where the grains stack up. Then it reforms. The dark field is deliberate: additive light needs somewhere dark to be light against.",
     render: <CoreOrb />,
+  },
+  {
+    id: "halo",
+    title: "Halo",
+    note: "Four masked rings turning behind the orb at different speeds and directions, in gold and silver, with the orb breathing inside them. Adapted from a loader; the ring stack is the same, the monochrome and the text are not.",
+    render: <HaloOrb />,
   },
 ];
 
