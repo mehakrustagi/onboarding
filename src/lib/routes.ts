@@ -71,9 +71,15 @@ export const NAV_ROUTES: NavRoute[] = [
     kind: "flow",
   },
   {
-    href: "/orb",
-    label: "Orb",
-    blurb: "One orb, treated several ways",
+    href: "/orbs",
+    label: "Orbs",
+    blurb: "The orb as it is meant to ship",
+    kind: "bench",
+  },
+  {
+    href: "/test-orb",
+    label: "Orb tests",
+    blurb: "Six treatments side by side, with the dials open",
     kind: "bench",
   },
   {

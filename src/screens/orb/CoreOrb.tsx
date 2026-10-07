@@ -5,6 +5,7 @@ import { useEffect, useRef, useState } from "react";
 import { useReducedMotion } from "framer-motion";
 
 import OrbV2 from "@/components/OrbV2";
+import { ORB_ART_BASE, type OrbArt } from "./orbArt";
 
 /* Variant 5 — core.
  *
@@ -308,6 +309,7 @@ export default function CoreOrb({
   controls = true,
   skin = "plain",
   tunable = false,
+  art,
 }: {
   orb?: number;
   /** The bench wants the cycle button and the caption; the chat does not. */
@@ -327,6 +329,11 @@ export default function CoreOrb({
   skin?: "plain" | "glass";
   /** Shows the sliders. The bench wants them; the chat frame does not. */
   tunable?: boolean;
+  /* Which orb the glass skin wears. Without it the skin uses OrbV2 — the
+     one orb this treatment was built against — and with it, any of the ten
+     from the Figma section, each colouring its own particles because the
+     colour source and the artwork are the same file. Ignored by `plain`. */
+  art?: OrbArt;
 }) {
   const glass = skin === "glass";
   const [tune, setTune] = useState<CoreTuning>(CORE_DEFAULTS);
@@ -339,6 +346,7 @@ export default function CoreOrb({
   const orbRef = useRef<HTMLDivElement>(null);
   const fieldRef = useRef<HTMLDivElement>(null);
   const flashRef = useRef<HTMLDivElement>(null);
+  const glassRef = useRef<HTMLDivElement>(null);
 
   const [thinking, setThinking] = useState(true);
   const thinkingRef = useRef(true);
@@ -382,7 +390,10 @@ export default function CoreOrb({
     let prevEnergy = 0;
 
     const img = new window.Image();
-    img.src = SOURCE;
+    /* The particles are sampled out of whatever the orb actually IS, so an
+       orb's grains are always its own colours and nothing has to be
+       hand-picked per orb. */
+    img.src = art?.src ?? SOURCE;
 
     img.onload = () => {
       if (cancelled) return;
@@ -497,6 +508,9 @@ export default function CoreOrb({
         const orbIn = Math.min(1, crisp + fl * 0.9);
         if (orbRef.current) orbRef.current.style.opacity = String(orbIn);
         if (fieldRef.current) fieldRef.current.style.opacity = String(1 - crisp);
+        /* The separately drawn glass only exists while the base is faded —
+           the base already contains it. */
+        if (glassRef.current) glassRef.current.style.opacity = String(1 - crisp);
         /* The cloud leaves faster than the orb arrives, so there is a beat
            of pure bloom between the two rather than a dissolve. */
         canvas.style.opacity = String(Math.max(0, 1 - crisp - fl * 0.75));
@@ -589,7 +603,7 @@ export default function CoreOrb({
       cancelled = true;
       cancelAnimationFrame(raf);
     };
-  }, [reduced, SIZE, orb, glass, tune.density]);
+  }, [reduced, SIZE, orb, glass, tune.density, art?.src]);
 
   /* Both skins get the same controls, so the button and the caption are
      written once and wrapped around whichever stack is built. */
@@ -681,39 +695,66 @@ export default function CoreOrb({
    * boundary here, and a wobble that reaches it gets sliced flat against
    * the inside of the glass. */
   if (glass) {
-    const k = orb / 137.685;
+    /* Geometry is written in the source frame's own units, so an orb from
+       the Figma section keys off its 200px frame and OrbV2 off its 137.685.
+       Everything below is a multiple of `k`. */
+    const base = art ? ORB_ART_BASE : 137.685;
+    const k = orb / base;
+    const gb = art?.glassBox ?? {
+      left: -7.614068508148193,
+      top: -9.941974639892578,
+      width: 152.351,
+      height: 156.941,
+    };
+    const glassSrc = art?.glass ?? "/assets/orb-v2/overlay.svg";
+
     return wrap(
       <div
         className="relative overflow-hidden rounded-full"
-        style={{
-          width: orb,
-          height: orb,
-          /* A TINT, not white, and not the orb's base either.
-             Pure white gave the front layer nothing to sit against — every
-             stroke in that SVG is white or a gradient to white, so over a
-             white interior the glass is only visible where it happens to
-             cross a grain. The orb's own base is the other extreme: dark
-             enough to read as a black disc, which is what it looked like.
-             These are three of the orb's own hues at very low alpha, placed
-             where that colour sits on the orb — warm at the upper left,
-             green at the lower right, violet at the lower left — over a
-             near-white ground. Light enough that the sphere still reads as
-             floating on the page, coloured enough that the glass has
-             something to reflect. */
-          background: [
-            "radial-gradient(circle at 30% 24%, rgba(236,190,150,0.34) 0%, rgba(236,190,150,0) 58%)",
-            "radial-gradient(circle at 74% 70%, rgba(123,160,96,0.26) 0%, rgba(123,160,96,0) 58%)",
-            "radial-gradient(circle at 18% 76%, rgba(150,96,168,0.24) 0%, rgba(150,96,168,0) 55%)",
-            "linear-gradient(158deg, #fffdfa 0%, #fbf6f2 100%)",
-          ].join(", "),
-        }}
+        style={{ width: orb, height: orb, background: "#ffffff" }}
         aria-hidden
       >
-        {/* The orb's BACKGROUND — everything but the front layer. This is
-            what fades out as the grains come apart and back in as they
-            land, so the settled state is the complete orb. */}
+        {/* THE WASH, and it never fades. A blurred, faint copy of the orb
+            itself, which gives the front glass something to be seen
+            against while the body behind it is gone — every stroke in that
+            SVG is white or a gradient to white, so over a white interior
+            the glass is only visible where it crosses a grain.
+            It is the orb's OWN image rather than a hand-picked tint, which
+            is the only thing that works across ten orbs: each one washes
+            its interior in its own colours without anyone choosing them. */}
+        <Image
+          src={art?.src ?? SOURCE}
+          alt=""
+          width={orb}
+          height={orb}
+          sizes={`${Math.ceil(orb)}px`}
+          style={{
+            position: "absolute",
+            inset: 0,
+            width: orb,
+            height: orb,
+            maxWidth: "none",
+            filter: `blur(${orb * 0.11}px)`,
+            opacity: 0.3,
+          }}
+        />
+
+        {/* The orb itself — the base that fades out as the grains come
+            apart and back in as they land, so the settled state is the
+            complete orb. */}
         <div ref={orbRef} className="absolute inset-0" style={{ opacity: 1 }}>
-          <OrbV2 size={orb} showOverlay={false} />
+          {art ? (
+            <Image
+              src={art.src}
+              alt=""
+              width={orb}
+              height={orb}
+              sizes={`${Math.ceil(orb)}px`}
+              style={{ width: orb, height: orb, maxWidth: "none" }}
+            />
+          ) : (
+            <OrbV2 size={orb} showOverlay={false} />
+          )}
         </div>
 
         <canvas
@@ -735,37 +776,40 @@ export default function CoreOrb({
           }}
         />
 
-        {/* THE FRONT LAYER, and it never fades. Same asset, same geometry
-            and same overhang as OrbV2 — it hangs off the top-left and the
-            parent's clip trims it back to the sphere. `maxWidth: none`,
-            because the CSS reset would otherwise squash art that is
-            oversized on purpose.
+        {/* THE FRONT GLASS, shown only while the body is faded.
+            For the Figma orbs the base export already has this baked into
+            it, so drawing it at rest as well would put the same white
+            strokes down twice and the line work would come out brighter
+            than the design. `glassRef` is driven by the inverse of the
+            base's opacity: as the orb dissolves this takes over, and as it
+            reassembles this gets out of the way.
 
-            The drop-shadow is not decoration. Every stroke in that SVG is
-            white or a gradient to white, so over the grains on a white
-            interior there are long stretches where it is white on white and
-            simply is not there. A half-pixel of dark under it gives each
-            stroke an edge to be seen by, and leaves it white. */}
-        <Image
-          src="/assets/orb-v2/overlay.svg"
-          alt=""
-          width={152.351 * k}
-          height={156.941 * k}
-          style={{
-            position: "absolute",
-            left: -7.614068508148193 * k,
-            top: -9.941974639892578 * k,
-            width: 152.351 * k,
-            height: 156.941 * k,
-            maxWidth: "none",
-            pointerEvents: "none",
-            filter: `drop-shadow(0 0 ${Math.max(0.5, orb * 0.004)}px rgba(60,52,70,0.55))`,
-          }}
-        />
+            The drop-shadow is not decoration — see the wash above. Over the
+            grains there are long stretches where white meets white, and
+            half a pixel of dark gives each stroke an edge to be seen by
+            while leaving it white. */}
+        <div ref={glassRef} className="absolute inset-0" style={{ opacity: 0 }}>
+          <Image
+            src={glassSrc}
+            alt=""
+            width={gb.width * k}
+            height={gb.height * k}
+            style={{
+              position: "absolute",
+              left: gb.left * k,
+              top: gb.top * k,
+              width: gb.width * k,
+              height: gb.height * k,
+              maxWidth: "none",
+              pointerEvents: "none",
+              filter: `drop-shadow(0 0 ${Math.max(0.5, orb * 0.004)}px rgba(60,52,70,0.55))`,
+            }}
+          />
+        </div>
 
-        {/* The glass edge. Without the dark interior there is nothing else
-            giving the circle a boundary, and a ball of dots with no rim
-            does not read as being inside anything. */}
+        {/* The glass edge, for the stretch where the orb is not drawing its
+            own. A ball of dots with no rim does not read as being inside
+            anything. */}
         <div
           ref={fieldRef}
           className="pointer-events-none absolute inset-0 rounded-full"
