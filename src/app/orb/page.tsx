@@ -70,13 +70,27 @@ export default function OrbPage() {
         </p>
       </header>
 
-      <div className="flex w-full max-w-[920px] flex-col gap-14">
+      {/* Two to a row, so a treatment can be watched against its neighbour
+          rather than remembered from further up the page — which is the
+          only thing this bench exists to make possible. One column below
+          the breakpoint, because two 340px cells plus their gutters do not
+          fit a phone and a squeezed tile tells you nothing.
+
+          Each tile gets a fixed minimum height so the row does not step
+          when one treatment's field is taller than the other's. */}
+      <div className="grid w-full max-w-[920px] grid-cols-1 gap-x-8 gap-y-14 md:grid-cols-2">
         {VARIANTS.map((v) => (
-          <section key={v.id} className="flex flex-col items-center gap-5">
-            <div data-variant={v.id} className="flex items-center justify-center">
+          <section
+            key={v.id}
+            className="flex flex-col items-center justify-start gap-5"
+          >
+            <div
+              data-variant={v.id}
+              className="flex min-h-[380px] items-center justify-center"
+            >
               {v.render}
             </div>
-            <div className="flex max-w-[420px] flex-col gap-1 text-center">
+            <div className="flex max-w-[400px] flex-col gap-1 text-center">
               <h2 className="text-[15px] font-medium text-[#0b0b0b]">{v.title}</h2>
               <p className="text-[13px] leading-[18px] text-[#6b6b73]">
                 {v.note}

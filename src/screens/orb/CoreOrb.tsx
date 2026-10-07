@@ -28,12 +28,23 @@ import OrbV2 from "@/components/OrbV2";
  * it turns. The spiral puts every point at an equal share of the surface
  * with no axis and no seam.
  *
- * WHY THE FIELD IS DARK, when the page is white and the other variants are
- * not: this one is drawn with additive compositing, which is the only way to
- * get grains to GLOW — overlapping ones have to sum. Summing toward white on
- * a white ground is invisible. The dark disc is what the light is light
- * against; it lives only inside the orb's own circle and the real orb fades
- * up over it at the end. */
+ * IT USED TO SIT ON A DARK DISC, and the two go together: the grains were
+ * composited ADDITIVELY, which is the only way to make overlapping ones
+ * glow, and additive light summing toward white is invisible on a white
+ * ground. The disc was what the light was light against.
+ *
+ * The disc had to go — it read as a black plate behind the orb, which is a
+ * heavy thing to put on a white page for an effect that is meant to be a
+ * status. So the compositing went with it. Grains are drawn normally now,
+ * in their own colours, and DEPTH IS CARRIED BY ALPHA: a grain on the far
+ * side is faint, which on white means it fades toward the page, which is
+ * exactly how something behind something else should look. The sphere reads
+ * as a volume for the same reason it did before, without needing the dark.
+ *
+ * What is lost is the bloom where grains stacked up. What replaces it is the
+ * rim: a thin silver-white ring on the sphere's edge with a soft shadow
+ * under it, which gives the orb its lift without putting anything heavy
+ * behind it. */
 
 /** Default orb diameter. */
 const ORB_DEFAULT = 211;
@@ -77,6 +88,10 @@ type Grain = {
   /** Per-grain phase for the micro-jitter. */
   seed: number;
 };
+
+function clamp255(v: number) {
+  return v < 0 ? 0 : v > 255 ? 255 : v | 0;
+}
 
 function easeInOut(t: number) {
   return t < 0.5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2;
@@ -205,10 +220,6 @@ export default function CoreOrb({
         canvas.style.opacity = String(1 - crisp);
 
         ctx.clearRect(0, 0, SIZE, SIZE);
-        /* ADDITIVE. Overlapping grains sum, so density becomes brightness
-           and the limb — where a sphere's surface stacks up along the line
-           of sight — lights itself without being drawn any differently. */
-        ctx.globalCompositeOperation = "lighter";
 
         const cosA = Math.cos(spin);
         const sinA = Math.sin(spin);
@@ -255,28 +266,32 @@ export default function CoreOrb({
           /* Depth: 0 at the far pole, 1 at the near one. */
           const depth = (Z + 1) / 2;
           const rad = GRAIN_R * p * (0.72 + depth * 0.55);
-          /* The far side still shows — it is a cloud of light, not an opaque
-             shell — but it is dim enough to read as behind. */
-          const a = 0.2 + depth * 0.65;
+          /* Depth, carried entirely by alpha now. On a white page a faint
+             grain fades toward the paper, which is what reads as distance —
+             the same cue the dark field used to get from dimming. */
+          const a = 0.16 + depth * 0.72;
 
           ctx.globalAlpha = a;
-          /* Lifted. The orb's own mid-tones are not bright enough to glow
-             when they are only a pixel across on a near-black field — the
-             sphere came out as a dark dotted ball rather than a core with
-             light in it. The lift is clamped, so the pale parts of the orb
-             saturate to white at the limb where the grains stack up, which
-             is where a real one would blow out anyway. */
-          ctx.fillStyle = `rgb(${Math.min(255, (gr.r * 1.4) | 0)},${Math.min(
-            255,
-            (gr.g * 1.4) | 0,
-          )},${Math.min(255, (gr.b * 1.4) | 0)})`;
+          /* Saturated and very slightly deepened rather than brightened.
+             Against black the grains had to be lifted to glow; against
+             white the opposite is true — the orb's pale regions are the
+             ones at risk of vanishing, and pushing each channel away from
+             its own luminance is what keeps them present without turning
+             the whole sphere muddy. */
+          const lum = gr.r * 0.299 + gr.g * 0.587 + gr.b * 0.114;
+          const sat = 1.35;
+          const dim = 0.94;
+          ctx.fillStyle = `rgb(${clamp255(
+            (lum + (gr.r - lum) * sat) * dim,
+          )},${clamp255((lum + (gr.g - lum) * sat) * dim)},${clamp255(
+            (lum + (gr.b - lum) * sat) * dim,
+          )})`;
           ctx.beginPath();
           ctx.arc(sx, sy, rad, 0, Math.PI * 2);
           ctx.fill();
         }
 
         ctx.globalAlpha = 1;
-        ctx.globalCompositeOperation = "source-over";
         raf = requestAnimationFrame(frame);
       };
 
@@ -297,24 +312,42 @@ export default function CoreOrb({
 
   const stack = (
     <div className="relative" style={{ width: SIZE, height: SIZE }} aria-hidden>
-      {/* The dark field the grains are light against. Ships at opacity 0
-          because the loop starts settled, so the markup the server sends and
-          the first client frame already agree. */}
+      {/* THE RIM. A thin silver-white ring on the sphere's edge, with a
+          soft shadow under it — the whole of the orb's lift, and the thing
+          that replaced the dark disc that used to sit behind it.
+
+          Two highlights on opposite sides rather than one. A single bright
+          point reads as a light passing by; two opposed ones read as a
+          turned metal edge, which is what gives it the elevation.
+
+          `closest-side` and `100%` on the mask: a bare radial-gradient
+          sizes to the farthest CORNER, so a stop at 50% lands at 0.354 of
+          the width and the ring comes out as a disc. */}
       <div
         ref={fieldRef}
         className="absolute left-1/2 top-1/2 rounded-full"
         style={{
-          /* Wider than the grain sphere and faded out over most of that
-             extra width. At 1.18 with the falloff starting at 62% it read
-             as a black PLATE sitting behind the orb — a hard disc edge is
-             the one thing that gives away that the dark is a layer rather
-             than space. */
-          width: orb * 1.5,
-          height: orb * 1.5,
-          marginLeft: -(orb * 1.5) / 2,
-          marginTop: -(orb * 1.5) / 2,
+          /* OUTSIDE the grain sphere, not on it. The grains' silhouette
+             sits at about 1.13 of the orb's radius once the height field
+             is at full amplitude, so a ring drawn at `orb` is buried in
+             the cloud and invisible. This rings it. */
+          width: orb * 1.17,
+          height: orb * 1.17,
+          marginLeft: -(orb * 1.17) / 2,
+          marginTop: -(orb * 1.17) / 2,
           background:
-            "radial-gradient(circle, #0d0a16 0%, #0c0914 34%, rgba(11,8,18,0.55) 58%, rgba(11,8,18,0) 78%)",
+            "conic-gradient(from 212deg," +
+            " rgba(255,255,255,0.95) 0deg," +
+            " rgba(176,182,196,0.45) 52deg," +
+            " rgba(255,255,255,0.9) 120deg," +
+            " rgba(158,166,184,0.35) 198deg," +
+            " rgba(252,251,255,0.92) 286deg," +
+            " rgba(255,255,255,0.95) 360deg)",
+          WebkitMaskImage: `radial-gradient(circle closest-side, transparent calc(100% - 1.5px), #000 100%)`,
+          maskImage: `radial-gradient(circle closest-side, transparent calc(100% - 1.5px), #000 100%)`,
+          /* Below the ring, not around it — an elevation shadow, offset
+             down, not a glow. */
+          boxShadow: `0 ${orb * 0.045}px ${orb * 0.1}px ${-orb * 0.03}px rgba(64,56,78,0.22)`,
           opacity: 0,
         }}
       />
