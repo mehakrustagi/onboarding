@@ -82,15 +82,55 @@ type Grain = {
   x: number;
   y: number;
   z: number;
-  r: number;
-  g: number;
-  b: number;
+  /** Final `rgb(...)` string, computed once at build time — there are five
+   *  thousand of these and the arithmetic does not change per frame. */
+  fill: string;
   /** Per-grain phase for the micro-jitter. */
   seed: number;
 };
 
 function clamp255(v: number) {
   return v < 0 ? 0 : v > 255 ? 255 : v | 0;
+}
+
+/* Luminance is REMAPPED INTO A BAND, not just saturated.
+ *
+ * The orb is lit, so a large part of it — the glare across its upper left
+ * and the pale wash at its lower right — is within a few percent of white.
+ * As a solid surface that is fine. As five thousand separate grains on a
+ * white page it is a hole: those grains are the colour of the paper, so the
+ * sphere came out with its middle missing and a bright rind around the
+ * edge, which is the opposite of how a lit ball should read.
+ *
+ * Squeezing luminance into [LO, HI] guarantees no grain can land near the
+ * page, and no grain can go to black either. It is done by scaling all
+ * three channels by the same factor, so the hue and the chroma ratio are
+ * untouched — only how light the grain is changes. Saturation is applied
+ * after, around the NEW luminance, or the remap would wash out what it had
+ * just preserved. */
+const LO = 80;
+const HI = 172;
+const SAT = 1.8;
+
+/* HI is the number that matters, and it wants to be lower than it looks
+   like it should. At 196 nothing was white any more and the hole was gone,
+   but a quarter of the sphere still sat close enough to the page to read as
+   cream, so the whole thing came out dusty. Dropping the ceiling to 172
+   costs the orb its glare — which, as five thousand dots on white, was
+   never surviving anyway — and buys every grain a colour you can name. SAT
+   then has room to work, because chroma on a mid-tone has somewhere to go
+   and chroma on a near-white does not. */
+
+function shade(r: number, g: number, b: number) {
+  const lum = r * 0.299 + g * 0.587 + b * 0.114;
+  const target = LO + (lum / 255) * (HI - LO);
+  const k = target / Math.max(lum, 1);
+  const nr = r * k;
+  const ng = g * k;
+  const nb = b * k;
+  return `rgb(${clamp255(target + (nr - target) * SAT)},${clamp255(
+    target + (ng - target) * SAT,
+  )},${clamp255(target + (nb - target) * SAT)})`;
 }
 
 function easeInOut(t: number) {
@@ -179,9 +219,7 @@ export default function CoreOrb({
           x,
           y,
           z,
-          r: data[o],
-          g: data[o + 1],
-          b: data[o + 2],
+          fill: shade(data[o], data[o + 1], data[o + 2]),
           seed: Math.random() * Math.PI * 2,
         });
       }
@@ -269,23 +307,10 @@ export default function CoreOrb({
           /* Depth, carried entirely by alpha now. On a white page a faint
              grain fades toward the paper, which is what reads as distance —
              the same cue the dark field used to get from dimming. */
-          const a = 0.16 + depth * 0.72;
+          const a = 0.22 + depth * 0.7;
 
           ctx.globalAlpha = a;
-          /* Saturated and very slightly deepened rather than brightened.
-             Against black the grains had to be lifted to glow; against
-             white the opposite is true — the orb's pale regions are the
-             ones at risk of vanishing, and pushing each channel away from
-             its own luminance is what keeps them present without turning
-             the whole sphere muddy. */
-          const lum = gr.r * 0.299 + gr.g * 0.587 + gr.b * 0.114;
-          const sat = 1.35;
-          const dim = 0.94;
-          ctx.fillStyle = `rgb(${clamp255(
-            (lum + (gr.r - lum) * sat) * dim,
-          )},${clamp255((lum + (gr.g - lum) * sat) * dim)},${clamp255(
-            (lum + (gr.b - lum) * sat) * dim,
-          )})`;
+          ctx.fillStyle = gr.fill;
           ctx.beginPath();
           ctx.arc(sx, sy, rad, 0, Math.PI * 2);
           ctx.fill();
