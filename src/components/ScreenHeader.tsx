@@ -1,64 +1,28 @@
-import Link from "next/link";
-
-/* Header for the prototype routes.
+/* Title and standfirst for a prototype route.
  *
- * These pages are review surfaces, not product — someone opening a Vercel
- * preview link needs to know which variant they're looking at and how to
- * reach the others without editing the URL. Kept quiet and grey so it
- * frames the phone rather than competing with it. */
-
-const ROUTES = [
-  { href: "/payment-transition", label: "Scattered" },
-  { href: "/payment-transition-v2", label: "Reel" },
-  { href: "/post-payment", label: "Post-payment" },
-  { href: "/profile", label: "Profile" },
-  { href: "/thinking-mode", label: "Thinking mode" },
-  { href: "/trips", label: "Trips" },
-  { href: "/trip-vault", label: "Trip vault" },
-  { href: "/loyalty", label: "Loyalty" },
-] as const;
+ * It used to carry its own row of route pills, and the home page carried a
+ * second grid of the same links that had already drifted out of step with
+ * it. Both are gone: `SiteNav` in the root layout is the only navigation,
+ * and it knows the current route from the pathname, so this no longer needs
+ * an `active` prop to be kept in sync by hand.
+ *
+ * What is left is the thing the nav cannot say — what you are looking at and
+ * what is worth watching for. Kept quiet and grey so it frames the phone
+ * rather than competing with it. */
 
 export default function ScreenHeader({
   title,
   description,
-  active,
 }: {
   title: string;
   description: string;
-  /** Href of the current route, so it can be marked in the nav. */
-  active: string;
 }) {
   return (
-    <header className="mb-8 flex w-full max-w-[560px] flex-col items-center gap-4 text-center">
-      <div className="flex flex-col gap-1.5">
-        <h1 className="text-[22px] font-medium tracking-[-0.4px] text-[#0b0b0b]">
-          {title}
-        </h1>
-        <p className="text-[14px] leading-[20px] text-[#6b6b73]">
-          {description}
-        </p>
-      </div>
-
-      <nav className="flex flex-wrap items-center justify-center gap-1.5">
-        {ROUTES.map((r) => {
-          const isActive = r.href === active;
-          return (
-            <Link
-              key={r.href}
-              href={r.href}
-              aria-current={isActive ? "page" : undefined}
-              className={
-                "rounded-full px-3.5 py-1.5 text-[13px] transition-colors " +
-                (isActive
-                  ? "bg-[#0b0b0b] text-white"
-                  : "bg-black/5 text-[#4b4b53] hover:bg-black/10")
-              }
-            >
-              {r.label}
-            </Link>
-          );
-        })}
-      </nav>
+    <header className="mb-8 flex w-full max-w-[560px] flex-col gap-1.5 text-center">
+      <h1 className="text-[22px] font-medium tracking-[-0.4px] text-[#0b0b0b]">
+        {title}
+      </h1>
+      <p className="text-[14px] leading-[20px] text-[#6b6b73]">{description}</p>
     </header>
   );
 }

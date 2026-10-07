@@ -7,7 +7,6 @@ export default function ThinkingModePage() {
       <ScreenHeader
         title="Thinking mode"
         description="Pre-thinking: the message is sent and the agent tree assembles under it — orb, step lines, then sub-agents hung off drawing connectors."
-        active="/thinking-mode"
       />
       <ThinkingModeScreen />
     </main>

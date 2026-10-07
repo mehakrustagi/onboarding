@@ -7,7 +7,6 @@ export default function TripsPage() {
       <ScreenHeader
         title="Trips"
         description="Payment success hands off to MyTrip on an iPhone-style knock — the phone rattles, the slab wobbles, and the colour carries the new screen up from the bottom edge. MyTrip itself is a first pass above the fold."
-        active="/trips"
       />
       <TripsScreen />
     </main>
