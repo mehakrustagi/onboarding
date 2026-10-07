@@ -101,20 +101,10 @@ function grainPlan(orbD: number, dpr: number, density: number) {
   return { count, radius };
 }
 
-/* The largest the wave can get: the three harmonics sum to 1 and the micro
-   term adds 0.16. Used to remap it one-sided for the glass skin, so it has
-   to track those numbers — change a harmonic and change this. */
-const AMP = 1.16;
-
 /* The merge. `FLASH_AT` is where in the condense the cloud is considered
    to have arrived; `FLASH_S` is how long the bloom takes to die. */
 const FLASH_AT = 0.14;
 const FLASH_S = 0.62;
-
-/* How deep the band is that grains are compressed into when they meet the
-   glass, as a fraction of the orb. Too thin and it is a drawn border again;
-   too thick and the sphere looks like it is dissolving into its own edge. */
-const COLLIDE_BAND = 0.055;
 
 /** How far the cloud draws in on itself just before it lands. */
 const GATHER_PULL = 0.055;
@@ -445,12 +435,15 @@ export default function CoreOrb({
       grains = built;
 
       const C = SIZE / 2;
-      /* Inside the glass the sphere IS the glass: same radius, no slack.
-         The wobble is made one-sided to go with it — see the height field
-         below — so the limb is never pulled inside the wall and the grains
-         press against it at all times. On the open page there is no wall,
-         so the wobble stays two-sided and the sphere breathes both ways. */
-      const R = orb / 2;
+      /* Inside the glass the sphere is drawn a little under the circle so
+         it never meets it. The motion is then IDENTICAL in both skins —
+         same two-sided wobble, same silhouette, same breathing — and the
+         glass is only what is in front of it.
+         It briefly worked the other way: full radius, a one-sided wobble so
+         the limb always touched, and grains stopped dead at the wall. That
+         is a different object — a jar with something pressed against the
+         inside of it — and what was wanted was this sphere, behind glass. */
+      const R = glass ? (orb / 2) * 0.92 : orb / 2;
 
       const start = performance.now();
       let last = start;
@@ -486,12 +479,7 @@ export default function CoreOrb({
         const gather = thinkingRef.current
           ? 0
           : Math.max(0, Math.min(1, 1 - e / 0.3));
-        /* The gather draws the cloud in on itself before it lands — which
-           inside the glass would open a gap at the wall, so there it
-           presses OUT by the same amount instead. Same beat, opposite
-           sign. */
-        const gatherBump = GATHER_PULL * 4 * gather * (1 - gather);
-        const squeeze = glass ? 1 + gatherBump : 1 - gatherBump;
+        const squeeze = 1 - GATHER_PULL * 4 * gather * (1 - gather);
 
         const T = tuneRef.current;
         spin += T.spin * e * dt * (Math.PI / 180);
@@ -530,11 +518,7 @@ export default function CoreOrb({
         const tilt = 0.32;
         const cosT = Math.cos(tilt);
         const sinT = Math.sin(tilt);
-        /* One-sided in the glass, for the same reason: a pulse that dips
-           below 1 lifts the sphere off the wall once a cycle. */
-        const pulse = glass
-          ? 1 + e * 0.035 * (Math.sin(t * 1.15) + 1) * 0.5
-          : 1 + e * 0.035 * Math.sin(t * 1.15);
+        const pulse = 1 + e * 0.035 * Math.sin(t * 1.15);
 
         for (let i = 0; i < grains.length; i++) {
           const gr = grains[i];
@@ -556,23 +540,7 @@ export default function CoreOrb({
             Math.sin(y2 * 3.1 - t * 0.67) * 0.34 +
             Math.sin(z2 * 2.2 + t * 1.05) * 0.26;
           const micro = Math.sin(t * 3.4 + gr.seed) * 0.16;
-          const wave = w + micro;
-
-          /* THE HEIGHT FIELD IS ONE-SIDED INSIDE THE GLASS.
-             Two-sided, the troughs pull the limb in by up to a seventh of
-             the radius and the sphere visibly lifts off the wall and
-             settles back — which on an open page is the sphere breathing
-             and inside a glass is it rattling around in a jar.
-             Remapping the wave from [-AMP, +AMP] to [0, 1] makes every
-             displacement outward: the troughs sit exactly on the wall and
-             the crests press through it and are clipped by the circle,
-             which is what grains against the inside of glass look like.
-             The motion is identical — only its sign is. */
-          const h = glass
-            ? pulse *
-              squeeze *
-              (1 + e * T.diffusion * 2 * ((wave + AMP) / (2 * AMP)))
-            : pulse * squeeze * (1 + e * T.diffusion * wave);
+          const h = pulse * squeeze * (1 + e * T.diffusion * (w + micro));
 
           const X = x1 * h;
           const Y = y2 * h;
@@ -582,55 +550,19 @@ export default function CoreOrb({
              drawn larger, which is the whole reason this reads as a volume
              and not as a disc of dots. */
           const p = T.depth / (T.depth - Z);
-          let sx = C + X * R * p;
-          let sy = C + Y * R * p;
+          const sx = C + X * R * p;
+          const sy = C + Y * R * p;
 
           /* Depth: 0 at the far pole, 1 at the near one. */
           const depth = (Z + 1) / 2;
           /* Through the flash the grains swell and brighten, so the cloud
              blooms into the orb rather than being wiped off it. */
-          let rad =
+          const rad =
             baseGrainR * T.size * p * (0.72 + depth * 0.55) * (1 + fl * 0.9);
           /* Depth, carried entirely by alpha now. On a white page a faint
              grain fades toward the paper, which is what reads as distance —
              the same cue the dark field used to get from dimming. */
-          let a = Math.min(1, (0.22 + depth * 0.7) * (1 + fl * 1.1));
-
-          /* COLLISION WITH THE GLASS, as a SOFT COMPRESSION.
-             Clipping is wrong — a clipped grain went through the wall and
-             had its outer half deleted, so the sphere reads as cropped and
-             the grains pressing hardest are the ones that vanish.
-             Snapping them to the wall is also wrong, and less obviously so.
-             The projection crowds enormous numbers of grains toward the
-             limb, so putting every overshooting one at exactly `wall` lands
-             them all on a single radius: a solid one-grain-thick ring that
-             reads as a drawn border rather than as particles.
-             So they are squeezed into a BAND instead. Everything past the
-             soft limit is compressed asymptotically into the last few
-             percent of the radius — nothing reaches the wall, the density
-             rises smoothly toward it, and no two grains are forced onto the
-             same circle. */
-          if (glass) {
-            const dx = sx - C;
-            const dy = sy - C;
-            const d = Math.sqrt(dx * dx + dy * dy);
-            const wall = Math.max(0, orb / 2 - rad);
-            const band = orb * COLLIDE_BAND;
-            const soft = Math.max(0, wall - band);
-            if (d > soft && d > 0) {
-              const over = d - soft;
-              /* Approaches `soft + band` — the wall — without reaching it. */
-              const squashed = soft + band * (1 - Math.exp(-over / band));
-              const k = squashed / d;
-              sx = C + dx * k;
-              sy = C + dy * k;
-              /* Gentle. The response used to be strong enough to light the
-                 ring on its own, which was half of why it read as a line. */
-              const hit = Math.min(1, over / band);
-              rad *= 1 + hit * 0.1;
-              a = Math.min(1, a * (1 + hit * 0.2));
-            }
-          }
+          const a = Math.min(1, (0.22 + depth * 0.7) * (1 + fl * 1.1));
 
           ctx.globalAlpha = a;
           ctx.fillStyle = gr.fill;
@@ -756,15 +688,24 @@ export default function CoreOrb({
         style={{
           width: orb,
           height: orb,
-          /* WHITE. The interior used to carry OrbV2's own base gradient so
-             that additive grains had something to glow against, and it read
-             as a black disc with a dark ring around the sphere — the ring
-             being the slack left for the wobble.
-             White removes both problems at once: the slack is invisible
-             against the page, and the grains go back to the dark saturated
-             colour the other skin uses, which is the only colour model in
-             here now. */
-          background: "#ffffff",
+          /* A TINT, not white, and not the orb's base either.
+             Pure white gave the front layer nothing to sit against — every
+             stroke in that SVG is white or a gradient to white, so over a
+             white interior the glass is only visible where it happens to
+             cross a grain. The orb's own base is the other extreme: dark
+             enough to read as a black disc, which is what it looked like.
+             These are three of the orb's own hues at very low alpha, placed
+             where that colour sits on the orb — warm at the upper left,
+             green at the lower right, violet at the lower left — over a
+             near-white ground. Light enough that the sphere still reads as
+             floating on the page, coloured enough that the glass has
+             something to reflect. */
+          background: [
+            "radial-gradient(circle at 30% 24%, rgba(236,190,150,0.34) 0%, rgba(236,190,150,0) 58%)",
+            "radial-gradient(circle at 74% 70%, rgba(123,160,96,0.26) 0%, rgba(123,160,96,0) 58%)",
+            "radial-gradient(circle at 18% 76%, rgba(150,96,168,0.24) 0%, rgba(150,96,168,0) 55%)",
+            "linear-gradient(158deg, #fffdfa 0%, #fbf6f2 100%)",
+          ].join(", "),
         }}
         aria-hidden
       >
