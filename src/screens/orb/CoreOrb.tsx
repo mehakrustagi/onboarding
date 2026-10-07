@@ -53,26 +53,51 @@ const ORB_DEFAULT = 211;
 const SOURCE = "/assets/orb-v2/orb-composed.png";
 const SRC_PX = 400;
 
-/* Grains and their size BOTH SCALE WITH THE ORB, and that is not a detail.
+/* GRAIN DENSITY IS SET IN DEVICE PIXELS, and it tightens as the orb shrinks.
  *
- * They used to be fixed — 5,200 grains at 0.85px whatever the orb was — so
- * at the chat's 26px the same five thousand dots were packed into a sphere
- * an eighth of the width, every one of them proportionally eight times too
- * fat, and the result was a solid blob with none of the grain structure the
- * bench version is entirely made of. Anything expressed in absolute pixels
- * while the thing around it scales will do this.
+ * Two wrong answers came before this one.
  *
- * Count goes with AREA and radius with LENGTH, which is what keeps the
- * density and the look constant across sizes. */
-function grainsFor(orbD: number) {
-  const k = orbD / ORB_DEFAULT;
-  return Math.max(260, Math.round(5200 * k * k));
-}
+ * Fixed count and fixed radius: 5,200 grains at 0.85px whatever the orb
+ * was. At the chat's 26px that is five thousand dots in a sphere an eighth
+ * of the width, each proportionally eight times too fat — a solid blob.
+ *
+ * Count by area, radius by length: proportionally exact, and it looks
+ * worse. Holding the spacing constant means a 26px orb gets eighty grains,
+ * which is not enough to read as a surface at all — it is a scatter of
+ * chunky specks, and at that radius each one is under a device pixel, so
+ * the renderer draws it as a blocky square rather than a dot.
+ *
+ * The thing worth holding constant is not the spacing, it is whether the
+ * sphere READS as one. A small sphere needs relatively more grains to do
+ * that, so spacing is compressed by a fractional power of the scale rather
+ * than tracking it: at 211px the grains sit about 5.2 device pixels apart,
+ * at 26px about 2, which is 500 grains instead of 80. The radius is tied to
+ * that spacing, with a floor of half a CSS pixel — below that a dot stops
+ * being drawn as a dot and the squares come back. */
 
-function grainRadiusFor(orbD: number) {
-  /* Floored, because below about a third of a pixel a dot stops being
-     drawn as a dot and starts being a faint smear. */
-  return Math.max(0.33, 0.85 * (orbD / ORB_DEFAULT));
+/** Grain spacing in DEVICE pixels at the default size. */
+const SPACING_AT_DEFAULT = 5.2;
+
+/* 1 would hold the spacing proportional and give the scatter above; 0 would
+   hold it absolute and make a small orb a solid mass. 0.45 keeps a 26px orb
+   dense enough to read while leaving the bench version as sparse as it is
+   meant to look. */
+const SPACING_FALLOFF = 0.45;
+
+function grainPlan(orbD: number, dpr: number) {
+  const k = orbD / ORB_DEFAULT;
+  const spacing = Math.max(
+    1.9,
+    SPACING_AT_DEFAULT * Math.pow(k, SPACING_FALLOFF),
+  );
+  const areaDev = Math.PI * Math.pow((orbD * dpr) / 2, 2);
+  const count = Math.min(
+    9000,
+    Math.max(300, Math.round(areaDev / (spacing * spacing))),
+  );
+  /* Back to CSS pixels for the draw call, floored so it stays a dot. */
+  const radius = Math.max(0.5, spacing / 3 / dpr);
+  return { count, radius };
 }
 
 /* Perspective: the eye's distance from the sphere's centre in sphere radii.
@@ -292,11 +317,15 @@ export default function CoreOrb({
       /* FIBONACCI SPHERE. `i + 0.5` over the count gives evenly spaced
          heights, and the golden angle between successive points is what
          stops them lining up into rows at any scale. */
+      const dpr = Math.min(2, window.devicePixelRatio || 1);
+      canvas.width = SIZE * dpr;
+      canvas.height = SIZE * dpr;
+      ctx.scale(dpr, dpr);
+
       const golden = Math.PI * (3 - Math.sqrt(5));
       const built: Grain[] = [];
       const half = SRC_PX / 2;
-      const grainCount = grainsFor(orb);
-      const grainR = grainRadiusFor(orb);
+      const { count: grainCount, radius: grainR } = grainPlan(orb, dpr);
       for (let i = 0; i < grainCount; i++) {
         const y = 1 - ((i + 0.5) / grainCount) * 2;
         const rad = Math.sqrt(Math.max(0, 1 - y * y));
@@ -320,11 +349,6 @@ export default function CoreOrb({
         });
       }
       grains = built;
-
-      const dpr = Math.min(2, window.devicePixelRatio || 1);
-      canvas.width = SIZE * dpr;
-      canvas.height = SIZE * dpr;
-      ctx.scale(dpr, dpr);
 
       const C = SIZE / 2;
       const R = orb / 2;
