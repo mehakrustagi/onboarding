@@ -1,8 +1,14 @@
 "use client";
 
 import Image from "next/image";
+
+import RippleOrb from "@/screens/orb/RippleOrb";
+import TwirlOrb from "@/screens/orb/TwirlOrb";
+import CoreOrb from "@/screens/orb/CoreOrb";
+import GradientOrb from "@/screens/orb/GradientOrb";
+import RimOrb from "@/screens/orb/RimOrb";
 import { motion } from "framer-motion";
-import { useEffect, useState } from "react";
+import { createContext, useContext, useEffect, useState } from "react";
 
 /* Pre-thinking / "Scanning" — Figma section 852:8608 (Dump_work), built
  * from the six-frame sequence at the "SINGLE - TEXT" board. The frames are
@@ -140,6 +146,32 @@ const SUB_AGENTS = [
   },
 ] as const;
 
+/* ORB TREATMENT — which version of the orb the chat is wearing.
+ *
+ * The treatments were built and tuned on `/orb`, on a white field at 132px
+ * and 211px, where the orb IS the subject. That is not the question anyone
+ * actually has about them: the question is whether they survive at the size
+ * the chat gives them, which is 26px, with a message bubble and a tree of
+ * sub-agents competing for attention. This row answers it.
+ *
+ * Passed by context rather than threaded through props because four of the
+ * stages render an orb and none of them otherwise care. */
+const ORB_TREATMENTS = [
+  { id: "current", label: "Current" },
+  { id: "ripple", label: "Ripple" },
+  { id: "twirl", label: "Twirl" },
+  { id: "mush", label: "Swirl" },
+  { id: "rims", label: "Rims" },
+  { id: "core", label: "Core" },
+] as const;
+
+type OrbTreatment = (typeof ORB_TREATMENTS)[number]["id"];
+
+const OrbTreatmentContext = createContext<OrbTreatment>("current");
+
+/* The chat's orb box, from the Figma node. Everything scales off it. */
+const CHAT_ORB = 26;
+
 /* The stages of the flow, in the order the Figma board lays them out. Each
  * one is a section on the "thinking mode animation" page; the sub-CTAs
  * below the phone switch between them, and anything not built yet is
@@ -161,8 +193,10 @@ export default function ThinkingModeScreen() {
      page load, which makes it useless to review. Switching stage counts
      as a new run for the same reason. */
   const [run, setRun] = useState(0);
+  const [treatment, setTreatment] = useState<OrbTreatment>("current");
 
   return (
+    <OrbTreatmentContext.Provider value={treatment}>
     <div className="flex flex-col items-center gap-3">
       {/* Sub-CTAs — which state of the flow the phone is showing. */}
       <nav className="mb-1 flex flex-wrap items-center justify-center gap-1.5">
@@ -193,6 +227,34 @@ export default function ThinkingModeScreen() {
         })}
       </nav>
 
+      {/* Orb treatment — a second row, separated from the stage row so the
+          two are not read as one set of choices. */}
+      <nav className="mb-1 flex items-center justify-center gap-1.5">
+        <span className="mr-1 text-[12px] text-[#8b8b93]">Orb</span>
+        {ORB_TREATMENTS.map((o) => {
+          const isActive = o.id === treatment;
+          return (
+            <button
+              key={o.id}
+              type="button"
+              aria-current={isActive ? "true" : undefined}
+              onClick={() => {
+                setTreatment(o.id);
+                setRun((r) => r + 1);
+              }}
+              className={
+                "rounded-full px-3 py-1 text-[12px] transition-colors " +
+                (isActive
+                  ? "bg-[#0b0b0b] text-white"
+                  : "bg-black/5 text-[#4b4b53] hover:bg-black/10")
+              }
+            >
+              {o.label}
+            </button>
+          );
+        })}
+      </nav>
+
       <div
         className="relative h-[852px] w-[393px] select-none overflow-hidden rounded-[40px] bg-white shadow-[0_40px_80px_-20px_rgba(0,0,0,0.5)]"
         onClick={() => setRun((r) => r + 1)}
@@ -216,6 +278,7 @@ export default function ThinkingModeScreen() {
       </div>
       <p className="text-[12px] text-[#8b8b93]">tap the screen to replay</p>
     </div>
+    </OrbTreatmentContext.Provider>
   );
 }
 
@@ -534,6 +597,40 @@ function AgentOrb({
   visible: boolean;
   top?: number;
 }) {
+  const treatment = useContext(OrbTreatmentContext);
+
+  /* The two bench treatments are centred on a field WIDER than the orb —
+     the ripple needs somewhere for its rings to go, the atoms need somewhere
+     to swell into. The chat's slot is exactly 26px, so the field is hung off
+     the middle of that slot and allowed to overflow it rather than being
+     squeezed into it. `overflow-visible` on the phone shell is not needed:
+     the orb sits well inside the screen. */
+  if (treatment !== "current") {
+    return (
+      <motion.div
+        className="pointer-events-none absolute"
+        style={{ left: 24 + CHAT_ORB / 2, top: top + CHAT_ORB / 2 }}
+        initial={{ opacity: 0 }}
+        animate={{ opacity: visible ? 1 : 0 }}
+        transition={{ duration: 0.55, ease: IN_EASE }}
+      >
+        <div className="absolute left-0 top-0 -translate-x-1/2 -translate-y-1/2">
+          {treatment === "ripple" ? (
+            <RippleOrb orb={CHAT_ORB} />
+          ) : treatment === "mush" ? (
+            <GradientOrb orb={CHAT_ORB} controls={false} />
+          ) : treatment === "rims" ? (
+            <RimOrb orb={CHAT_ORB} controls={false} />
+          ) : treatment === "core" ? (
+            <CoreOrb orb={CHAT_ORB} controls={false} />
+          ) : (
+            <TwirlOrb orb={CHAT_ORB} controls={false} />
+          )}
+        </div>
+      </motion.div>
+    );
+  }
+
   return (
     <motion.div
       className="pointer-events-none absolute"
