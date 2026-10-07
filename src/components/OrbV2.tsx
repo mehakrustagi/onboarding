@@ -31,12 +31,18 @@ const BASE = 137.685;
 type OrbV2Props = {
   /** Diameter in pixels. Defaults to the node's own size. */
   size?: number;
+  /* The front layer — the SVG line work — can be left off so a caller can
+     draw its own thing between the orb's background and its glass and then
+     put the glass back on top itself. `CoreOrb`'s glass skin is the only
+     caller that needs this; everything else wants the whole orb. */
+  showOverlay?: boolean;
   className?: string;
   style?: CSSProperties;
 };
 
 export default function OrbV2({
   size = BASE,
+  showOverlay = true,
   className,
   style,
 }: OrbV2Props) {
@@ -102,6 +108,7 @@ export default function OrbV2({
 
       {/* Hangs off the top-left and overruns the orb on every side; the
           clip on the parent is what trims it back to the sphere. */}
+      {showOverlay && (
       <Image
         src="/assets/orb-v2/overlay.svg"
         alt=""
@@ -117,6 +124,7 @@ export default function OrbV2({
           pointerEvents: "none",
         }}
       />
+      )}
     </div>
   );
 }

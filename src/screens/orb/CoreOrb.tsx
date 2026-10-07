@@ -236,16 +236,6 @@ function rampHue(t: number) {
 }
 
 /** `px`/`py` are the grain's home position on the unit disc. */
-/* Inside the glass the ground is the orb's own dark base, so the grains go
- * the other way: lifted toward white rather than pushed into a dark band.
- * Clamped, so the pale parts of the orb saturate at the limb where the
- * grains stack up — which is where a real one would blow out anyway. */
-function shadeOnDark(r: number, g: number, b: number) {
-  const k = 1.4;
-  const c = (v: number) => Math.min(255, (v * k) | 0);
-  return `rgb(${c(r)},${c(g)},${c(b)})`;
-}
-
 function shade(r: number, g: number, b: number, px: number, py: number) {
   const src = rgbToHsl(r, g, b);
   const t = (Math.atan2(py, px) + Math.PI) / (Math.PI * 2);
@@ -275,12 +265,11 @@ export default function CoreOrb({
      behind it, its front glass — the SVG line work — over the top, and the
      photograph that normally sits between them replaced by the grains.
 
-     The two differ in more than their chrome, and they have to. On the page
-     the ground is white, so the grains are dark, saturated and composited
-     normally. Inside the orb the ground is the orb's own near-black base,
-     so they are bright and composited ADDITIVELY — which is the only way
-     grains glow, and it is also what makes the white line work on top read,
-     since white on white is nothing. */
+     Both grounds are white, so both draw the grains the same way — dark,
+     saturated, composited normally. The skins differ only in their chrome:
+     glass clips to the orb's circle, carries its rim and its front layer,
+     and never hands over to a photograph, because there is no photograph
+     in it to hand over to. */
   skin?: "plain" | "glass";
 }) {
   const glass = skin === "glass";
@@ -374,16 +363,18 @@ export default function CoreOrb({
           x,
           y,
           z,
-          fill: glass
-            ? shadeOnDark(data[o], data[o + 1], data[o + 2])
-            : shade(data[o], data[o + 1], data[o + 2], x, y),
+          fill: shade(data[o], data[o + 1], data[o + 2], x, y),
           seed: Math.random() * Math.PI * 2,
         });
       }
       grains = built;
 
       const C = SIZE / 2;
-      const R = glass ? (orb / 2) * 0.86 : orb / 2;
+      /* 0.92 inside the glass rather than 1.0, which is only enough slack
+         for the wobble not to be sliced flat against the inside of the
+         circle. It used to be 0.86 and the margin showed as a dark ring,
+         because the interior was dark; on white there is nothing to show. */
+      const R = glass ? (orb / 2) * 0.92 : orb / 2;
 
       const start = performance.now();
       let last = start;
@@ -428,21 +419,17 @@ export default function CoreOrb({
            `crisp` still sets the floor, but the flash lifts it the rest of
            the way at once, so the orb APPEARS in the bloom instead of
            ghosting up underneath a cloud that is still there. */
+        /* Both skins hand over the same way. In `plain` what arrives is
+           the whole orb; in `glass` it is the orb's BACKGROUND, because the
+           front layer is a separate element that never leaves. Either way
+           the settled state is the complete orb. */
         const crisp = Math.max(0, Math.min(1, 1 - e / 0.22));
-        if (glass) {
-          /* Nothing is handed over. The grains ARE the orb's interior in
-             this skin, so when it settles they settle — they do not get
-             faded out from under a photograph that is not there. */
-          canvas.style.opacity = "1";
-        } else {
-          const orbIn = Math.min(1, crisp + fl * 0.9);
-          if (orbRef.current) orbRef.current.style.opacity = String(orbIn);
-          if (fieldRef.current)
-            fieldRef.current.style.opacity = String(1 - crisp);
-          /* The cloud leaves faster than the orb arrives, so there is a
-             beat of pure bloom between the two rather than a dissolve. */
-          canvas.style.opacity = String(Math.max(0, 1 - crisp - fl * 0.75));
-        }
+        const orbIn = Math.min(1, crisp + fl * 0.9);
+        if (orbRef.current) orbRef.current.style.opacity = String(orbIn);
+        if (fieldRef.current) fieldRef.current.style.opacity = String(1 - crisp);
+        /* The cloud leaves faster than the orb arrives, so there is a beat
+           of pure bloom between the two rather than a dissolve. */
+        canvas.style.opacity = String(Math.max(0, 1 - crisp - fl * 0.75));
 
         if (flashRef.current) {
           flashRef.current.style.opacity = String(fl);
@@ -453,9 +440,6 @@ export default function CoreOrb({
         }
 
         ctx.clearRect(0, 0, SIZE, SIZE);
-        /* Additive inside the glass: overlapping grains sum, so density
-           becomes brightness and the limb lights itself. */
-        ctx.globalCompositeOperation = glass ? "lighter" : "source-over";
 
         const cosA = Math.cos(spin);
         const sinA = Math.sin(spin);
@@ -507,11 +491,7 @@ export default function CoreOrb({
           /* Depth, carried entirely by alpha now. On a white page a faint
              grain fades toward the paper, which is what reads as distance —
              the same cue the dark field used to get from dimming. */
-          const a = Math.min(
-            1,
-            (glass ? 0.14 + depth * 0.62 : 0.22 + depth * 0.7) *
-              (1 + fl * 1.1),
-          );
+          const a = Math.min(1, (0.22 + depth * 0.7) * (1 + fl * 1.1));
 
           ctx.globalAlpha = a;
           ctx.fillStyle = gr.fill;
@@ -590,30 +570,31 @@ export default function CoreOrb({
         style={{
           width: orb,
           height: orb,
-          /* NEUTRAL, not OrbV2's own base.
-             That base runs #181818 to #525edf and put a blue cast through
-             the bottom half of everything — the grains at the foot of the
-             sphere came out tinted rather than their own colour. This is
-             the same shape of gradient, dark at the top and lifting toward
-             the bottom so the sphere still reads as lit from below, with
-             the hue taken out. All of the colour in here is now the
-             grains', which are carrying the orb's palette anyway.
-
-             It cannot go to nothing, which is the one thing worth knowing:
-             every stroke in the overlay SVG is white or a gradient to
-             white, so a transparent interior is a white page with
-             invisible glass on it. Something dark has to be behind it. */
-          background: "linear-gradient(to bottom, #111112, #343438)",
+          /* WHITE. The interior used to carry OrbV2's own base gradient so
+             that additive grains had something to glow against, and it read
+             as a black disc with a dark ring around the sphere — the ring
+             being the slack left for the wobble.
+             White removes both problems at once: the slack is invisible
+             against the page, and the grains go back to the dark saturated
+             colour the other skin uses, which is the only colour model in
+             here now. */
+          background: "#ffffff",
         }}
         aria-hidden
       >
+        {/* The orb's BACKGROUND — everything but the front layer. This is
+            what fades out as the grains come apart and back in as they
+            land, so the settled state is the complete orb. */}
+        <div ref={orbRef} className="absolute inset-0" style={{ opacity: 1 }}>
+          <OrbV2 size={orb} showOverlay={false} />
+        </div>
+
         <canvas
           ref={canvasRef}
           className="absolute inset-0"
-          style={{ width: SIZE, height: SIZE, display: "block" }}
+          style={{ width: SIZE, height: SIZE, display: "block", opacity: 0 }}
         />
 
-        {/* The bloom, inside the glass with everything else. */}
         <div
           ref={flashRef}
           className="pointer-events-none absolute left-1/2 top-1/2 rounded-full"
@@ -627,10 +608,17 @@ export default function CoreOrb({
           }}
         />
 
-        {/* The front glass. Same asset, same geometry, same overhang as
-            OrbV2 — it hangs off the top-left and the parent's clip trims it
-            back to the sphere. `maxWidth: none`, because the CSS reset
-            would otherwise squash art that is oversized on purpose. */}
+        {/* THE FRONT LAYER, and it never fades. Same asset, same geometry
+            and same overhang as OrbV2 — it hangs off the top-left and the
+            parent's clip trims it back to the sphere. `maxWidth: none`,
+            because the CSS reset would otherwise squash art that is
+            oversized on purpose.
+
+            The drop-shadow is not decoration. Every stroke in that SVG is
+            white or a gradient to white, so over the grains on a white
+            interior there are long stretches where it is white on white and
+            simply is not there. A half-pixel of dark under it gives each
+            stroke an edge to be seen by, and leaves it white. */}
         <Image
           src="/assets/orb-v2/overlay.svg"
           alt=""
@@ -644,6 +632,19 @@ export default function CoreOrb({
             height: 156.941 * k,
             maxWidth: "none",
             pointerEvents: "none",
+            filter: `drop-shadow(0 0 ${Math.max(0.5, orb * 0.004)}px rgba(60,52,70,0.55))`,
+          }}
+        />
+
+        {/* The glass edge. Without the dark interior there is nothing else
+            giving the circle a boundary, and a ball of dots with no rim
+            does not read as being inside anything. */}
+        <div
+          ref={fieldRef}
+          className="pointer-events-none absolute inset-0 rounded-full"
+          style={{
+            boxShadow: `inset 0 0 0 ${Math.max(0.6, orb * 0.005)}px rgba(92,84,104,0.30)`,
+            opacity: 0,
           }}
         />
       </div>,
