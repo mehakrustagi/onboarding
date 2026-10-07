@@ -85,7 +85,7 @@ const SPACING_AT_DEFAULT = 5.2;
    meant to look. */
 const SPACING_FALLOFF = 0.45;
 
-function grainPlan(orbD: number, dpr: number) {
+function grainPlan(orbD: number, dpr: number, density: number) {
   const k = orbD / ORB_DEFAULT;
   const spacing = Math.max(
     1.9,
@@ -93,8 +93,8 @@ function grainPlan(orbD: number, dpr: number) {
   );
   const areaDev = Math.PI * Math.pow((orbD * dpr) / 2, 2);
   const count = Math.min(
-    9000,
-    Math.max(300, Math.round(areaDev / (spacing * spacing))),
+    14000,
+    Math.max(120, Math.round((areaDev / (spacing * spacing)) * density)),
   );
   /* Back to CSS pixels for the draw call, floored so it stays a dot. */
   const radius = Math.max(0.5, spacing / 3 / dpr);
@@ -108,6 +108,11 @@ const EYE = 3.2;
 
 /** Height-field amplitude, as a fraction of the radius. */
 const WOBBLE = 0.13;
+
+/* The largest the wave can get: the three harmonics sum to 1 and the micro
+   term adds 0.16. Used to remap it one-sided for the glass skin, so it has
+   to track those numbers — change a harmonic and change this. */
+const AMP = 1.16;
 
 /** Degrees per second about the vertical, at full energy. */
 const SPIN = 22;
@@ -246,6 +251,54 @@ function shade(r: number, g: number, b: number, px: number, py: number) {
 }
 
 /** Smooth 0→1. */
+/* LIVE TUNING.
+ *
+ * Five numbers that were constants until it became clear they all wanted
+ * trying against each other rather than one at a time. They are the ones
+ * that actually change what this looks like; everything else in the file is
+ * either structural or a consequence of these.
+ *
+ * `density` is the only one that cannot be applied per frame — the grain
+ * count decides how the sphere is BUILT, so moving it rebuilds the field
+ * and restarts the cycle. The rest are read from a ref inside the loop, so
+ * they take effect mid-flight without the animation jumping. */
+export type CoreTuning = {
+  /** Multiplier on the grain count. */
+  density: number;
+  /** Multiplier on the grain radius. */
+  size: number;
+  /** Height-field amplitude — how far the surface departs from a sphere. */
+  diffusion: number;
+  /** Degrees per second about the vertical. */
+  spin: number;
+  /** Eye distance in sphere radii. Lower is a wider lens. */
+  depth: number;
+};
+
+export const CORE_DEFAULTS: CoreTuning = {
+  density: 1,
+  size: 1,
+  diffusion: WOBBLE,
+  spin: SPIN,
+  depth: EYE,
+};
+
+const SLIDERS: {
+  key: keyof CoreTuning;
+  label: string;
+  min: number;
+  max: number;
+  step: number;
+  /** How many decimals to show; spin reads better as a whole number. */
+  dp: number;
+}[] = [
+  { key: "density", label: "Density", min: 0.25, max: 2.5, step: 0.05, dp: 2 },
+  { key: "size", label: "Particle size", min: 0.4, max: 2.5, step: 0.05, dp: 2 },
+  { key: "diffusion", label: "Diffusion", min: 0, max: 0.4, step: 0.005, dp: 3 },
+  { key: "spin", label: "Spin", min: 0, max: 70, step: 1, dp: 0 },
+  { key: "depth", label: "Depth", min: 2.2, max: 8, step: 0.1, dp: 1 },
+];
+
 function easeInOut(t: number) {
   return t < 0.5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2;
 }
@@ -254,6 +307,7 @@ export default function CoreOrb({
   orb = ORB_DEFAULT,
   controls = true,
   skin = "plain",
+  tunable = false,
 }: {
   orb?: number;
   /** The bench wants the cycle button and the caption; the chat does not. */
@@ -271,8 +325,15 @@ export default function CoreOrb({
      and never hands over to a photograph, because there is no photograph
      in it to hand over to. */
   skin?: "plain" | "glass";
+  /** Shows the sliders. The bench wants them; the chat frame does not. */
+  tunable?: boolean;
 }) {
   const glass = skin === "glass";
+  const [tune, setTune] = useState<CoreTuning>(CORE_DEFAULTS);
+  const tuneRef = useRef(tune);
+  useEffect(() => {
+    tuneRef.current = tune;
+  }, [tune]);
   const reduced = useReducedMotion();
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const orbRef = useRef<HTMLDivElement>(null);
@@ -344,7 +405,11 @@ export default function CoreOrb({
       const golden = Math.PI * (3 - Math.sqrt(5));
       const built: Grain[] = [];
       const half = SRC_PX / 2;
-      const { count: grainCount, radius: grainR } = grainPlan(orb, dpr);
+      const { count: grainCount, radius: baseGrainR } = grainPlan(
+        orb,
+        dpr,
+        tune.density,
+      );
       for (let i = 0; i < grainCount; i++) {
         const y = 1 - ((i + 0.5) / grainCount) * 2;
         const rad = Math.sqrt(Math.max(0, 1 - y * y));
@@ -370,11 +435,12 @@ export default function CoreOrb({
       grains = built;
 
       const C = SIZE / 2;
-      /* 0.92 inside the glass rather than 1.0, which is only enough slack
-         for the wobble not to be sliced flat against the inside of the
-         circle. It used to be 0.86 and the margin showed as a dark ring,
-         because the interior was dark; on white there is nothing to show. */
-      const R = glass ? (orb / 2) * 0.92 : orb / 2;
+      /* Inside the glass the sphere IS the glass: same radius, no slack.
+         The wobble is made one-sided to go with it — see the height field
+         below — so the limb is never pulled inside the wall and the grains
+         press against it at all times. On the open page there is no wall,
+         so the wobble stays two-sided and the sphere breathes both ways. */
+      const R = orb / 2;
 
       const start = performance.now();
       let last = start;
@@ -410,9 +476,15 @@ export default function CoreOrb({
         const gather = thinkingRef.current
           ? 0
           : Math.max(0, Math.min(1, 1 - e / 0.3));
-        const squeeze = 1 - GATHER_PULL * 4 * gather * (1 - gather);
+        /* The gather draws the cloud in on itself before it lands — which
+           inside the glass would open a gap at the wall, so there it
+           presses OUT by the same amount instead. Same beat, opposite
+           sign. */
+        const gatherBump = GATHER_PULL * 4 * gather * (1 - gather);
+        const squeeze = glass ? 1 + gatherBump : 1 - gatherBump;
 
-        spin += SPIN * e * dt * (Math.PI / 180);
+        const T = tuneRef.current;
+        spin += T.spin * e * dt * (Math.PI / 180);
 
         /* Hand over to the real orb as the sphere reforms.
            The orb is brought in on the flash rather than on a plain fade:
@@ -448,7 +520,11 @@ export default function CoreOrb({
         const tilt = 0.32;
         const cosT = Math.cos(tilt);
         const sinT = Math.sin(tilt);
-        const pulse = 1 + e * 0.035 * Math.sin(t * 1.15);
+        /* One-sided in the glass, for the same reason: a pulse that dips
+           below 1 lifts the sphere off the wall once a cycle. */
+        const pulse = glass
+          ? 1 + e * 0.035 * (Math.sin(t * 1.15) + 1) * 0.5
+          : 1 + e * 0.035 * Math.sin(t * 1.15);
 
         for (let i = 0; i < grains.length; i++) {
           const gr = grains[i];
@@ -470,7 +546,23 @@ export default function CoreOrb({
             Math.sin(y2 * 3.1 - t * 0.67) * 0.34 +
             Math.sin(z2 * 2.2 + t * 1.05) * 0.26;
           const micro = Math.sin(t * 3.4 + gr.seed) * 0.16;
-          const h = pulse * squeeze * (1 + e * WOBBLE * (w + micro));
+          const wave = w + micro;
+
+          /* THE HEIGHT FIELD IS ONE-SIDED INSIDE THE GLASS.
+             Two-sided, the troughs pull the limb in by up to a seventh of
+             the radius and the sphere visibly lifts off the wall and
+             settles back — which on an open page is the sphere breathing
+             and inside a glass is it rattling around in a jar.
+             Remapping the wave from [-AMP, +AMP] to [0, 1] makes every
+             displacement outward: the troughs sit exactly on the wall and
+             the crests press through it and are clipped by the circle,
+             which is what grains against the inside of glass look like.
+             The motion is identical — only its sign is. */
+          const h = glass
+            ? pulse *
+              squeeze *
+              (1 + e * T.diffusion * 2 * ((wave + AMP) / (2 * AMP)))
+            : pulse * squeeze * (1 + e * T.diffusion * wave);
 
           const X = x1 * h;
           const Y = y2 * h;
@@ -479,7 +571,7 @@ export default function CoreOrb({
           /* Perspective. Nearer grains land further from the centre and are
              drawn larger, which is the whole reason this reads as a volume
              and not as a disc of dots. */
-          const p = EYE / (EYE - Z);
+          const p = T.depth / (T.depth - Z);
           const sx = C + X * R * p;
           const sy = C + Y * R * p;
 
@@ -487,7 +579,7 @@ export default function CoreOrb({
           const depth = (Z + 1) / 2;
           /* Through the flash the grains swell and brighten, so the cloud
              blooms into the orb rather than being wiped off it. */
-          const rad = grainR * p * (0.72 + depth * 0.55) * (1 + fl * 0.9);
+          const rad = baseGrainR * T.size * p * (0.72 + depth * 0.55) * (1 + fl * 0.9);
           /* Depth, carried entirely by alpha now. On a white page a faint
              grain fades toward the paper, which is what reads as distance —
              the same cue the dark field used to get from dimming. */
@@ -518,10 +610,56 @@ export default function CoreOrb({
       cancelled = true;
       cancelAnimationFrame(raf);
     };
-  }, [reduced, SIZE, orb, glass]);
+  }, [reduced, SIZE, orb, glass, tune.density]);
 
   /* Both skins get the same controls, so the button and the caption are
      written once and wrapped around whichever stack is built. */
+  function meters() {
+    if (!tunable) return null;
+    return (
+      <div className="mt-1 grid w-[300px] grid-cols-1 gap-x-5 gap-y-2.5">
+        {SLIDERS.map((sl) => {
+          const value = tune[sl.key];
+          return (
+            <label key={sl.key} className="flex flex-col gap-1">
+              <span className="flex items-baseline justify-between text-[11px] text-[#6b6b73]">
+                {sl.label}
+                <span className="tabular-nums text-[#9a9aa2]">
+                  {value.toFixed(sl.dp)}
+                </span>
+              </span>
+              <input
+                type="range"
+                min={sl.min}
+                max={sl.max}
+                step={sl.step}
+                value={value}
+                onChange={(ev) =>
+                  setTune((t) => ({ ...t, [sl.key]: Number(ev.target.value) }))
+                }
+                /* The slider sits inside the button that drives the cycle,
+                   so dragging it would also toggle thinking/done on every
+                   release. */
+                onClick={(ev) => ev.stopPropagation()}
+                className="h-1 w-full cursor-pointer appearance-none rounded-full bg-black/10 accent-[#0b0b0b]"
+              />
+            </label>
+          );
+        })}
+        <button
+          type="button"
+          onClick={(ev) => {
+            ev.stopPropagation();
+            setTune(CORE_DEFAULTS);
+          }}
+          className="mt-0.5 self-start text-[11px] text-[#9a9aa2] underline underline-offset-2 hover:text-[#4b4b53]"
+        >
+          Reset
+        </button>
+      </div>
+    );
+  }
+
   function wrap(inner: React.ReactNode) {
     if (!controls) return inner;
     return (
@@ -540,6 +678,7 @@ export default function CoreOrb({
         <p className="text-[12px] text-[#9a9aa2]">
           {auto ? "Cycling — click to drive it" : thinking ? "Thinking" : "Done"}
         </p>
+        {meters()}
       </div>
     );
   }
