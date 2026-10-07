@@ -67,15 +67,11 @@ export default function OrbPage() {
       className="flex min-h-screen flex-col items-center px-6 py-10"
       style={{ background: GROUND }}
     >
-      <header className="mb-10 flex w-full max-w-[560px] flex-col gap-1.5 text-center">
-        <h1 className="text-[22px] font-medium tracking-[-0.4px] text-[#0b0b0b]">
-          Orb
-        </h1>
-        <p className="text-[14px] leading-[20px] text-[#6b6b73]">
-          One orb, treated several ways. The orb itself is Figma 405:8740 and
-          is identical in every cell — only what happens around it changes.
-        </p>
-      </header>
+      {/* The title and nothing else. What the orb is and where it comes
+          from lives in `OrbV2`, next to the numbers it was built from. */}
+      <h1 className="mb-10 text-[22px] font-medium tracking-[-0.4px] text-[#0b0b0b]">
+        Orb
+      </h1>
 
       {/* Two to a row, so a treatment can be watched against its neighbour
           rather than remembered from further up the page — which is the
